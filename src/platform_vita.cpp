@@ -24,6 +24,12 @@
 #include "game.h"
 #include "data.h"
 
+// All of the common dialog memory (vitaGL's own value, from its private mem_utils.h; vglInitExtended
+// passes it so that none is taken). The SDK headers don't define it.
+#ifndef SCE_KERNEL_MAX_MAIN_CDIALOG_MEM_SIZE
+#define SCE_KERNEL_MAX_MAIN_CDIALOG_MEM_SIZE 0x8C6000
+#endif
+
 extern "C" {
 // The game's own heap (models, circuits, sounds): a full 20-car race peaks at ~21 MB (FL_MEM=1 on the
 // PC test), so 64 MB leaves plenty; it used to reserve 200 MB.
