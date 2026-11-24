@@ -551,7 +551,7 @@ int Game::updateSetup(int dx, int dy, bool ok, bool back, bool trackGarage) {
     else if (ok && trackGarage && setupSel == 9) leave = 2;
     else if (ok && trackGarage && setupSel == 11) leave = 3;
     else if (back && !trackGarage) leave = 1;
-    if (leave && !ttMode) setups.put(set.track, CARS[set.car].cls, su);   // remembered for this circuit and class
+    if (leave && !ttMode) setups.put(set.track, CARS[set.car].era, su);   // remembered for this circuit and era
     return leave;
 }
 
@@ -610,7 +610,7 @@ void Game::drawPodium() {
     R.quad3D(rel * M4::basis(V3(1, 0, 0), Z, V3(0, -1, 0), V3(0, 1.6f, 0)), -6.5f, 0.4f, 6.5f, 6.0f, RGBA(18, 30, 70));
     R.quad3D(rel * M4::basis(V3(1, 0, 0), Z, V3(0, -1, 0), V3(0, 1.59f, 0)), -6.5f, 4.9f, 6.5f, 5.05f, RGBA(255, 150, 40));
     char b[96];
-    snprintf(b, sizeof b, "%s  -  %s", TRACKS[race.set.track].name, pc == CLASS_HYPER ? "HYPERCAR" : "LMGT3");
+    snprintf(b, sizeof b, "%s  -  %s", TRACKS[race.set.track].name, ERA_SHORT[CARS[race.set.car].era]); (void)pc;
     R.text3D(rel * M4::basis(V3(1, 0, 0), Z, V3(0, -1, 0), V3(0, 1.58f, 5.45f)), b, 0.42f, RGBA(255, 255, 255), true);
     R.text3D(rel * M4::basis(V3(1, 0, 0), Z, V3(0, -1, 0), V3(0, 1.58f, 4.45f)), "FORMULA LEGENDS", 0.24f, RGBA(150, 170, 210), true);
     static const float SX[3] = {0, -2.9f, 2.9f}, SH[3] = {1.45f, 1.0f, 0.75f};
@@ -838,13 +838,14 @@ void Game::screenHelp(Panel& P) {
         {"Producer / CEO / Engineer", "Erin"},
         {"Main coder", "Claude Code (Anthropic)"},
         {"Studio", "CODE 4 Studios"},
-        {"Music and intro theme", "Generated with Google Lyria 3"},
-        {"", "(via Unity AI)"},
-        {"Cars and cockpits", "Generated in code"},
-        {"Pit crew, props, textures", "Unity AI (Tripo, Gemini)"},
+        {"Engine", "Endurance Motor Racing 3D"},
+        {"Intro music", "Kickstart My Heart - Motley Crue"},
+        {"Menu music", "Generated with Google Lyria 3"},
+        {"Cars, wheels, cockpits", "Generated in code"},
+        {"Pit crew, props", "Unity AI (Tripo, Gemini)"},
         {"Engine sounds", "Endurance Motor Racing (Unity)"},
-        {"Circuit shapes", "based on OpenStreetMap, bacinger/f1-circuits"},
-        {"Circuit hills", "EU-DEM 25 m, SRTM 30 m (OpenTopoData)"},
+        {"Circuit outlines", "bacinger/f1-circuits (MIT)"},
+        {"Circuit heights", "EU-DEM 25 m, SRTM 30 m"},
     };
     P.fill(30, 42, 420, 200, RGBA(0, 0, 0, 120));
     int n = sizeof(L) / sizeof(L[0]);
@@ -1139,9 +1140,9 @@ void Game::screenCareerNew(Panel& P) {
     static const char* DIFFN[3] = {"Easy", "Normal", "Hard"};
     char v[6][64];
     snprintf(v[0], 64, "Team:  < %s >", TEAM_NAMES[newName]);
-    snprintf(v[1], 64, "Class:  < %s >", newCls == CLASS_HYPER ? "Hypercar" : "LMGT3");
+    snprintf(v[1], 64, "Era:  < %s >", ERA_NAME[newCls % ERA_COUNT]);
     snprintf(v[2], 64, "Opponents:  < %s >", DIFFN[newDiff]);
-    snprintf(v[3], 64, "Race length:  < %d min >", newMin);
+    snprintf(v[3], 64, "Race length:  < %d laps >", newMin);
     snprintf(v[4], 64, "START THE TEAM");
     snprintf(v[5], 64, "Back");
     P.fill(8, 42, 250, 206, RGBA(0, 0, 0, 120));
@@ -1153,12 +1154,12 @@ void Game::screenCareerNew(Panel& P) {
     P.fill(266, 42, 206, 206, RGBA(0, 0, 0, 120));
     float y = 50;
     P.text(274, y, "YOUR OWN TEAM", ACC, 0.8f); y += 20;
-    const char* lines[] = {"Your car takes the place", "of one entry on the grid.", "", "Between races: sign", "sponsors, hire your two", "team-mates, buy upgrades", "and paint the livery.", ""};
+    const char* lines[] = {"Your two cars take the", "place of a team on the grid.", "", "Between races: sign", "sponsors, hire your team-", "mate and a reserve, buy", "upgrades, paint the livery.", ""};
     for (const char* l : lines) { P.text(274, y, l, WHITE, 0.66f); y += 14; }
-    money(b, sizeof b, newCls == CLASS_HYPER ? 4000 : 1500);
+    money(b, sizeof b, newCls >= ERA_HYBRID ? 4000 : 1500);
     char b2[128]; snprintf(b2, sizeof b2, "Budget to start: %s", b); P.text(274, y, b2, GOLD, 0.7f); y += 15;
-    P.text(274, y, newCls == CLASS_HYPER ? "Hypercars cost far more" : "GT3: the cheaper way in", DIM, 0.64f); y += 13;
-    P.text(274, y, newCls == CLASS_HYPER ? "to run - and pay more." : "to start a team.", DIM, 0.64f); y += 15;
+    P.text(274, y, newCls >= ERA_HYBRID ? "Hybrid-era cars cost far" : "The older eras: the", DIM, 0.64f); y += 13;
+    P.text(274, y, newCls >= ERA_HYBRID ? "more to run - and pay more." : "cheaper way in.", DIM, 0.64f); y += 15;
     {
         char one[24]; fmtSpan(one, sizeof one, 6 * 60.0f / newMin);
         snprintf(b2, sizeof b2, "TIP: a 6 h round in %d min:", newMin); P.text(274, y, b2, RGBA(140, 200, 255), 0.6f); y += 11;
@@ -1225,15 +1226,15 @@ void Game::screenCareer(Panel& P) {
         snprintf(b, sizeof b, "Budget %s", m); P.text(222, y, b, c.money < 0 ? RGBA(255, 90, 60) : GOLD, 1.0f); y += 22;
         int cp = c.classPos();
         ChampEntry* me = nullptr; for (int i = 0; i < c.champ.count; i++) if (c.champ.e[i].number == c.number) me = (ChampEntry*)&c.champ.e[i];
-        snprintf(b, sizeof b, "%s  round %d/%d  %s P%d  %.0f pts", c.cls == CLASS_HYPER ? "HY" : "GT3", rd < CHAMP_ROUND_COUNT ? rd + 1 : CHAMP_ROUND_COUNT, CHAMP_ROUND_COUNT,
-                 "class", cp, me ? me->pts : 0.0f);
-        if (!cp) snprintf(b, sizeof b, "%s  round %d/%d  no points yet", c.cls == CLASS_HYPER ? "HY" : "GT3", rd + 1, CHAMP_ROUND_COUNT);
+        snprintf(b, sizeof b, "%s  round %d/%d  %s P%d  %.0f pts", ERA_SHORT[c.cls % ERA_COUNT], rd < CHAMP_ROUND_COUNT ? rd + 1 : CHAMP_ROUND_COUNT, CHAMP_ROUND_COUNT,
+                 "champ.", cp, me ? me->pts : 0.0f);
+        if (!cp) snprintf(b, sizeof b, "%s  round %d/%d  no points yet", ERA_SHORT[c.cls % ERA_COUNT], rd + 1, CHAMP_ROUND_COUNT);
         line(b, WHITE);
         snprintf(b, sizeof b, "#%d  Eng %d  Aero %d  Wt %d  Pit %d", c.number, c.up[0], c.up[1], c.up[2], c.up[3]); line(b, DIM);
         char n1[24], n2[24];
         Car tmp; tmp.drv[1] = c.crew[0].d; tmp.drv[2] = c.crew[1].d;
         Race::driverName(tmp, 1, n1, sizeof n1); Race::driverName(tmp, 2, n2, sizeof n2);
-        snprintf(b, sizeof b, "You, %s (%d), %s (%d)", n1, driverRating(c.crew[0].d), n2, driverRating(c.crew[1].d)); line(b, DIM);
+        snprintf(b, sizeof b, "You + %s (%d), reserve %s (%d)", n1, driverRating(c.crew[0].d), n2, driverRating(c.crew[1].d)); line(b, DIM);
         snprintf(b, sizeof b, "Sponsors: %s%s%s", c.sponsor[0].name >= 0 ? SPONSOR_NAMES[c.sponsor[0].name] : "none",
                  c.sponsor[1].name >= 0 ? ", " : "", c.sponsor[1].name >= 0 ? SPONSOR_NAMES[c.sponsor[1].name] : "");
         line(b, DIM);
@@ -1324,7 +1325,7 @@ void Game::screenCareer(Panel& P) {
     } else if (careerPage == 5) {
         row(0, "Back", WHITE);
         int idx[48]; int n = c.champ.standings((CarClass)c.cls, idx, 48);
-        snprintf(b, sizeof b, "%s STANDINGS  (after %d of %d)", c.cls == CLASS_HYPER ? "HYPERCAR" : "LMGT3", rd, CHAMP_ROUND_COUNT); line(b, ACC, 0.7f);
+        snprintf(b, sizeof b, "%s STANDINGS  (after %d of %d)", ERA_SHORT[c.cls % ERA_COUNT], rd, CHAMP_ROUND_COUNT); line(b, ACC, 0.7f);
         for (int k = 0; k < 11 && k < n; k++) {
             const ChampEntry& e = c.champ.e[idx[k]];
             snprintf(b, sizeof b, "%2d  #%-3d %-10s %5.1f", k + 1, e.number, CARS[e.car].make, e.pts);

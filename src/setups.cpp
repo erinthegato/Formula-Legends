@@ -5,13 +5,13 @@
 SetupStore setups;
 
 bool SetupStore::get(int track, int cls, CarSetup& out) const {
-    if (track < 0 || track >= TRACK_COUNT || track >= MAX_TRACKS || cls < 0 || cls > 1 || !has[track][cls]) return false;
+    if (track < 0 || track >= TRACK_COUNT || track >= MAX_TRACKS || cls < 0 || cls >= ERA_COUNT || !has[track][cls]) return false;
     out = su[track][cls];
     return true;
 }
 
 void SetupStore::put(int track, int cls, const CarSetup& s) {
-    if (track < 0 || track >= TRACK_COUNT || track >= MAX_TRACKS || cls < 0 || cls > 1) return;
+    if (track < 0 || track >= TRACK_COUNT || track >= MAX_TRACKS || cls < 0 || cls >= ERA_COUNT) return;
     has[track][cls] = true; su[track][cls] = s;
     save();
 }
@@ -24,7 +24,7 @@ void SetupStore::load() {
         while (fscanf(f, " %31s %d %d %d %d %d %d %d %d %d", id, &cls, &w, &sp, &g, &bf, &br, &mp, &ty, &fu) == 10) {
             int t = -1;
             for (int i = 0; i < TRACK_COUNT; i++) if (!strcmp(TRACKS[i].id, id)) t = i;
-            if (t < 0 || t >= MAX_TRACKS || cls < 0 || cls > 1) continue;
+            if (t < 0 || t >= MAX_TRACKS || cls < 0 || cls >= ERA_COUNT) continue;
             auto in = [](int x, int lo, int hi) { return x < lo ? lo : (x > hi ? hi : x); };
             CarSetup& s = su[t][cls];
             s.wing = in(w, 1, 5); s.susp = in(sp, 0, 2); s.gearing = in(g, 0, 2); s.brakeF = in(bf, 30, 100); s.brakeR = in(br, 20, 100);

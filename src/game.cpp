@@ -58,7 +58,7 @@ void Game::ghostPath(char* out, int n) const { snprintf(out, n, "tt_%s_%s.gst", 
 
 void Game::startSession(Session ses) {
     if (raceLoaded) race.end();
-    if (!ttMode && (ses == SES_PRACTICE || (ses == SES_RACE && !set.weekend))) setups.get(set.track, CARS[set.car].cls, set.setup);   // a new weekend: the remembered setup
+    if (!ttMode && (ses == SES_PRACTICE || (ses == SES_RACE && !set.weekend))) setups.get(set.track, CARS[set.car].era, set.setup);   // a new weekend: the remembered setup
     std::vector<int> grid;
     if (ses == SES_RACE && set.weekend && !ttMode) grid = qualiGrid;
     RaceSettings s = set;
@@ -249,7 +249,7 @@ void Game::benchUpdate(float dt) {
     if (!strcmp(w, "menus")) { screen = SCR_TITLE; sel = 0; return; }
     if (!strcmp(w, "livery")) {
         if (raceLoaded) leaveRace();
-        if (!career.active) { career.begin(0, CLASS_GT3, 1, 20); }
+        if (!career.active) { career.begin(0, ERA_GE, 1, 5); }
         career.apply(); careerLivery(); careerMode = true;
         screen = SCR_LIVERY; sel = 0; t = 0;
         return;
@@ -424,14 +424,14 @@ void Game::updateRace(float dt, const Pad& p) {
     // trophies during the race
     if (race.session == SES_RACE) {
         if (race.time < 2 || gridPos == 0) gridPos = me.position;
-        if (race.nightLevel() > 0.6f) sawNight = true;
-        if (me.driver == 0 && !me.plan.aiDrives && me.stint >= 2 * 3600) trophies.award(TR_DOUBLE_STINT);
+        if (race.nightLevel() > 0.25f || TRACKS[race.set.track].floodlit) sawNight = true;
+
         if (race.qte.on) qteWasOn = true;
         else if (qteWasOn) {
             // a manual stop just ended
             qteWasOn = false;
             if (race.qte.miss == 0 && race.qte.good == 0 && race.qte.perfect > 0) trophies.award(TR_PERFECT_STOP);
-            if (me.pitTotal > 0 && me.pitTotal < 9.0f && me.wear < 0.01f) trophies.award(TR_QUICK_STOP);
+            if (me.pitTotal > 0 && me.pitTotal < 4.0f && me.wear < 0.01f) trophies.award(TR_QUICK_STOP);
         }
     }
     raceEvents();
@@ -449,21 +449,20 @@ void Game::checkRaceTrophies() {
     const Car& me = race.player();
     if (me.finished) {
         trophies.award(TR_FIRST_RACE);
-        int classPos = 1;
-        for (const Car& o : race.cars) if (&o != &me && o.def->cls == me.def->cls && o.position < me.position) classPos++;
+        int classPos = me.position;
         if (classPos <= 3) trophies.award(TR_PODIUM);
-        if (classPos == 1) trophies.award(TR_CLASS_WIN);
+        if (classPos <= (me.def->era == ERA_90S ? 6 : 10)) trophies.award(TR_CLASS_WIN);      // (the points places)
         if (me.position == 1) trophies.award(TR_OVERALL_WIN);
         if (gridPos > 0 && gridPos - me.position >= 5) trophies.award(TR_COMEBACK);
-        bool long20 = race.set.raceMin >= 20 || race.time >= 20 * 60;
+        bool long20 = race.set.laps >= 10 || race.set.raceMin >= 20;
         if (long20 && me.penalty <= 0 && !me.driveThrough && me.damage() < 0.1f) trophies.award(TR_CLEAN);
         if (classPos == 1 && race.rain > 0.3f) trophies.award(TR_RAIN_WIN);
         if (sawNight) trophies.award(TR_NIGHT);
         const TrackDef& td = TRACKS[race.set.track];
-        float hours = race.set.eventHours > 0 ? race.set.eventHours : td.hours;
-        bool sablons24 = !strcmp(td.id, "sablons") && race.set.raceMin > 0 && hours >= 24;
-        if (sablons24) trophies.award(TR_LE_MANS);
-        if (sablons24 && classPos == 1) trophies.award(TR_LE_MANS_WIN);
+        if (race.set.raceMin <= 0 && race.set.laps >= td.gpLaps) trophies.award(TR_DOUBLE_STINT);      // the full distance
+        bool monaco = !strcmp(td.id, "monaco") && race.set.raceMin <= 0 && race.set.laps >= 10;
+        if (monaco) trophies.award(TR_LE_MANS);
+        if (monaco && classPos == 1) trophies.award(TR_LE_MANS_WIN);
     }
     gridPos = 0; sawNight = false; qteWasOn = false;
 }
@@ -602,7 +601,7 @@ void Game::update(float dt, const Pad& p) {
         if (ok && ttMode) { set.car = sel; t = 0; startSession(SES_PRACTICE); break; }   // time trial: straight to the garage
         if (ok) {
             set.car = sel; screen = SCR_SETTINGS; sel = 13; t = 0; setupPage = false;
-            if (setups.get(set.track, CARS[set.car].cls, set.setup)) { snprintf(note, sizeof note, "Your %s setup is loaded", TRACKS[set.track].name); noteT = 2.5f; }
+            if (setups.get(set.track, CARS[set.car].era, set.setup)) { snprintf(note, sizeof note, "Your %s setup is loaded", TRACKS[set.track].name); noteT = 2.5f; }
         }
         if (back) {
             if (champMode) { screen = SCR_TITLE; sel = 1; }
@@ -683,13 +682,9 @@ void Game::update(float dt, const Pad& p) {
         sel = (sel + dy + 7) % 7;
         if (dx) {
             if (sel == 0) { int v = pl.tyres ? pl.tyre + 1 : 0; v = (v + dx + TY_COUNT + 1) % (TY_COUNT + 1); pl.tyres = v > 0; if (v) pl.tyre = v - 1; }
-            if (sel == 1) pl.fuel = clampf(pl.fuel + dx * 0.1f, fmaxf(me.fuel, 0.1f), 1.0f);
+            if (sel == 1 && race.ep().refuel) pl.fuel = clampf(pl.fuel + dx * 0.1f, fmaxf(me.fuel, 0.1f), 1.0f);
             if (sel == 2) pl.repair = !pl.repair;
-            if (sel == 3) {                         // next driver: you, or one of your two team-mates (then the AI drives, you manage)
-                pl.nextDriver = (pl.nextDriver + dx + DRIVERS_PER_CAR) % DRIVERS_PER_CAR;
-                pl.swapDriver = pl.nextDriver != me.driver;
-                pl.aiDrives = pl.nextDriver != 0;
-            }
+            if (sel == 3) pl.repair = !pl.repair;   // (Formula 1: one driver per car; a new nose is part of the repairs)
             if (sel == 4) saveSlot = (saveSlot + dx + 3) % 3;
         }
         if (ok && sel == 4) {
@@ -912,9 +907,10 @@ void Game::drawTeam() {
     char v[7][48];
     char nm[24]; Race::driverName(me, pl.nextDriver, nm, sizeof nm);
     snprintf(v[0], 48, "Tyres:  < %s >", pl.tyres ? TYRE_NAME[pl.tyre] : "No change");
-    snprintf(v[1], 48, "Fuel to:  < %d%% >", (int)(pl.fuel * 100 + 0.5f));
+    if (race.ep().refuel) snprintf(v[1], 48, "Fuel to:  < %d%% >", (int)(pl.fuel * 100 + 0.5f));
+    else snprintf(v[1], 48, "Fuel:  no refuelling (%d%%)", (int)(me.fuel * 100 + 0.5f));
     snprintf(v[2], 48, "Repairs:  < %s >", pl.repair ? "Yes" : "No");
-    snprintf(v[3], 48, "Driver:  < %s >%s", nm, pl.nextDriver == me.driver ? " stays" : "");
+    snprintf(v[3], 48, "Front wing:  < %s >", pl.repair ? "new nose" : "no change"); (void)nm;
     snprintf(v[4], 48, "Save race:  < Slot %d >", saveSlot + 1);
     snprintf(v[5], 48, "RELEASE THE CAR");
     snprintf(v[6], 48, "Retire to menu");
@@ -923,19 +919,7 @@ void Game::drawTeam() {
         if (i == sel) gfx::drawFill2D(12, y - 2, 242, 19, RGBA(255, 150, 40, 200));
         R.font.draw(20, y, v[i], i == sel ? RGBA(20, 20, 20) : (i == 5 ? GOLD : WHITE), 0.82f);
     }
-    // the three drivers: who's in, who's next, how tired, how long they have driven
-    for (int k = 0; k < DRIVERS_PER_CAR; k++) {
-        const Driver& d = me.drv[k];
-        float y = 206 + k * 13;
-        char dn[24]; Race::driverName(me, k, dn, sizeof dn);
-        u32 col = k == pl.nextDriver ? GOLD : (k == me.driver ? WHITE : DIM);
-        char line[40]; snprintf(line, sizeof line, "%s%s", k == me.driver ? "> " : "  ", dn);
-        R.font.draw(16, y, line, col, 0.66f);
-        gfx::drawFill2D(122, y + 4, 60, 5, RGBA(50, 50, 55));
-        u32 fc = d.fatigue < 0.45f ? RGBA(80, 220, 90) : (d.fatigue < 0.7f ? RGBA(250, 200, 40) : RGBA(250, 60, 40));
-        gfx::drawFill2D(122, y + 4, 60 * d.fatigue, 5, fc);
-        snprintf(line, sizeof line, "%.1f h", d.hours); R.font.draw(190, y, line, DIM, 0.62f);
-    }
+    // (Formula 1: one driver per car, no stints to manage)
     // what the car needs
     gfx::drawFill2D(266, 42, 206, 206, RGBA(5, 10, 18, 220));
     char b[64];
@@ -944,14 +928,11 @@ void Game::drawTeam() {
     snprintf(b, sizeof b, "Tyres: %s, %d%% left", TYRE_NAME[me.tyre], (int)((1 - me.wear) * 100)); R.font.draw(274, y, b, DIM, 0.72f); y += 15;
     snprintf(b, sizeof b, "Fuel: %d%%", (int)(me.fuel * 100)); R.font.draw(274, y, b, DIM, 0.72f); y += 15;
     snprintf(b, sizeof b, "Damage: %d%%%s%s", (int)(me.damage() * 100), me.noseOff ? " no nose" : "", me.wingOff ? " no wing" : ""); R.font.draw(274, y, b, me.damage() > 0.3f ? RGBA(255, 120, 60) : DIM, 0.72f); y += 15;
-    { char dn[24]; Race::driverName(me, me.driver, dn, sizeof dn);
-      snprintf(b, sizeof b, "%s: stint %d:%02d (max %d h)", dn, (int)me.stint / 3600, ((int)me.stint / 60) % 60, (int)MAX_STINT_H);
-      R.font.draw(274, y, b, me.stint > (MAX_STINT_H - 0.5f) * 3600 ? RGBA(255, 120, 60) : DIM, 0.72f); y += 15; }
-    if (pl.nextDriver != 0) { R.font.draw(274, y, "Team-mate drives: you manage", RGBA(140, 190, 255), 0.68f); y += 5; }
+    snprintf(b, sizeof b, "Lap %d of %d", me.lap + 1, race.set.laps); R.font.draw(274, y, b, DIM, 0.72f); y += 15;
     y += 15;
     const char* wx = race.rain < 0.05f ? (race.wet > 0.2f ? "Dry now, track still wet" : "Dry") : (race.rain < 0.5f ? "Light rain" : (race.storm ? "Thunderstorm" : "Heavy rain"));
     snprintf(b, sizeof b, "Weather: %s", wx); R.font.draw(274, y, b, RGBA(140, 190, 255), 0.72f); y += 15;
-    snprintf(b, sizeof b, "Engineer: %s tyres", TYRE_NAME[race.bestTyreFor(race.wet) == TY_MEDIUM ? (me.def->cls == CLASS_HYPER ? TY_MEDIUM : TY_HARD) : race.bestTyreFor(race.wet)]); R.font.draw(274, y, b, RGBA(140, 190, 255), 0.72f); y += 15;
+    snprintf(b, sizeof b, "Engineer: %s tyres", TYRE_NAME[race.bestTyreFor(race.wet) == TY_MEDIUM ? TY_MEDIUM : race.bestTyreFor(race.wet)]); R.font.draw(274, y, b, RGBA(140, 190, 255), 0.72f); y += 15;
     float left = race.raceLeft();
     if (left >= 0) {
         int s = (int)(left * race.timeScale);
@@ -1130,9 +1111,9 @@ void Game::updateCareer(int dx, int dy, bool ok, bool back, bool square) {
         sel = (sel + dy + 6) % 6;
         if (dx) {
             if (sel == 0) newName = cyc(newName, TEAM_NAME_COUNT);
-            if (sel == 1) newCls = newCls == CLASS_GT3 ? CLASS_HYPER : CLASS_GT3;
+            if (sel == 1) newCls = (newCls + (dx ? dx : 1) + ERA_COUNT) % ERA_COUNT;
             if (sel == 2) newDiff = cyc(newDiff, 3);
-            if (sel == 3) { static const int M[4] = {10, 20, 30, 60}; int mi = 0; for (int i = 0; i < 4; i++) if (M[i] == newMin) mi = i; newMin = M[cyc(mi, 4)]; }
+            if (sel == 3) { static const int M[4] = {3, 5, 10, 20}; int mi = 0; for (int i = 0; i < 4; i++) if (M[i] == newMin) mi = i; newMin = M[cyc(mi, 4)]; }
         }
         if (back || (ok && sel == 5)) { screen = SCR_TITLE; sel = 2; t = 0; return; }
         if (ok && sel == 4) {

@@ -199,7 +199,7 @@ void Renderer::drawScene(const Race& r, const Camera& cam, bool hidePlayer) {
     u32 haze = t.desert ? RGBA(215, 205, 185) : RGBA(190, 205, 222);
     {
         // rain brings the fog in; at night the haze goes dark
-        float k = 1 - r.nightLevel() * 0.9f, w = r.rain;
+        float k = 1 - (r.nightLevel() * 0.5f + r.sunLevel() * 0.5f) * 0.9f, w = r.rain;
         int hr = (int)((haze & 255) * k * (1 - w * 0.3f) + 120 * w * 0.3f * k), hg = (int)(((haze >> 8) & 255) * k * (1 - w * 0.3f) + 125 * w * 0.3f * k), hb = (int)(((haze >> 16) & 255) * k * (1 - w * 0.3f) + 135 * w * 0.3f * k);
         haze = RGBA(hr, hg, hb);
     }

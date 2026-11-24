@@ -4,8 +4,8 @@
 #include <cstdlib>
 #include <algorithm>
 
-const char* TEAM_NAMES[] = {"Code 4 Racing", "Gato Motorsport", "Midnight Stint Racing", "Apex Endurance", "Northlight Racing",
-    "Blue Hour Motorsport", "Redline Collective", "Sunrise Racing Team", "Ironclad Endurance", "Velvet Comet Racing",
+const char* TEAM_NAMES[] = {"Code 4 Grand Prix", "Gato Motorsport", "Midnight Racing", "Apex Formula", "Northlight Racing",
+    "Blue Hour Motorsport", "Redline Collective", "Sunrise Racing Team", "Ironclad Grand Prix", "Velvet Comet Racing",
     "Harbour Lights Racing", "Erin Racing"};
 const char* TEAM_SHORT[] = {"Code 4", "Gato", "Midnight", "Apex", "Northlight", "Blue Hour", "Redline", "Sunrise", "Ironclad",
     "Velvet Comet", "Harbour", "Erin"};
@@ -29,7 +29,8 @@ static int irnd(int n) { return (int)(rnd() * n) % n; }
 
 int driverRating(const Driver& d) { return (int)(60 + (d.pace - 0.986f) / 0.014f * 39 + 0.5f); }
 
-static bool hyper(const Career& c) { return c.cls == CLASS_HYPER; }
+// (Formula Legends: Career::cls holds the era; the modern eras cost more to run and pay more)
+static bool hyper(const Career& c) { return c.cls >= ERA_HYBRID; }
 
 static Hire makeDriver(const Career& c, float quality) {
     Hire h;
@@ -78,30 +79,39 @@ void Career::begin(int nm, int cl, int diff, int mins) {
     // the entry we take over: one of the first cars of our class on a normal grid
     int seen = 0, pick = irnd(4);
     for (int i = 0; i < CAR_PICK; i++)
-        if ((int)CARS[i].cls == cls) { if (seen == pick) { skipCar = i; skipNum = CARS[i].numbers[0]; } seen++; }
-    // two rookie team-mates on cheap deals, a first look at the market and the sponsors
+        if (CARS[i].era == cls && i % TEAMS_PER_ERA >= 5) { if (seen == pick) { skipCar = i; skipNum = CARS[i].numbers[0]; } seen++; }
+    // two rookie drivers on cheap deals (seat 1 races the team's second car, seat 2 is the reserve),
+    // a first look at the market and the sponsors
     crew[0] = makeDriver(*this, 0.25f); crew[1] = makeDriver(*this, 0.2f);
     newMarket(); newOffers();
     sponsor[0] = offers[0]; sponsor[0].perRace = sponsor[0].perRace * 3 / 4; sponsor[0].title = true;   // a starter deal
     newOffers();
     RaceSettings base;
-    base.car = carIndex(); base.difficulty = difficulty; base.raceMin = raceMin; base.opponents = 11;
+    base.car = carIndex(); base.difficulty = difficulty; base.raceMin = 0; base.laps = raceMin; base.opponents = 19;
     base.manualPits = true; base.weekend = true;
     champ.begin(base);
     lastValid = false;
 }
 
 void Career::apply() const {
-    static CarDef stock[2]; static bool have = false;
-    if (!have) { stock[0] = CARS[careerCarIndex(CLASS_HYPER)]; stock[1] = CARS[careerCarIndex(CLASS_GT3)]; have = true; }
+    static CarDef stock[ERA_COUNT]; static bool have = false;
+    if (!have) { for (int e = 0; e < ERA_COUNT; e++) stock[e] = CARS[careerCarIndex(e)]; have = true; }
     if (!active) return;
     int idx = carIndex();
     CarDef& d = CARS[idx];
-    d = stock[cls == CLASS_HYPER ? 0 : 1];
+    d = stock[cls % ERA_COUNT];
     int n = name % TEAM_NAME_COUNT;
     d.make = TEAM_SHORT[n]; d.team = TEAM_NAMES[n];
-    d.model = cls == CLASS_HYPER ? "Hypercar" : "GT3";
-    d.numbers[0] = number; d.numbers[1] = 0;
+    static const char* MODEL[ERA_COUNT] = {"C4-98", "C4-10", "C4-16", "C4-25"};
+    d.model = MODEL[cls % ERA_COUNT];
+    // two cars, like every Formula 1 team: yours and your team-mate's (the next free number)
+    int n2 = number + 1;
+    for (int tries = 0; tries < 99; tries++, n2++) {
+        bool used = n2 == number;
+        for (int i = 0; i < CAR_PICK; i++) if (CARS[i].numbers[0] == n2 || CARS[i].numbers[1] == n2) used = true;
+        if (!used) break;
+    }
+    d.numbers[0] = number; d.numbers[1] = n2;
     d.colour = LIVERY_COLOURS[colA % LIVERY_COLOURS_N];
     d.powerKW *= 1 + 0.015f * up[UP_ENGINE];
     d.grip *= 1 + 0.008f * up[UP_AERO];
@@ -118,7 +128,7 @@ RaceSettings Career::roundSettings() const {
     // every round is a full race weekend, like a quick race: practice, qualifying (sets the grid), race
     // (older careers were saved with race-only rounds)
     s.weekend = true;
-    s.sessionMin = raceMin >= 30 ? 10 : 5;
+    s.sessionMin = 5;
     return s;
 }
 

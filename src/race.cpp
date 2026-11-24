@@ -72,7 +72,7 @@ bool Race::start(const RaceSettings& s0, Session ses, const std::vector<int>* gr
     era = me->era;
     for (int k = 0; k < 2; k++)
         for (int i = 0; i < CAR_PICK; i++)
-            if (&CARS[i] != me && CARS[i].era == me->era && !(i == s.skipCar && CARS[i].numbers[k] == s.skipNum)) pool.push_back({&CARS[i], CARS[i].numbers[k]});
+            if (&CARS[i] != me && CARS[i].era == me->era && !(i == s.skipCar && (s.career || CARS[i].numbers[k] == s.skipNum))) pool.push_back({&CARS[i], CARS[i].numbers[k]});
     std::vector<std::pair<const CarDef*, int>> hy, gt;
     for (auto& e : pool) (e.first->cls == CLASS_HYPER ? hy : gt).push_back(e);
     size_t a = 0, b = 0;
@@ -114,6 +114,8 @@ bool Race::start(const RaceSettings& s0, Session ses, const std::vector<int>* gr
         c.gear = 1; c.rpm = c.def->idleRpm;
         crewDrivers(c);
         if (c.player && s.career) { c.drv[1] = s.crew[1]; c.drv[2] = s.crew[2]; c.drv[1].fatigue = c.drv[2].fatigue = 0; c.drv[1].hours = c.drv[2].hours = 0; }
+        // career: the team's second car is driven by your first hired driver
+        if (!c.player && s.career && c.def == me) { c.drv[0] = s.crew[1]; c.drv[0].fatigue = 0; c.driver = 0; }
         if (c.player) playerIdx = k;
         cars.push_back(c);
     }

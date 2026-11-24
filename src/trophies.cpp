@@ -5,22 +5,22 @@
 Trophies trophies;
 
 const TrophyDef TROPHIES[TR_COUNT] = {
-    {"Green Flag",        "Finish a race",                                   TIER_BRONZE},
-    {"On the Podium",     "Finish in the top 3 of your class",               TIER_BRONZE},
-    {"Class Winner",      "Win your class in a race",                        TIER_SILVER},
-    {"Overall Victory",   "Take the chequered flag first overall",           TIER_GOLD},
+    {"Lights Out",        "Finish a race",                                   TIER_BRONZE},
+    {"On the Podium",     "Finish in the top 3",                             TIER_BRONZE},
+    {"Points Finish",     "Finish in the points (the era's points places)",  TIER_SILVER},
+    {"Grand Prix Winner", "Take the chequered flag first",                   TIER_GOLD},
     {"Comeback Drive",    "Gain 5 places from where you started",            TIER_BRONZE},
-    {"Clean Sheet",       "Finish a race of 20+ min with no penalty or damage", TIER_SILVER},
-    {"Rain Master",       "Win your class with rain falling at the flag",    TIER_SILVER},
-    {"Through the Night", "Finish a race that ran through the night",        TIER_BRONZE},
-    {"Quick Hands",       "Manual pit stop with tyres in under 9 seconds",   TIER_BRONZE},
+    {"Clean Sheet",       "Finish a 10+ lap race with no penalty or damage", TIER_SILVER},
+    {"Rain Master",       "Win with rain falling at the flag",               TIER_SILVER},
+    {"Under the Lights",  "Finish a night race",                             TIER_BRONZE},
+    {"Quick Hands",       "A manual pit stop for tyres in under 4 seconds",  TIER_BRONZE},
     {"Perfect Stop",      "Hit every prompt PERFECT in a manual pit stop",   TIER_SILVER},
     {"Ghost Buster",      "Set a new time trial record",                     TIER_BRONZE},
-    {"Double Stint",      "Drive 2 hours of race time without a break",      TIER_SILVER},
-    {"Twice Around",      "Finish the 24 Hours of the Sablons",              TIER_GOLD},
-    {"Sablons Legend",    "Win your class at the 24 Hours of the Sablons",   TIER_GOLD},
-    {"World Champion",    "Win the championship in your class",              TIER_GOLD},
-    {"Formula Legend",  "Win every other trophy",                          TIER_PLATINUM},
+    {"Full Distance",     "Finish a race over the full Grand Prix distance", TIER_SILVER},
+    {"Monaco",            "Finish the Monaco Grand Prix (10+ laps)",         TIER_GOLD},
+    {"King of Monaco",    "Win at Monaco (10+ laps)",                        TIER_GOLD},
+    {"World Champion",    "Win a championship season",                       TIER_GOLD},
+    {"Formula Legend",    "Win every other trophy",                          TIER_PLATINUM},
 };
 
 void Trophies::award(int id) {

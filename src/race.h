@@ -278,7 +278,8 @@ struct Race {
 
     // race control / strategy (racecontrol.cpp)
     float clockHour() const;                    // time of day at the track
-    float nightLevel() const;                   // 0 day .. 1 night
+    float nightLevel() const;                   // 0 day .. 1 night (F1: floodlit, at most 0.32)
+    float sunLevel() const;                     // the sun alone: 0 day .. 1 night
     float raceLeft() const;                     // seconds of a timed race left (or -1)
     float pitRel(float s) const;                // metres from pit entry along the lap (wrapping)
     bool inPitLane(const Car& c) const;

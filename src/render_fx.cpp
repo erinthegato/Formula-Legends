@@ -312,7 +312,7 @@ void Renderer::drawEffects(const Race& r, const Camera& cam, bool ownLights) {
 
 // ------------------------------------------------------------------ sky, night, rain, lightning
 u32 Renderer::skyColour(const Race& r) const {
-    float n = r.nightLevel(), w = r.rain;
+    float n = r.sunLevel(), w = r.rain;          // the sky follows the sun; the floodlit circuit does not
     float cr = r.track.desert ? 150 : 120, cg = r.track.desert ? 185 : 170, cb = r.track.desert ? 225 : 230;
     // dusk tint
     float h = r.clockHour();
@@ -374,10 +374,10 @@ void Renderer::drawBeamFor(const Car& c, const Camera& cam, float k, bool pool) 
 }
 
 void Renderer::drawBeam(const Race& r, const Camera& cam) {
-    // headlights on the road (drawn after the darkness, so they light it up). The PSP lights only the
-    // player's; the Vita also the cars within 70 m, and adds the bright pool
+    // headlights on the road (drawn after the darkness, so they light it up). Formula 1 cars have none:
+    // night races are floodlit
     float n = r.nightLevel();
-    if (n < 0.1f) return;
+    if (n < 2.0f) return;
     bool vita = input::hasTouch();
     drawBeamFor(r.player(), cam, vita ? n * 1.15f : n, vita);
     if (!vita) return;

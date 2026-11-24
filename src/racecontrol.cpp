@@ -28,6 +28,12 @@ float Race::clockHour() const {
 }
 
 float Race::nightLevel() const {
+    float n = sunLevel();
+    // Formula 1 races after dark run under floodlights: a dark sky over a lit circuit
+    return fminf(n, 0.32f);
+}
+
+float Race::sunLevel() const {
     float h = clockHour();
     // sunrise 6:00-7:30, sunset 19:30-21:00
     if (h >= 7.5f && h <= 19.5f) return 0;
