@@ -163,7 +163,14 @@ void beginFrame(u32 clear) {
     for (int i = 0; i < SCREEN_W * SCREEN_H; i++) { fb[i] = clear | 0xFF000000; zb[i] = 1e9f; }
     scratchUsed = 0; trisDrawn = 0; drawCalls = 0; vertsSent = 0;
 }
-void endFrame() {}
+// FL_MEM=1: the most heap in use at any frame end, printed at exit (to size the Vita's heap)
+static size_t g_memPeak = 0;
+static void memReport() { fprintf(stderr, "heap peak %.1f MB\n", g_memPeak / 1048576.0); }
+void endFrame() {
+    static int on = -1;
+    if (on < 0) { on = getenv("FL_MEM") != nullptr; if (on) atexit(memReport); }
+    if (on) { struct mallinfo2 mi = mallinfo2(); size_t u = mi.uordblks + mi.hblkhd; if (u > g_memPeak) g_memPeak = u; }
+}
 void setSync(bool, int) {}
 void clearDepth() { for (int i = 0; i < SCREEN_W * SCREEN_H; i++) zb[i] = 1e9f; }
 bool beginInset(float x, float y, float w, float h, u32 c) {

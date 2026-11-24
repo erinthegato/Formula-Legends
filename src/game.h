@@ -71,6 +71,7 @@ struct Game {
     int era = ERA_GE;             // the era being picked on the circuit / team screens
     float t = 0;                  // time on this screen
     float idle = 0;               // time without a button press (title -> highlights reel)
+    int padDir = 0; float padHeld = 0;   // the d-pad steering: which way, held how long
     float steer = 0;
     Pad prev;
     float tiltBase = 0; bool tiltCal = false;          // PS Vita tilt steering: the console's angle when driving began

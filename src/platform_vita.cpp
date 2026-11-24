@@ -25,7 +25,9 @@
 #include "data.h"
 
 extern "C" {
-int _newlib_heap_size_user = 200 * 1024 * 1024;
+// The game's own heap (models, circuits, sounds): a full 20-car race peaks at ~21 MB (FL_MEM=1 on the
+// PC test), so 64 MB leaves plenty; it used to reserve 200 MB.
+int _newlib_heap_size_user = 64 * 1024 * 1024;
 unsigned int sceUserMainThreadStackSize = 2 * 1024 * 1024;
 }
 
@@ -533,7 +535,16 @@ bool init() {
                        "3. Start this game again", "", "Press any button to close"});
     }
 
-    vglInitExtended(0, VITA_W, VITA_H, 16 * 1024 * 1024, SCE_GXM_MULTISAMPLE_2X);
+    // vitaGL takes the memory left over for textures and draw buffers. Leave some of each kind free for
+    // plugins - a screen recorder (Vita-Recorder) needs ~2 MB of video memory (or 2 MB of physically
+    // contiguous RAM) plus a little ordinary RAM while it records. vglInitExtended left none of the
+    // first two.
+    vglInitWithCustomThreshold(0, VITA_W, VITA_H,
+                               16 * 1024 * 1024,      // ordinary RAM
+                               8 * 1024 * 1024,       // video memory (CDRAM)
+                               4 * 1024 * 1024,       // physically contiguous RAM
+                               SCE_KERNEL_MAX_MAIN_CDIALOG_MEM_SIZE,   // all dialog memory stays free (as before)
+                               SCE_GXM_MULTISAMPLE_2X);
     vglWaitVblankStart(GL_TRUE);
     glViewport(0, 0, VITA_W, VITA_H);
     glEnable(GL_DEPTH_TEST);

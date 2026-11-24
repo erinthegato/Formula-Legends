@@ -342,6 +342,9 @@ struct Race {
     float surfaceGrip() const { return track.def && track.def->street ? 0.92f : 1.0f; }   // dusty public roads
     float playerThrPrev = 0, playerStab = 0; // (the throttle stab detector)
     int steerHelp = 0;                       // the player's steering help: 0 off, 1 light, 2 strong (set by the game)
+    // the steering lock at speed v (rad at full wheel), and how much of the wheel gives a lateral pull
+    static float steerLock(float v) { return 0.30f / (1 + v / 13.0f) + 0.014f; }
+    float steerFor(float v, float lat) const { return v < 3 ? 1 : clampf(atanf(lat * 2.9f / (v * v)) / steerLock(v), 0, 1); }
     float playerLatMax = 0;                  // the player's cornering grip last step, m/s^2 (for the steering help)
     bool newRecord = false;                  // set when a lap beats the record (the game saves the ghost)
     float ttDelta = 0; bool ttDeltaOn = false;   // the live gap to the record (+ slower)

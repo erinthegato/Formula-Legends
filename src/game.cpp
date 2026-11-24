@@ -376,6 +376,8 @@ void Game::updateRace(float dt, const Pad& p) {
     }
     // steering: analogue stick, or the d-pad with a little smoothing
     float target = 0;
+    bool digital = false;
+    if (!p.right && !p.left) padDir = 0;
     // the stick: a small dead zone, full lock just before the edge (small sticks rarely reach it),
     // and a curve so small moves turn gently
     const float DZ = 0.12f, FULL = 0.90f;
@@ -385,7 +387,22 @@ void Game::updateRace(float dt, const Pad& p) {
         target = (p.stickX > 0 ? 1.0f : -1.0f) * powf(m, 2.0f);       // (less twitchy: a softer centre)
         (void)EXPO;
     }
-    else if (p.right || p.left) target = (p.right ? 1.0f : 0) - (p.left ? 1.0f : 0);
+    else if (p.right || p.left) {
+        // the d-pad: holding it winds the wheel on gradually (a tap is a small correction), and at
+        // speed it stops near the grip limit instead of slamming on full lock - gentle with no help
+        int dir = (p.right ? 1 : 0) - (p.left ? 1 : 0);
+        if (dir != padDir) { padDir = dir; padHeld = 0; }
+        padHeld += dt;
+        float reach = 1.0f;
+        if (raceLoaded) {
+            const Car& me = race.player();
+            float lat = race.playerLatMax > 0 ? race.playerLatMax : 30.0f;
+            reach = fmaxf(race.steerFor(me.v, lat * (cfg.help() == 0 ? 1.12f : 1.0f)), 0.12f);
+        }
+        float wind = clampf(0.35f + padHeld * 1.6f, 0, 1);              // 35 % at once, all of it after 0.4 s
+        target = dir * reach * wind;
+        digital = true;
+    }
     else if (cfg.tilt && p.hasTilt) {
         // tilt steering: turn the console like a wheel; the angle when driving began is straight ahead
         if (!tiltCal) { tiltBase = p.tilt; tiltCal = true; }
@@ -398,6 +415,7 @@ void Game::updateRace(float dt, const Pad& p) {
     // at 300 km/h needs only a touch of lock), always quicker back to the centre
     float vk = raceLoaded ? clampf(race.player().v / 85.0f, 0, 1) : 0;
     float rate = (fabsf(target) > fabsf(steer) && target * steer >= 0) ? 4.2f - 2.0f * vk : 6.5f - 2.0f * vk;
+    if (digital && fabsf(target) > fabsf(steer) && target * steer >= 0) rate = 3.0f - 1.6f * vk;    // the d-pad winds on more slowly
     steer += clampf(target - steer, -rate * dt, rate * dt);
     // R accelerates and L brakes as well as the bound buttons (only while driving)
     float thr = held(p, ACT_ACCEL) || p.r ? 1.0f : (p.stickY < -0.4f ? -p.stickY : 0);

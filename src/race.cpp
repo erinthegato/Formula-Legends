@@ -740,7 +740,7 @@ void Race::update(float dt, float steer, float throttle, float brake, int shift,
             c.throttle = throttle; c.brake = brake;
             // the lock falls away with speed (less twitchy at high speed), and the car takes ~0.1 s to
             // answer the wheel, so a flick of the stick doesn't jerk the nose round
-            float lock = 0.30f / (1 + c.v / 13.0f) + 0.014f;
+            float lock = steerLock(c.v);
             float delta = -steer * lock;
             c.steer = steer;
             float wantRate = c.v * tanf(delta) / WHEELBASE;

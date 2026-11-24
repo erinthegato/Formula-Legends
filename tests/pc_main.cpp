@@ -599,7 +599,7 @@ int main(int argc, char** argv) {
         const Car& me = g.race.player();
         float v0 = me.v * 3.6f; bool spun = false; float maxSlip = 0, maxDrift = 0;
         for (float simT = 0; simT < 3; simT += 1.0f / 60) {
-            Pad pp{}; pp.stickX = 1.0f; pp.r = true;
+            Pad pp{}; if (getenv("FL_DPAD")) pp.right = true; else pp.stickX = 1.0f; pp.r = true;
             g.step(1.0f / 60, pp);
             spun |= me.spinning; maxSlip = fmaxf(maxSlip, me.slip); maxDrift = fmaxf(maxDrift, fabsf(me.drift));
         }
