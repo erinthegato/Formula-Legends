@@ -598,3 +598,8 @@ int main(int, char**) {
     sceKernelExitProcess(0);
     return 0;
 }
+
+// vita-elf-create needs a few KB free at the end of the code segment for its own tables; when the
+// code happens to end right at the segment boundary it fails ("segment 1 overlaps"). This read-only
+// filler moves the boundary. If that error ever comes back, change its size by a few KB.
+extern "C" __attribute__((used, aligned(16))) const char fl_segment_pad[6144] = {1};
