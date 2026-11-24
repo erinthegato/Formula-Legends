@@ -81,6 +81,9 @@ int main(int argc, char** argv) {
             if (g.introPos < lastPos - 5) { loops++; fprintf(stderr, "looped at frame %d (music %.1f -> %.1f)\n", f, lastPos, g.introPos); }
             lastPos = g.introPos;
             if (g.introShot != lastShot) { lastShot = g.introShot; shotFrames = 0; }
+            if (getenv("FL_VIDEO") && f < 60 * atoi(getenv("FL_VIDEO")) && f % 2 == 0) {
+                char b[64]; snprintf(b, sizeof b, "/v_%05d.ppm", f / 2); pc::saveShot((out + b).c_str());
+            }
             if (++shotFrames == 50 && loops == 0) {
                 char b[64]; snprintf(b, sizeof b, "/attract_%03d_%05.1f.ppm", n++, g.introPos); pc::saveShot((out + b).c_str());
             }
