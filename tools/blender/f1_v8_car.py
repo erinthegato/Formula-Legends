@@ -32,10 +32,10 @@ import bpy, bmesh, math, json, os, sys
 from mathutils import Vector
 
 AXLE_F, AXLE_R, R = 1.60, -1.60, 0.33
-WHEEL_YF, WHEEL_YR, TYRE_WF, TYRE_WR = 0.73, 0.70, 0.245, 0.325
-FLAP = (-2.40, 0.86, 0.22)           # the game's DRS flap: hinge x, z and chord
+WHEEL_YF, WHEEL_YR, TYRE_WF, TYRE_WR = 0.725, 0.71, 0.274, 0.38    # 1.80 m over the wheels (2010 rules 3.3, 12.4)
+FLAP = (-2.015, 0.87, 0.1815)        # the game's DRS flap: hinge x, z and chord
 FLOOR_TOP = 0.10                     # the floor's top: the sidepods and engine cover sit on it
-RW_HALF = 0.50                       # rear wing half span: as wide as the rear floor / diffuser under it
+RW_HALF = 0.375                      # rear wing half span: 0.75 m above 200 mm behind the axle (2010 rules 3.5.2)
 OPEN = (0.78, 0.08, 0.22)            # the hollow cockpit: front x, back x, half width (room for the
                                      # steering wheel and its display; no driver)
 
@@ -213,11 +213,11 @@ def build_lod(B):
                                 (-1.0, 0.11, 0.10, 0.38), (-1.5, 0.06, 0.10, 0.27)], BODY, yc=s * 0.43, n=n)
         if lod < 2:
             B.box('SidepodInlet' + sn, (0.56, s * 0.43, 0.31), (0.02, 0.24, 0.30), CARB)
-        B.prism('FW_Flap' + sn, [(2.40, 0.13), (2.24, 0.25), (2.20, 0.25), (2.36, 0.12)], 0.62, s * 0.56, ACC)
-        B.prism('FW_End' + sn, [(2.70, 0.05), (2.70, 0.20), (2.45, 0.30), (2.15, 0.28), (2.15, 0.05)], 0.015, s * 0.875, BODY)
+        B.prism('FW_Flap' + sn, [(2.32, 0.13), (2.16, 0.25), (2.12, 0.25), (2.28, 0.12)], 0.62, s * 0.56, ACC)
+        B.prism('FW_End' + sn, [(2.60, 0.075), (2.60, 0.20), (2.37, 0.275), (2.07, 0.27), (2.07, 0.075)], 0.015, s * 0.8825, BODY)
         if lod < 2:
-            B.prism('NosePylon' + sn, [(2.52, 0.10), (2.47, 0.34), (2.30, 0.36), (2.30, 0.10)], 0.012, s * 0.06, CARB)
-        B.prism('RW_End' + sn, [(-2.02, 0.30), (-2.02, 0.86), (-2.14, 1.02), (-2.68, 1.02), (-2.68, 0.30)], 0.015, s * (RW_HALF + 0.008), BODY)
+            B.prism('NosePylon' + sn, [(2.44, 0.10), (2.40, 0.34), (2.22, 0.36), (2.22, 0.10)], 0.012, s * 0.06, CARB)
+        B.prism('RW_End' + sn, [(-1.83, 0.30), (-1.83, 0.86), (-1.92, 0.95), (-2.20, 0.95), (-2.20, 0.30)], 0.015, s * (RW_HALF - 0.008), BODY)
         if lod < 2:
             B.box('Mirror' + sn, (0.72, s * 0.36, 0.73), (0.04, 0.12, 0.05), BODY)
             B.rod('MirrorStalk' + sn, (0.78, s * 0.26, 0.64), (0.73, s * 0.33, 0.72), 0.01, CARB)
@@ -236,17 +236,17 @@ def build_lod(B):
     B.loft('Deck', [(0.06, 0.56, FLOOR_TOP, 0.47), (-0.40, 0.54, FLOOR_TOP, 0.44),
                     (-1.00, 0.46, FLOOR_TOP, 0.33), (-1.50, 0.30, FLOOR_TOP, 0.25), (-2.00, 0.10, FLOOR_TOP + 0.02, 0.22)],
            BODY, n=n, e=0.35)
-    B.prism('FW_Main', [(2.68, 0.09), (2.58, 0.125), (2.38, 0.115), (2.26, 0.09), (2.45, 0.075)], 1.74, 0, CARB)
-    B.prism('RW_Main', [(-2.08, 0.79), (-2.15, 0.82), (-2.30, 0.835), (-2.46, 0.825), (-2.50, 0.80), (-2.30, 0.785)], 2 * RW_HALF, 0, BODY)
+    B.prism('FW_Main', [(2.60, 0.09), (2.50, 0.125), (2.30, 0.115), (2.18, 0.09), (2.37, 0.075)], 1.75, 0, CARB)
+    B.prism('RW_Main', [(-1.85, 0.80), (-1.90, 0.83), (-1.98, 0.835), (-2.005, 0.82), (-2.01, 0.80), (-1.95, 0.79)], 2 * RW_HALF - 0.032, 0, BODY)
     # (the top flap of the rear wing is the game's DRS flap, drawn on its own so it can open)
     if lod < 2:
-        B.prism('BeamWing', [(-2.25, 0.44), (-2.30, 0.47), (-2.45, 0.46), (-2.50, 0.44)], 2 * RW_HALF, 0, CARB)
-    B.prism('RW_Pillar', [(-2.0, 0.25), (-2.28, 0.79), (-2.38, 0.79), (-2.18, 0.25)], 0.02, 0, CARB)
+        B.prism('BeamWing', [(-1.86, 0.40), (-1.90, 0.43), (-2.04, 0.42), (-2.08, 0.40)], 2 * RW_HALF - 0.032, 0, CARB)
+    B.prism('RW_Pillar', [(-1.70, 0.25), (-1.90, 0.79), (-1.98, 0.79), (-1.85, 0.25)], 0.02, 0, CARB)
     # the floor: its top meets the sidepods, the tub and the engine cover (one piece with the body)
     fz, ft = (0.035 + FLOOR_TOP) / 2, FLOOR_TOP - 0.035
     B.box('Floor', (-0.125, 0, fz), (2.25, 1.36, ft), CARB)
     B.box('FloorRear', (-1.625, 0, fz), (0.75, 1.0, ft), CARB)
-    B.prism('Diffuser', [(-1.70, 0.05), (-2.15, 0.05), (-2.15, 0.24), (-1.95, 0.20)], 0.9, 0, CARB)
+    B.prism('Diffuser', [(-1.70, 0.05), (-2.15, 0.05), (-2.15, 0.20), (-1.95, 0.18)], 0.9, 0, CARB)
 
 
 def build_preview(col):
@@ -259,7 +259,7 @@ def build_preview(col):
             ob.rotation_euler = (0, 0, math.pi / 2)
             ob.location = (ax, s * wy, R)
     B.prism('PREVIEW_DRSFlap', [(FLAP[0], FLAP[1]), (FLAP[0] - FLAP[2], FLAP[1]), (FLAP[0] - FLAP[2], FLAP[1] + 0.022), (FLAP[0], FLAP[1] + 0.022)],
-            2 * RW_HALF - 0.02, 0, 'second')
+            2 * RW_HALF - 0.032, 0, 'second')
 
 
 def build():

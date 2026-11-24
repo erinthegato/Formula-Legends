@@ -46,12 +46,12 @@ E = {
                 drs=False, groove=True, cover=False, mirrors=(0.30, 0.42, 0.72)),
     # 2010: the shape of the Blender car (tools/blender/f1_v8_car.py, the first-generation car); these
     # numbers place its wheels, DRS flap and livery lines
-    'v8':  dict(L=4.95, xf=1.60, xr=-1.60, R=0.330, wf=0.245, wr=0.325, wheel_y=0.725, wheel_yr=0.71,
+    'v8':  dict(L=4.95, xf=1.60, xr=-1.60, R=0.330, wf=0.305, wr=0.38, wheel_y=0.725, wheel_yr=0.71,
                 nose_tip=(2.55, 0.38), nose_hw=0.08, chassis_hw=0.30, chassis_top=0.68, nose_low=0.26,
                 cockpit=(0.78, 0.08), rim=0.69, head=(0.20, 0.72), airbox=(-0.20, 0.95, 0.16), cover_end=(-2.00, 0.40),
                 pod=(0.55, -1.50, 0.62, 0.55), pod_end_y=0.43, floor_hw=0.68,
                 fw=(2.20, 2.68, 0.87, 0.075, 'cascade'), fw_endplate=0.22,
-                rw=(-2.20, -2.60, 0.50, 0.79, 0.26), rw2=False, beam=False, fin=0.86, halo=False, high_nose=True, finger=False,
+                rw=(-1.85, -2.18, 0.375, 0.80, 0.20), rw2=False, beam=False, fin=0.86, halo=False, high_nose=True, finger=False,
                 drs=True, groove=False, cover=False, mirrors=(0.72, 0.36, 0.73)),
     'hybrid': dict(L=5.25, xf=1.82, xr=-1.65, R=0.330, wf=0.245, wr=0.325, wheel_y=0.78, wheel_yr=0.76,
                 nose_tip=(2.72, 0.24), nose_hw=0.07, chassis_hw=0.27, chassis_top=0.64, nose_low=0.16,

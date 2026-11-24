@@ -21,7 +21,7 @@ static const CockpitLayout COCKPIT[ERA_COUNT] = {
 };
 // the DRS flap's hinge on each era's rear wing (tools/gen_f1.py flap_pivot) and the front tyres' width
 // against the rears
-static const V3 FLAP_PIVOT[ERA_COUNT] = {V3(-1.975f, 0, 0.87f), V3(-2.40f, 0, 0.86f), V3(-2.23f, 0, 0.87f), V3(-2.385f, 0, 0.89f)};
+static const V3 FLAP_PIVOT[ERA_COUNT] = {V3(-1.975f, 0, 0.87f), V3(-2.015f, 0, 0.87f), V3(-2.23f, 0, 0.87f), V3(-2.385f, 0, 0.89f)};
 static const float FRONT_W[ERA_COUNT] = {0.78f, 0.72f, 0.75f, 0.75f};
 
 void formatTime(char* out, float t) {
