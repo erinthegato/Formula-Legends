@@ -66,6 +66,31 @@ int main(int argc, char** argv) {
         fprintf(stderr, "intro ended: screen %d at %.1f s of music\n", (int)g.screen, g.introPos);
         return 0;
     }
+    if (mode == "attract") {
+        // attract <outdir>: idle on the title until the attract movie starts, a frame from each shot,
+        // then past the end of the song to see it loop, and a button press back to the title
+        std::string out = argv[2];
+        sound::musicFile(nullptr); g.screen = SCR_TITLE; g.idle = 0;
+        int f = 0;
+        for (; f < 60 * 40 && g.screen == SCR_TITLE; f++) { Pad q{}; g.frame(1.0f / 60, q); }
+        fprintf(stderr, "attract started after %.1f s idle (screen %d)\n", f / 60.0f, (int)g.screen);
+        int lastShot = -2, shotFrames = 0, n = 0, loops = 0; float lastPos = 0;
+        for (f = 0; f < 60 * 225 && g.screen == SCR_INTRO; f++) {
+            Pad q{}; g.frame(1.0f / 60, q);
+            if (pc::mixFn) { std::vector<int16_t> b(735 * 2); pc::mixFn(b.data(), 735); }
+            if (g.introPos < lastPos - 5) { loops++; fprintf(stderr, "looped at frame %d (music %.1f -> %.1f)\n", f, lastPos, g.introPos); }
+            lastPos = g.introPos;
+            if (g.introShot != lastShot) { lastShot = g.introShot; shotFrames = 0; }
+            if (++shotFrames == 50 && loops == 0) {
+                char b[64]; snprintf(b, sizeof b, "/attract_%03d_%05.1f.ppm", n++, g.introPos); pc::saveShot((out + b).c_str());
+            }
+        }
+        fprintf(stderr, "after %.1f s: screen %d, loops %d, shot %d, music %.1f\n", f / 60.0f, (int)g.screen, loops, g.introShot, g.introPos);
+        press(g, &Pad::cross);
+        for (int i = 0; i < 30; i++) { Pad q{}; g.frame(1.0f / 60, q); }
+        fprintf(stderr, "after a button: screen %d (title %d)\n", (int)g.screen, (int)SCR_TITLE);
+        return 0;
+    }
     if (mode == "barriers") {   // barrier lines of a circuit (x y per point, left then right), with / without the run-off cut
         std::string tid = argv[2]; FILE* f = fopen(argv[3], "w");
         for (int cut = 0; cut < 2; cut++) {

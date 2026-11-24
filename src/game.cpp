@@ -514,7 +514,7 @@ void Game::update(float dt, const Pad& p) {
             int pos = 0; for (int i = 0; i < 8; i++) if (TITLE_ORDER[i] == sel) pos = i;
             sel = TITLE_ORDER[(pos + dy + 8) % 8];
         }
-        if (idle > cfg.attract && !aiDrivesPlayer) { idle = 0; startReel(); break; }
+        if (idle > cfg.attract && !aiDrivesPlayer) { idle = 0; introBegin(1); break; }
         if (ok || pressed(p, &Pad::start)) {
             t = 0;
             ttMode = sel == 6;

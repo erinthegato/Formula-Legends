@@ -840,10 +840,11 @@ void Game::screenHelp(Panel& P) {
         {"Studio", "CODE 4 Studios"},
         {"Engine", "Endurance Motor Racing 3D"},
         {"Intro music", "Kickstart My Heart - Motley Crue"},
+        {"Attract music", "Lose My Mind - Don Toliver feat. Doja Cat"},
         {"Menu music", "Generated with Google Lyria 3"},
         {"Cars, wheels, cockpits", "Generated in code"},
         {"Pit crew, props", "Unity AI (Tripo, Gemini)"},
-        {"Engine sounds", "Endurance Motor Racing (Unity)"},
+        {"Engine sounds", "Generated in code"},
         {"Circuit outlines", "bacinger/f1-circuits (MIT)"},
         {"Circuit heights", "EU-DEM 25 m, SRTM 30 m"},
     };

@@ -40,6 +40,13 @@ engine (physics, circuits, trackside scenery, pit crews and their animations). N
   at the Red Bull Ring): empty-track crane shots, DRS trains, overtakes, pit stops, crashes, a grid
   start, era title cards (the next circuit loads behind them) and FORMULA LEGENDS at the end. Any
   button skips it. The script is `src/intro.cpp` (shots in bars of four beats, 178 BPM).
+* **The attract movie**: leave the title screen alone (Options: "Attract screen after", 10 s by
+  default) and a second movie plays to the whole of *Lose My Mind* (Don Toliver feat. Doja Cat,
+  `DATA/music/attract.emu`, 110 BPM), cut on the bar lines and one era per section of the song:
+  1998 at Imola from the drop, 2010 at night in Singapore for the chorus, 2016 at Silverstone (DRS)
+  and in the rain at Interlagos, 2025 on the Las Vegas Strip for the Doja Cat verse and Zandvoort,
+  then the title over the outro. It loops with the song until a button is pressed. Same script
+  file, `ATTRACT_SHOTS`.
 
 ## Install (PS Vita)
 Get `FormulaLegends.vpk` from the GitHub Actions run (artifact `FormulaLegends-Vita`), copy it to
@@ -80,7 +87,9 @@ DRS opens by itself when you have it; the DRS box by the speedometer shows it (o
   envelope of the samples.
 * Intro music: `ffmpeg -i song.mp3 -t 64.5 -af afade=t=out:st=61.8:d=2.6 -ac 2 -ar 22050 -f s16le - |
   tools/music/adpcm_enc DATA/music/intro.emu 2`; `DATA/music/intro.txt` holds the first beat and the
-  beat length.
+  beat length. Attract music: the same without `-t`/fade into `DATA/music/attract.emu`;
+  `attract.txt`: first downbeat 0.340 s, beat 0.545454 s (fitted to the onsets, steady through the
+  song). `./fl_test attract shots` checks it starts after 10 s idle, loops, and a button stops it.
 
 Data credits: bacinger/f1-circuits (MIT), EU-DEM (Copernicus), SRTM (NASA) via OpenTopoData,
 OpenStreetMap contributors (ODbL, EMR's circuits). Engine, crew, props and engine sounds from

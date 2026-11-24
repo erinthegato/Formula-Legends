@@ -1,4 +1,4 @@
-// The Formula Legends intro, cut to the music (Motley Crue - Kickstart My Heart, DATA/music/intro.emu):
+// The Formula Legends intro and attract movie, cut to the music. The intro (Motley Crue - Kickstart My Heart, DATA/music/intro.emu):
 // the bike revs under a flashing "CODE 4 STUDIOS", then from the first beat a highlight reel of the
 // four eras, a block of shots per era on one circuit: empty-track crane shots, DRS trains, overtakes,
 // pit stops, crashes and a thunderstorm, era title cards between them, and the game's title at the end.
@@ -9,26 +9,77 @@
 #include <string>
 
 namespace {
-enum ShotType { SH_EMPTY, SH_DRS, SH_PIT, SH_OVERTAKE, SH_CRASH, SH_STORM, SH_START, SH_CARD, SH_FINAL };
+enum ShotType { SH_EMPTY, SH_DRS, SH_PIT, SH_OVERTAKE, SH_CRASH, SH_STORM, SH_START, SH_CARD, SH_FINAL, SH_TEXT };
 struct Block { int era; const char* track; int weather; float hour; };
-// the four era blocks (each loads its circuit while its title card shows)
-const Block BLOCKS[4] = {
+// a shot: first bar (bars of 4 beats from the music's first beat), era block, type; a text card's two lines
+struct Shot { int bar; int block; int type; const char* line1; const char* line2; };
+
+// ---- the boot intro: Kickstart My Heart (DATA/music/intro.emu, the first 64 s)
+const Block INTRO_BLOCKS[] = {
     {ERA_GE, "suzuka", WX_DRY, 14.5f},
     {ERA_90S, "monaco", WX_DRY, 15.0f},
     {ERA_V8, "spa", WX_STORM, 14.0f},
     {ERA_HYBRID, "redbullring", WX_DRY, 17.6f},
 };
-// the shots: first bar (bars of 4 beats from the band's first beat), block, type
-struct Shot { int bar; int block; int type; };
-const Shot SHOTS[] = {
+const Shot INTRO_SHOTS[] = {
     {0, 0, SH_EMPTY}, {2, 0, SH_DRS}, {4, 0, SH_PIT}, {6, 0, SH_OVERTAKE},
     {8, 1, SH_CARD}, {9, 1, SH_EMPTY}, {10, 1, SH_OVERTAKE}, {12, 1, SH_CRASH}, {14, 1, SH_PIT},
     {16, 2, SH_CARD}, {17, 2, SH_STORM}, {20, 2, SH_OVERTAKE}, {22, 2, SH_CRASH},
     {24, 3, SH_CARD}, {25, 3, SH_EMPTY}, {26, 3, SH_DRS}, {28, 3, SH_PIT}, {30, 3, SH_OVERTAKE}, {32, 3, SH_START}, {34, 3, SH_DRS}, {35, 3, SH_EMPTY},
     {36, 3, SH_FINAL},
 };
-const int SHOT_N = sizeof(SHOTS) / sizeof(SHOTS[0]);
-const int FINAL_BARS = 4;
+
+// ---- the attract movie: Lose My Mind (Don Toliver feat. Doja Cat, DATA/music/attract.emu, the whole
+// song, 110 BPM). Its sections: quiet intro bars 0-7, the beat drops at 8, a break in bar 23, chorus
+// 24-39, second verse 40-47, chorus 48-63, the Doja Cat verse 64-79, bridge 80-87, outro from 88.
+// One era per section; the era cards land one bar before each section so the cut hits the downbeat.
+const Block ATTRACT_BLOCKS[] = {
+    {ERA_90S, "imola", WX_DRY, 14.0f},
+    {ERA_V8, "singapore", WX_DRY, 20.5f},        // the first night race
+    {ERA_HYBRID, "silverstone", WX_DRY, 13.0f},
+    {ERA_HYBRID, "interlagos", WX_STORM, 14.0f},
+    {ERA_GE, "lasvegas", WX_DRY, 22.0f},
+    {ERA_GE, "zandvoort", WX_DRY, 15.0f},
+};
+const Shot ATTRACT_SHOTS[] = {
+    // quiet intro: the studio, empty circuit, the four eras
+    {0, 0, SH_TEXT, "CODE 4 STUDIOS", "PRESENTS"}, {2, 0, SH_EMPTY}, {4, 0, SH_TEXT, "FOUR ERAS", "ONE GRID"}, {5, 0, SH_EMPTY},
+    {7, 0, SH_CARD},
+    // the drop: 1998, lights out on the first big beat
+    {8, 0, SH_START}, {10, 0, SH_OVERTAKE}, {12, 0, SH_PIT}, {14, 0, SH_EMPTY}, {15, 0, SH_OVERTAKE}, {17, 0, SH_CRASH},
+    {19, 0, SH_EMPTY}, {20, 0, SH_OVERTAKE}, {22, 0, SH_EMPTY},
+    // chorus: 2010 under the lights, a cut every bar or two
+    {23, 1, SH_CARD},
+    {24, 1, SH_OVERTAKE}, {26, 1, SH_PIT}, {27, 1, SH_CRASH}, {29, 1, SH_EMPTY}, {30, 1, SH_OVERTAKE}, {32, 1, SH_PIT},
+    {34, 1, SH_OVERTAKE}, {35, 1, SH_CRASH}, {37, 1, SH_OVERTAKE},
+    // second verse: 2016, DRS
+    {39, 2, SH_CARD},
+    {40, 2, SH_EMPTY}, {42, 2, SH_DRS}, {44, 2, SH_PIT}, {46, 2, SH_DRS},
+    // chorus: 2016 in the rain
+    {47, 3, SH_CARD},
+    {48, 3, SH_START}, {50, 3, SH_STORM}, {52, 3, SH_OVERTAKE}, {54, 3, SH_CRASH}, {56, 3, SH_STORM}, {58, 3, SH_OVERTAKE},
+    {60, 3, SH_PIT}, {62, 3, SH_STORM},
+    // Doja Cat's verse: 2025 on the Strip at night
+    {63, 4, SH_CARD},
+    {64, 4, SH_EMPTY}, {66, 4, SH_DRS}, {68, 4, SH_OVERTAKE}, {70, 4, SH_PIT}, {72, 4, SH_DRS}, {74, 4, SH_CRASH},
+    {76, 4, SH_OVERTAKE}, {78, 4, SH_EMPTY},
+    // bridge: 2025 by the sea
+    {79, 5, SH_CARD},
+    {80, 5, SH_START}, {82, 5, SH_DRS}, {84, 5, SH_OVERTAKE}, {85, 5, SH_PIT}, {87, 5, SH_EMPTY},
+    // outro: the title until the song ends, then it all starts again
+    {88, 5, SH_FINAL},
+};
+
+struct Script { const Block* blocks; const Shot* shots; int nshots; const char* music; const char* txt; bool logo; bool loop; };
+const Script SCRIPTS[2] = {
+    {INTRO_BLOCKS, INTRO_SHOTS, (int)(sizeof(INTRO_SHOTS) / sizeof(Shot)), "intro.emu", "DATA/music/intro.txt", true, false},
+    {ATTRACT_BLOCKS, ATTRACT_SHOTS, (int)(sizeof(ATTRACT_SHOTS) / sizeof(Shot)), "attract.emu", "DATA/music/attract.txt", false, true},
+};
+int curScript = 0;
+#define BLOCKS (SCRIPTS[curScript].blocks)
+#define SHOTS (SCRIPTS[curScript].shots)
+#define SHOT_N (SCRIPTS[curScript].nshots)
+bool isCard(int type) { return type == SH_CARD || type == SH_TEXT; }
 
 float sstep(float a, float b, float x) { float t = clampf((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); }
 float hash1(int k) { uint32_t h = (uint32_t)k * 2654435761u; h ^= h >> 13; h *= 0x5bd1e995u; h ^= h >> 15; return (h & 0xFFFFFF) / 16777216.0f; }
@@ -36,17 +87,20 @@ float hash1(int k) { uint32_t h = (uint32_t)k * 2654435761u; h ^= h >> 13; h *= 
 
 float Game::introBarTime(int bar) const { return introBeat0 + bar * 4 * introPeriod; }
 
-void Game::introBegin() {
-    // DATA/music/intro.txt: the band's first beat, the beat length, the intro's length
+void Game::introBegin(int script) {
+    // DATA/music/<intro|attract>.txt: the music's first beat, the beat length, the piece's length
+    curScript = script; introScript = script;
+    const Script& sc = SCRIPTS[script];
     int sz = 0;
-    char* txt = (char*)sys::loadFile("DATA/music/intro.txt", &sz);
-    if (!txt) return;
+    char* txt = (char*)sys::loadFile(sc.txt, &sz);
+    if (!txt) { if (script) { screen = SCR_TITLE; idle = 0; } return; }
     std::string all(txt, sz); sys::freeFile(txt);
     sscanf(all.c_str(), "beat0 %f\nperiod %f\nlength %f", &introBeat0, &introPeriod, &introLength);
-    screen = SCR_INTRO; t = 0;
+    screen = SCR_INTRO; t = 0; introLastPos = 0;
     introShot = -1; introBlock = -1; introPendingBlock = -1; introCardFrames = 0;
-    introLoadBlock(0);                         // the first circuit loads before the music starts
-    sound::musicFile("intro.emu", true);
+    introLoadBlock(sc.shots[0].block);           // the first circuit loads before the music starts
+    // the attract movie loops with its music (the file plays round again without a gap)
+    sound::musicFile(sc.music, !sc.loop);
 }
 
 void Game::introEnd() {
@@ -94,9 +148,30 @@ static float tightestCorner(const Track& t, float from, float len) {
     return t.wrap(best);
 }
 
+// the attract movie (many shots per circuit): a different corner each shot, from the circuit's
+// tightest corners (curvature peaks at least 250 m apart), in turn
+static float nthCorner(const Track& t, int n) {
+    float ks[8], ss[8]; int m = 0;
+    float L = t.length;
+    for (float s = 0; s < L; s += t.step) {
+        float k = fabsf(t.curvAt(s));
+        if (k < 0.012f || k < fabsf(t.curvAt(t.wrap(s - t.step))) || k < fabsf(t.curvAt(t.wrap(s + t.step)))) continue;
+        int near = -1;
+        for (int i = 0; i < m; i++) { float d = fabsf(ss[i] - s); if (fminf(d, L - d) < 250) near = i; }
+        if (near >= 0) { if (k > ks[near]) { ks[near] = k; ss[near] = s; } continue; }
+        if (m < 8) { ks[m] = k; ss[m] = s; m++; continue; }
+        int lo = 0; for (int i = 1; i < 8; i++) if (ks[i] < ks[lo]) lo = i;
+        if (k > ks[lo]) { ks[lo] = k; ss[lo] = s; }
+    }
+    if (!m) return tightestCorner(t, 0, L);
+    // in order round the lap, so neighbouring shots are on different parts of the circuit
+    for (int i = 0; i < m; i++) for (int j = i + 1; j < m; j++) if (ss[j] < ss[i]) { float a = ss[i]; ss[i] = ss[j]; ss[j] = a; }
+    return ss[(n * 3) % m];
+}
+
 void Game::introStage(int k) {
     const Shot& S = SHOTS[k];
-    if (S.type == SH_CARD || S.type == SH_FINAL || !raceLoaded) return;
+    if (isCard(S.type) || S.type == SH_FINAL || !raceLoaded) return;
     Race& r = race;
     const Track& tr = r.track;
     float L = tr.length;
@@ -112,7 +187,7 @@ void Game::introStage(int k) {
     switch (S.type) {
     case SH_EMPTY: {
         // a crane sweep along a curving stretch with nobody on it
-        float s0 = tightestCorner(tr, L * (0.15f + 0.4f * hash1(seedish)), L * 0.3f) - 140;
+        float s0 = (curScript ? nthCorner(tr, k) : tightestCorner(tr, L * (0.15f + 0.4f * hash1(seedish)), L * 0.3f)) - 140;
         introCamS = s0;
         break;
     }
@@ -143,7 +218,7 @@ void Game::introStage(int k) {
     }
     case SH_OVERTAKE: {
         // side by side into a corner: the car on the inside brakes later and takes the place
-        float c0 = tightestCorner(tr, L * (0.1f + 0.5f * hash1(seedish + 3)), L * 0.35f);
+        float c0 = curScript ? nthCorner(tr, k + 1) : tightestCorner(tr, L * (0.1f + 0.5f * hash1(seedish + 3)), L * 0.35f);
         float s0 = c0 - 260;
         float side = tr.curvAt(c0) > 0 ? 1.0f : -1.0f;        // inside of the corner
         float hw = tr.pts[tr.index(s0)].hw;
@@ -158,7 +233,7 @@ void Game::introStage(int k) {
     }
     case SH_CRASH: {
         // too fast into a corner: the rear goes, the car spins into the wall and loses its wing
-        float c0 = tightestCorner(tr, L * (0.2f + 0.5f * hash1(seedish + 5)), L * 0.3f);
+        float c0 = curScript ? nthCorner(tr, k + 2) : tightestCorner(tr, L * (0.2f + 0.5f * hash1(seedish + 5)), L * 0.3f);
         float side = tr.curvAt(c0) > 0 ? -1.0f : 1.0f;        // outside of the corner
         float s0 = c0 - 95;
         Car& c = car(5);
@@ -220,7 +295,13 @@ void Game::introDirect(int k, float st) {
 
 void Game::introUpdate(float dt, bool skip) {
     introPos = sound::musicPos();
-    if (skip || introPos >= introLength - 0.05f || t > 90) { introEnd(); return; }
+    const Script& sc = SCRIPTS[curScript];
+    if (skip || (!sc.loop && introPos >= introLength - 0.05f) || t > introLength + 30) { introEnd(); return; }
+    if (sc.loop && introPos < introLastPos - 5) {
+        // the music has gone round: back to the first shot (its title card covers loading the first circuit)
+        t = 0; introShot = -1;
+    }
+    introLastPos = introPos;
     // a pending circuit: loaded once its title card has been on screen
     if (introPendingBlock >= 0 && introCardFrames >= 2) {
         int b = introPendingBlock; introPendingBlock = -1;
@@ -235,11 +316,11 @@ void Game::introUpdate(float dt, bool skip) {
     if (k != introShot) {
         introShot = k;
         const Shot& S = SHOTS[k];
-        if (S.type == SH_CARD && S.block != introBlock) { introPendingBlock = S.block; introCardFrames = 0; return; }
+        if (isCard(S.type) && S.block != introBlock) { introPendingBlock = S.block; introCardFrames = 0; return; }
         if (S.block != introBlock && S.type != SH_FINAL) { introLoadBlock(S.block); }
         introStage(k);
     }
-    if (!raceLoaded || SHOTS[introShot].type == SH_CARD || SHOTS[introShot].type == SH_FINAL) return;
+    if (!raceLoaded || isCard(SHOTS[introShot].type) || SHOTS[introShot].type == SH_FINAL) return;
     float st = introPos - introShotT0;
     introDirect(introShot, st);
     // the race runs at real speed in small steps
@@ -340,6 +421,7 @@ void Game::drawIntro() {
     float p = introPos;
     const u32 BLACK = RGBA(0, 0, 0);
     // ---- 0 .. first beat: CODE 4 STUDIOS, flashing with the bike's revs
+    if ((p < introBeat0 - 0.02f || introShot < 0) && !SCRIPTS[curScript].logo) { gfx::beginFrame(BLACK); finishFrame(); return; }
     if (p < introBeat0 - 0.02f || introShot < 0) {
         gfx::beginFrame(BLACK);
         gfx::setDepthTest(false); gfx::setBlend(true);
@@ -364,7 +446,21 @@ void Game::drawIntro() {
     }
     const Shot& S = SHOTS[introShot];
     float st = p - introBarTime(S.bar);
-    float bar = 4 * introPeriod;
+    // ---- a text card (the attract movie's opening)
+    if (S.type == SH_TEXT) {
+        gfx::beginFrame(BLACK);
+        gfx::setDepthTest(false); gfx::setBlend(true);
+        float in = sstep(0, 0.6f, st);
+        float beatPh = fmodf(fmaxf(st, 0), introPeriod) / introPeriod;
+        int A = (int)(255 * in);
+        gfx::drawFill2D(SCREEN_W / 2 - 150 * in, 128, 300 * in, 2, RGBA(255, 70, 40, (int)(A * (0.55f + 0.45f * (1 - beatPh)))));
+        bigText(R, SCREEN_W / 2, 84, S.line1, RGBA(255, 255, 255, A), 2.4f);
+        if (S.line2) bigText(R, SCREEN_W / 2, 144, S.line2, RGBA(255, 200, 150, (int)(A * sstep(0.4f, 1.0f, st))), 1.1f);
+        gfx::setBlend(false); gfx::setDepthTest(true);
+        introCardFrames++;
+        finishFrame();
+        return;
+    }
     // ---- era title card (the circuit loads behind it)
     if (S.type == SH_CARD || introPendingBlock >= 0) {
         const Block& B = BLOCKS[S.block];
@@ -387,7 +483,7 @@ void Game::drawIntro() {
     if (S.type == SH_FINAL) {
         gfx::beginFrame(BLACK);
         gfx::setDepthTest(false); gfx::setBlend(true);
-        float in = sstep(0, 0.35f, st), out = 1 - sstep(FINAL_BARS * bar - 1.4f, FINAL_BARS * bar - 0.2f, st);
+        float in = sstep(0, 0.35f, st), out = 1 - sstep(introLength - 1.4f, introLength - 0.2f, p);
         float beatPh = fmodf(st, introPeriod) / introPeriod;
         int A = (int)(255 * in * out);
         if (st < 0.25f) gfx::drawFill2D(0, 0, SCREEN_W, SCREEN_H, RGBA(255, 255, 255, (int)(255 * (1 - st / 0.25f))));
@@ -401,6 +497,7 @@ void Game::drawIntro() {
             bigText(R, SCREEN_W / 2 + (e - 1.5f) * 84, 150, ERA_SHORT[e], col, 1.1f);
         }
         bigText(R, SCREEN_W / 2, 230, "a CODE 4 STUDIOS game", RGBA(170, 170, 180, A), 0.75f);
+        if (SCRIPTS[curScript].loop && fmodf(p, 1.0f) < 0.6f) bigText(R, SCREEN_W / 2, 196, "PRESS ANY BUTTON", RGBA(255, 255, 255, A), 0.9f);
         gfx::setBlend(false); gfx::setDepthTest(true);
         finishFrame();
         return;
