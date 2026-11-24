@@ -12,10 +12,26 @@ static const float GEAR[8] = {0, 0.36f, 0.49f, 0.60f, 0.70f, 0.79f, 0.89f, 1.0f}
 const ClassPhys& Race::phys(int era) {
     // tuned so the AI on Hard laps close to each era's real pole times (see tests: Monza, Spa, Suzuka)
     //                                  top   mu     dfV   brake  cdA    cap   fuel  ers   drs    refuel vsc
-    static const ClassPhys E[ERA_COUNT] = {{350, 1.45f, 52, 1.95f, 1.02f, 3.0f, 95,  0,   false, true,  false},   // 1998 V10
-                                           {335, 1.55f, 48, 2.10f, 1.10f, 3.2f, 160, 0,   false, false, false},   // 2010 V8
-                                           {345, 1.60f, 48, 2.10f, 1.16f, 3.2f, 100, 120, true,  false, true},    // 2016 hybrid
-                                           {345, 1.66f, 46, 2.20f, 1.14f, 3.4f, 100, 120, true,  false, true}};   // 2025 ground effect
+    static ClassPhys E[ERA_COUNT] = {{350, 1.32f, 52, 1.95f, 1.08f, 3.0f, 95,  0,   false, true,  false},   // 1998 V10
+                                     {335, 1.41f, 48, 2.10f, 1.15f, 3.1f, 160, 0,   false, false, false},   // 2010 V8
+                                     {345, 1.42f, 50, 2.10f, 1.18f, 3.2f, 100, 120, true,  false, true},    // 2016 hybrid
+                                     {345, 1.52f, 47, 2.20f, 1.12f, 3.4f, 100, 120, true,  false, true}};   // 2025 ground effect
+    // AI on Hard, dry, best of 3 laps (Monza / Spa / Monaco / Suzuka) against the real pole times:
+    //   1998 1:23.9 1:49.5 1:15.7 1:36.4 (real 1:25.3 1:48.7 1:19.8 1:36.3)
+    //   2010 1:23.0 1:45.8 1:13.0 1:31.9 (real 1:21.9 1:45.8 1:13.8 1:30.8)
+    //   2016 1:21.3 1:45.0 1:12.0 1:31.2 (real 1:21.1 1:46.7 1:13.6 1:30.6)
+    //   2025 1:19.4 1:40.3 1:09.5 1:27.2 (real 1:18.8 1:40.5 1:10.0 1:27.0)
+#ifndef PLATFORM_VITA
+    // tests: FL_PHYS="era mu dfV cdA cap" overrides one era's numbers (lap-time tuning)
+    static bool once = false;
+    if (!once) {
+        once = true;
+        if (const char* o = getenv("FL_PHYS")) {
+            int e; float mu, df, cd, cap;
+            if (sscanf(o, "%d %f %f %f %f", &e, &mu, &df, &cd, &cap) == 5 && e >= 0 && e < ERA_COUNT) { E[e].muBase = mu; E[e].downforceV = df; E[e].cdA = cd; E[e].aeroCap = cap; }
+        }
+    }
+#endif
     return E[era < 0 ? 0 : era % ERA_COUNT];
 }
 
@@ -31,6 +47,7 @@ static float topSpeed(const CarDef* d) {
 
 bool Race::start(const RaceSettings& s0, Session ses, const std::vector<int>* gridOrder) {
     RaceSettings s = s0;
+    if (s.laps >= 999 && s.track >= 0 && s.track < TRACK_COUNT) s.laps = TRACKS[s.track].gpLaps;   // the full Grand Prix distance
     if (s.timeTrial) { s.opponents = 0; s.weather = WX_DRY; s.weekend = false; ses = SES_PRACTICE; }
     set = s;
     session = ses;
@@ -172,7 +189,7 @@ void Race::plan() {
         for (int i = 0; i < n; i++) {
             float k = 0; for (int j = -3; j <= 3; j++) k += track.pts[(i + j + n) % n].curv;
             k = fabsf(k / 7) / 1.3f;
-            float mu = p.muBase * gripScale * G, aero = mu / (p.downforceV * p.downforceV);
+            float mu = p.muBase * gripScale * surfaceGrip() * G, aero = mu / (p.downforceV * p.downforceV);
             float vc = k > aero + 1e-6f ? sqrtf(mu / (k - aero)) : 999.0f;
             // past the downforce cap the grip stops growing with speed
             float vcap = p.downforceV * sqrtf(p.aeroCap - 1);
@@ -255,7 +272,7 @@ void Race::physics(Car& c, float dt) {
     float suspK = DRY[c.su.susp] + (WETK[c.su.susp] - DRY[c.su.susp]) * wet;
     float gripMul = (off ? (gravel ? 0.42f : 0.55f) : (onKerb ? KERB[c.su.susp] : 1.0f)) * c.def->grip * tyreGrip(c) * (1 - 0.25f * c.dmg[DM_SUSP]) * suspK;
     if (!off) gripMul *= rubberGrip(c);
-    float latMax = p.muBase * gripScale * G * aeroK * gripMul;
+    float latMax = p.muBase * gripScale * surfaceGrip() * G * aeroK * gripMul;
     if (c.player) playerLatMax = latMax;
 
     // ---- longitudinal
@@ -618,6 +635,7 @@ void Race::update(float dt, float steer, float throttle, float brake, int shift,
     blueFlags(dt);
     updateDrs(dt);
     for (auto& c : cars) {
+        if (c.hold) { c.v = 0; continue; }
         if (c.startDelay > 0) { c.startDelay -= dt; if (c.startDelay <= 0 && c.player) message("In the car - go!", RGBA(60, 255, 90)); }
         bool human = c.player && !aiPlayer && !c.finished && c.pit == PIT_NONE && !c.plan.aiDrives;
         // the player's car is taken into the pit lane automatically once the entry is reached

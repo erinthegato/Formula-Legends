@@ -10,10 +10,11 @@
 
 static const char* CAMS[CAM_COUNT] = {"Chase", "Far chase", "Cockpit"};
 // race length: > 0 laps, < 0 minutes
-static const int LENGTHS[] = {1, 2, 3, 5, 10, 20, -5, -10, -15, -20, -30, -45, -60, -90, -120, -180, -360, -720, -1440};
+// race length: laps (999 = the full Grand Prix distance), negative = timed race in minutes
+static const int LENGTHS[] = {1, 2, 3, 5, 8, 10, 15, 20, 30, 999, -10, -20, -30};
 static const int LENGTH_N = sizeof(LENGTHS) / sizeof(LENGTHS[0]);
 static const float EVENTH[] = {0, 1, 2, 4, 6, 8, 10, 12, 24};
-static const int OPP[] = {5, 11, 19, 27, 33};
+static const int OPP[] = {5, 9, 13, 19};      // a full Formula 1 grid is 20 cars
 static const int ACCEL[] = {1, 2, 4, 8, 16};
 
 static u32 WHITE = RGBA(255, 255, 255), DIM = RGBA(175, 185, 200), ACC = RGBA(255, 150, 40), GOLD = RGBA(255, 215, 70);
@@ -29,16 +30,8 @@ bool Game::init() {
     trophies.load();
     setups.load();
     set.car = 1; set.track = 1;
-    // the Code 4 intro, timed to its theme (DATA/music/intro.txt: tick times, where the music resolves, length)
-    int sz = 0;
-    char* txt = (char*)sys::loadFile("DATA/music/intro.txt", &sz);
-    if (txt) {
-        std::string all(txt, sz); sys::freeFile(txt);
-        sscanf(all.c_str(), "ticks %f %f\nmusic_end %f\nlength %f", &introTicks0, &introTickStep, &introMusicEnd, &introLength);
-        screen = SCR_INTRO; t = 0;
-        sound::musicFile("intro.emu", true);
-        if (bench) { sound::musicFile(nullptr); screen = SCR_TITLE; }
-    }
+    // the intro: Code 4 Studios, then the eras' highlight reel, cut to its music (intro.cpp)
+    if (!bench) introBegin();
     return ok;
 }
 
@@ -511,11 +504,7 @@ void Game::update(float dt, const Pad& p) {
     bool ok = pressed(p, &Pad::cross), back = pressed(p, &Pad::circle);
     switch (screen) {
     case SCR_INTRO:
-        introPos = sound::musicPos();
-        if (t > 40 || introPos >= introLength - 0.05f || (any && t > 0.6f && !(prev.cross || prev.circle || prev.start))) {
-            sound::musicFile(nullptr);
-            screen = SCR_TITLE; sel = 0; t = 0; idle = 0;
-        }
+        introUpdate(dt, any && t > 0.6f && !(prev.cross || prev.circle || prev.start));
         break;
     case SCR_TITLE:
         if (dy) {
@@ -593,20 +582,35 @@ void Game::update(float dt, const Pad& p) {
         updateCareer(dx, dy, ok, back, pressed(p, &Pad::square));
         break;
     case SCR_TRACK:
-        sel = (sel + dy + TRACK_COUNT) % TRACK_COUNT;
-        if (ok) { set.track = sel; screen = SCR_CAR; sel = set.car; t = 0; }
+        // the era's own ten circuits; L / R or left / right changes the era
+        if (dx || pressed(p, &Pad::l) || pressed(p, &Pad::r)) { int d = dx ? dx : (pressed(p, &Pad::l) ? -1 : 1); era = (era + d + ERA_COUNT) % ERA_COUNT; t = 0; }
+        sel = (sel + dy + ERA_ROUNDS) % ERA_ROUNDS;
+        if (ok) {
+            set.track = eraTrack(era, sel);
+            if (CARS[set.car].era != era) set.car = eraFirstCar(era);
+            screen = SCR_CAR; sel = set.car; t = 0;
+        }
         if (back) { screen = SCR_TITLE; sel = ttMode ? 6 : 0; t = 0; }
         break;
-    case SCR_CAR:
-        sel = (sel + dy + CAR_PICK) % CAR_PICK;
+    case SCR_CAR: {
+        // the era's ten teams (sel is the CARS index); in a championship left / right changes the era
+        int e = CARS[sel % CAR_PICK].era, k = sel % TEAMS_PER_ERA;
+        if (champMode && (dx || pressed(p, &Pad::l) || pressed(p, &Pad::r))) { int d = dx ? dx : (pressed(p, &Pad::l) ? -1 : 1); e = (e + d + ERA_COUNT) % ERA_COUNT; t = 0; }
+        k = (k + dy + TEAMS_PER_ERA) % TEAMS_PER_ERA;
+        sel = eraFirstCar(e) + k; era = e;
         if (dy) t = 0;
         if (ok && ttMode) { set.car = sel; t = 0; startSession(SES_PRACTICE); break; }   // time trial: straight to the garage
         if (ok) {
             set.car = sel; screen = SCR_SETTINGS; sel = 13; t = 0; setupPage = false;
             if (setups.get(set.track, CARS[set.car].cls, set.setup)) { snprintf(note, sizeof note, "Your %s setup is loaded", TRACKS[set.track].name); noteT = 2.5f; }
         }
-        if (back) { if (champMode) { screen = SCR_TITLE; sel = 1; } else { screen = SCR_TRACK; sel = set.track; } t = 0; }
+        if (back) {
+            if (champMode) { screen = SCR_TITLE; sel = 1; }
+            else { screen = SCR_TRACK; sel = 0; for (int k2 = 0; k2 < ERA_ROUNDS; k2++) if (eraTrack(era, k2) == set.track) sel = k2; }
+            t = 0;
+        }
         break;
+    }
     case SCR_SETTINGS: {
         if (setupPage) {
             // the diagnostics computer: car setup
@@ -619,15 +623,15 @@ void Game::update(float dt, const Pad& p) {
         auto cyc = [&](int v, int n) { return (v + dx + n) % n; };
         int li = 0, oi = 0, ei = 0;
         for (int i = 0; i < LENGTH_N; i++) if ((set.raceMin > 0 && LENGTHS[i] == -set.raceMin) || (set.raceMin <= 0 && LENGTHS[i] == set.laps)) li = i;
-        for (int i = 0; i < 5; i++) if (OPP[i] == set.opponents) oi = i;
+        for (int i = 0; i < 4; i++) if (OPP[i] == set.opponents) oi = i;
         for (int i = 0; i < 9; i++) if (EVENTH[i] == set.eventHours) ei = i;
         if (dx) {
             if (sel == 0) { int v = LENGTHS[cyc(li, LENGTH_N)]; if (v > 0) { set.laps = v; set.raceMin = 0; } else set.raceMin = -v; }
-            if (sel == 1) set.eventHours = EVENTH[cyc(ei, 9)];
-            if (sel == 2) set.opponents = OPP[cyc(oi, 5)];
+            if (sel == 1) { int e = (CARS[set.car].era + dx + ERA_COUNT) % ERA_COUNT; set.car = eraFirstCar(e) + (set.car % TEAMS_PER_ERA); era = e; }
+            if (sel == 2) set.opponents = OPP[cyc(oi, 4)];
             if (sel == 3) set.difficulty = cyc(set.difficulty, 3);
             if (sel == 4) set.startPos = cyc(set.startPos, 3);
-            if (sel == 5) set.startType = cyc(set.startType, 4);
+            if (sel == 5) set.startType = set.startType == START_ROLLING ? START_STANDING : START_ROLLING;
             if (sel == 6) set.weather = cyc(set.weather, 4);
             if (sel == 7) set.manualPits = !set.manualPits;
             if (sel == 8) set.manualGears = !set.manualGears;
@@ -637,8 +641,8 @@ void Game::update(float dt, const Pad& p) {
         }
         if (ok && sel == 13) {
             if (champMode && !champ.active) {
-                // a new season with these settings
-                if (set.raceMin <= 0) set.raceMin = 20;
+                // a new season with these settings (lap races)
+                set.raceMin = 0;
                 champ.begin(set); champ.save("champ.sav");
                 screen = SCR_CHAMP; sel = 0; t = 0;
             } else startRace();

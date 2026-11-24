@@ -168,26 +168,39 @@ void Renderer::drawPit(const Race& r, const Camera& cam) {
             continue;
         }
         {
-            // four wheel men (crouched in close at the wheels while they work), the jack man front and rear
+            // a Formula 1 crew: at each wheel the gun man (crouched in close while they work), the man
+            // taking the old wheel off and the one bringing the new one; the front and rear jack men and a
+            // man holding each side of the car
             int ph = c.pitPhase;
             bool wheels = ph == 1;
-            float in = wheels ? 1.15f : 1.9f;
-            const float WX[6] = {1.6f, 1.6f, -1.6f, -1.6f, 3.2f, -3.2f};
-            const float WY[6] = {1, -1, 1, -1, 0, 0};
-            for (int k = 0; k < 6; k++) {
-                float y = WY[k] * in + (wheels && k < 4 ? sinf(tt + k) * 0.05f : 0);
-                float yaw = k < 4 ? (WY[k] > 0 ? -1.57f : 1.57f) : (WX[k] > 0 ? 3.14f : 0);
+            float in = wheels ? 1.05f : 1.8f;
+            const Model& body = carModel[c.def - CARS];
+            float xf = body.axleF != 0 ? body.axleF : 1.6f, xr = body.axleR != 0 ? body.axleR : -1.6f;
+            float hl = c.def->lengthM * 0.5f;
+            const float WX[8] = {xf, xf, xr, xr, hl + 0.7f, -hl - 0.6f, 0.1f, 0.1f};
+            const float WY[8] = {1, -1, 1, -1, 0, 0, 1.25f, -1.25f};
+            for (int k = 0; k < 8; k++) {
+                float y = (k < 4 ? WY[k] * in : WY[k]) + (wheels && k < 4 ? sinf(tt + k) * 0.05f : 0);
+                float yaw = k < 4 || k >= 6 ? (WY[k] > 0 ? -1.57f : 1.57f) : (WX[k] > 0 ? 3.14f : 0);
                 bool gun = wheels && k < 4;
                 float squat = gun && !poseCount[ANIM_WHEELGUN] ? 0.7f : 1.0f;
                 M4 p = place * M4::translate(V3(WX[k], y, 0)) * M4::rotZ(yaw) * M4::scale(1, 1, squat);
                 drawPerson(p, gun ? ANIM_WHEELGUN : ANIM_IDLE, tt * 0.33f + k * 0.3f);
+                if (k < 4) {
+                    // wheel off (behind) and wheel on (ahead) men, standing off a little while the gun works
+                    float sy = WY[k] * (in + 0.75f);
+                    M4 a = place * M4::translate(V3(WX[k] - 0.75f, sy, 0)) * M4::rotZ(WY[k] > 0 ? -2.2f : 2.2f);
+                    M4 b = place * M4::translate(V3(WX[k] + 0.75f, sy, 0)) * M4::rotZ(WY[k] > 0 ? -0.9f : 0.9f);
+                    drawPerson(a, ANIM_IDLE, tt * 0.33f + k * 0.5f + 1.0f);
+                    drawPerson(b, ANIM_IDLE, tt * 0.33f + k * 0.7f + 2.0f);
+                }
             }
             if (ph == 0 || ph == -2) {
                 M4 p = place * M4::translate(V3(-0.8f, 1.6f, 0)) * M4::rotZ(-1.57f);
                 drawPerson(p, ANIM_IDLE, tt * 0.33f + 2.0f);
             }
         }
-        if (fuelRig.lodCount) {
+        if (fuelRig.lodCount && r.ep().refuel) {           // refuelling only in the 1990s
             gfx::bindTexture(&fuelRig.lod[0].tex);
             M4 p = place * M4::translate(V3(-0.8f, 4.0f, 0)) * M4::rotZ(1.57f);
             gfx::drawModel(fuelRig.lod[0].verts, fuelRig.lod[0].count, fuelRig.matrix(p));

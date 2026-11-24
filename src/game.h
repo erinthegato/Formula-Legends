@@ -68,6 +68,7 @@ struct Game {
     void drawReplayHud();
     void drawPhotoHud();
     int sel = 0;                  // highlighted row on the current screen
+    int era = ERA_GE;             // the era being picked on the circuit / team screens
     float t = 0;                  // time on this screen
     float idle = 0;               // time without a button press (title -> highlights reel)
     float steer = 0;
@@ -110,8 +111,19 @@ struct Game {
     void startReel();
     bool loadSlot(int slot);
     std::vector<int> qualiGrid;   // car numbers in qualifying order
-    float introTicks0 = 0.05f, introTickStep = 0.5f, introMusicEnd = 17.6f, introLength = 30.7f;
-    float introPos = 0;
+    // the intro (intro.cpp): music position, the beat grid, the shot and era block on screen
+    float introPos = 0, introBeat0 = 9.78f, introPeriod = 0.33655f, introLength = 64.0f;
+    int introShot = -1, introBlock = -1, introPendingBlock = -1, introCardFrames = 0;
+    float introShotT0 = 0, introCamS = 0; int introFocus = 0, introFocus2 = 1; bool introCrashDone = false;
+    void introBegin();
+    void introEnd();
+    void introUpdate(float dt, bool skip);
+    void introLoadBlock(int block);
+    void introPlace(Car& c, float s, float d, float v);
+    void introStage(int shot);
+    void introDirect(int shot, float st);
+    Camera introCamera(float st);
+    float introBarTime(int bar) const;
 
     int controlRows(int* ids) const;     // the rows the Controls page shows (CR_* ids), in order
 private:

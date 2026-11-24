@@ -130,6 +130,7 @@ struct Car {
     // DRS: allowed in the zone it was detected for (within a second of the car ahead), open while
     // in that zone and not braking; drsFlap animates the flap 0 (shut) .. 1 (open)
     int drsZone = -1; bool drs = false; float drsFlap = 0;
+    bool hold = false;            // the intro: this car stands still where it was put (not driven)
 
     float damage() const { float m = 0; for (float x : dmg) m = m > x ? m : x; return m; }
 };
@@ -198,6 +199,7 @@ struct SafetyCar {
 };
 
 struct Race {
+    friend struct Game;           // (the intro stages its shots with the race's own tools)
     Track track;
     RaceSettings set;
     std::vector<Car> cars;
@@ -319,6 +321,7 @@ struct Race {
     float ghostLap = 0;                      // the record's lap time (0 = none yet)
     bool lapInvalid = false;                 // this lap went off the track: no time
     float gripScale = 1.08f;                 // all cars' cornering grip (the F1 06-style handling: planted)
+    float surfaceGrip() const { return track.def && track.def->street ? 0.92f : 1.0f; }   // dusty public roads
     float playerThrPrev = 0, playerStab = 0; // (the throttle stab detector)
     int steerHelp = 0;                       // the player's steering help: 0 off, 1 light, 2 strong (set by the game)
     float playerLatMax = 0;                  // the player's cornering grip last step, m/s^2 (for the steering help)

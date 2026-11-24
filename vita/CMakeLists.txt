@@ -28,7 +28,7 @@ add_executable(${PROJECT_NAME}
   ${ROOT}/src/data.cpp ${ROOT}/src/track.cpp ${ROOT}/src/race.cpp ${ROOT}/src/racecontrol.cpp
   ${ROOT}/src/champ.cpp ${ROOT}/src/career.cpp ${ROOT}/src/settings.cpp ${ROOT}/src/menu.cpp
   ${ROOT}/src/sound.cpp ${ROOT}/src/render.cpp ${ROOT}/src/render_fx.cpp ${ROOT}/src/clip.cpp
-  ${ROOT}/src/game.cpp ${ROOT}/src/trophies.cpp ${ROOT}/src/setups.cpp ${ROOT}/src/platform_vita.cpp)
+  ${ROOT}/src/game.cpp ${ROOT}/src/intro.cpp ${ROOT}/src/trophies.cpp ${ROOT}/src/setups.cpp ${ROOT}/src/platform_vita.cpp)
 target_include_directories(${PROJECT_NAME} PRIVATE ${ROOT}/src)
 target_compile_definitions(${PROJECT_NAME} PRIVATE PLATFORM_VITA=1)
 

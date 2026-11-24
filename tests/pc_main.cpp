@@ -53,13 +53,15 @@ int main(int argc, char** argv) {
         // play the intro with the real audio clock and grab frames at the sync points
         std::string out = argv[2];
         std::vector<int16_t> wav;
-        float marks[] = {1.0f, 6.3f, 12.6f, 17.8f, 19.6f, 25.0f};
+        float marks[] = {2.6f, 9.0f, 10.5f, 13.6f, 15.6f, 17.8f, 19.4f, 21.0f, 23.4f, 26.8f, 28.4f, 30.2f, 32.0f, 34.5f, 38.0f, 40.2f, 41.6f,
+                         43.0f, 44.6f, 46.4f, 47.6f, 49.8f, 52.0f, 54.4f, 55.6f, 57.2f, 58.6f, 60.0f};
+        const int NM = sizeof(marks) / sizeof(marks[0]);
         int mi = 0;
-        for (int f = 0; f < 60 * 33 && g.screen == SCR_INTRO; f++) {
+        for (int f = 0; f < 60 * 70 && g.screen == SCR_INTRO; f++) {
             Pad q{}; g.frame(1.0f / 60, q);
             if (pc::mixFn) { std::vector<int16_t> b(735 * 2); pc::mixFn(b.data(), 735); if (f % 2 == 0) wav.insert(wav.end(), b.begin(), b.end()); }
             if (f % 120 == 0) fprintf(stderr, "f %d pos %.2f t %.2f screen %d\n", f, g.introPos, g.t, (int)g.screen);
-            if (mi < 6 && g.introPos >= marks[mi]) { char b[48]; snprintf(b, sizeof b, "/intro_%02d.ppm", (int)(marks[mi] * 10)); pc::saveShot((out + b).c_str()); mi++; }
+            if (mi < NM && g.introPos >= marks[mi]) { char b[48]; snprintf(b, sizeof b, "/intro_%03d.ppm", (int)(marks[mi] * 10)); pc::saveShot((out + b).c_str()); mi++; }
         }
         fprintf(stderr, "intro ended: screen %d at %.1f s of music\n", (int)g.screen, g.introPos);
         return 0;

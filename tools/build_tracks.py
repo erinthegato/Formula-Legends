@@ -139,7 +139,7 @@ def build_one(tid, out):
     frac = [i / n0 for i in range(n0)]
     import build_tracks_spurs as SP
     dense, frac = SP.remove_spurs(tid, dense, frac, base=14)
-    sm = smooth_closed(dense, passes=4 if street else 6, keep=0.5)
+    sm = smooth_closed(dense, passes=2 if street else 6, keep=0.5)
     # keep each point's place round the original lap (for the heights)
     sm_f = frac
     # even spacing again, carrying the lap fraction along

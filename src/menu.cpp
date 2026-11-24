@@ -12,7 +12,7 @@
 static const u32 WHITE = RGBA(255, 255, 255), DIM = RGBA(175, 185, 200), ACC = RGBA(255, 150, 40), GOLD = RGBA(255, 215, 70), INK = RGBA(20, 20, 20);
 static const char* DIFF[3] = {"Easy", "Normal", "Hard"};
 static const char* STARTP[3] = {"Pole", "Middle", "Back"};
-static const char* STARTT[4] = {"Event", "Rolling", "Standing", "Le Mans"};
+static const char* STARTT[4] = {"Standing", "Rolling", "Standing", "Standing"};
 static const char* WXN[4] = {"Changeable", "Dry", "Wet", "Thunderstorm"};
 static const char* CAMS[CAM_COUNT] = {"Chase", "Far chase", "Cockpit"};
 
@@ -78,6 +78,7 @@ struct Panel {
 };
 
 static void fmtLength(char* out, const RaceSettings& s) {
+    if (s.raceMin <= 0 && s.laps >= 999) { snprintf(out, 24, "Full GP (%d laps)", TRACKS[s.track].gpLaps); return; }
     if (s.raceMin <= 0) { snprintf(out, 24, "%d lap%s", s.laps, s.laps == 1 ? "" : "s"); return; }
     if (s.raceMin >= 60) snprintf(out, 24, "%d h%s", s.raceMin / 60, s.raceMin % 60 ? " 30" : "");
     else snprintf(out, 24, "%d min", s.raceMin);
@@ -414,8 +415,7 @@ void Game::screenSetupTablet(Panel& P) {
     char v[15][48], len_[24];
     fmtLength(len_, set);
     snprintf(v[0], 48, "Length:  < %s >", len_);
-    if (set.eventHours > 0) snprintf(v[1], 48, "Event:  < %g h >", set.eventHours);
-    else snprintf(v[1], 48, "Event:  < real (%g h) >", TRACKS[set.track].hours);
+    snprintf(v[1], 48, "Era:  < %s >", ERA_NAME[CARS[set.car].era]);
     snprintf(v[2], 48, "Opponents:  < %d >", set.opponents);
     snprintf(v[3], 48, "AI:  < %s >", DIFF[set.difficulty]);
     snprintf(v[4], 48, "Grid:  < %s >", STARTP[set.startPos]);
@@ -432,7 +432,7 @@ void Game::screenSetupTablet(Panel& P) {
     for (int i = 0; i < 15; i++) {
         float y = 27 + i * 13.2f;
         if (i == sel && !setupPage) P.fill(4, y - 1, P.vw - 8, 14, RGBA(255, 150, 40, 230));
-        bool off = (i == 11 && !set.weekend) || (i == 1 && set.raceMin <= 0);
+        bool off = (i == 11 && !set.weekend);
         P.text(10, y, v[i], i == sel && !setupPage ? INK : (i == 13 ? GOLD : (i == 14 ? RGBA(140, 200, 255) : (off ? DIM : WHITE))), 0.76f);
     }
     {
@@ -704,48 +704,61 @@ void Game::screenTitle(Panel& P) {
 void Game::screenTrack(Panel& P) {
     char b[96];
     header(P, "SELECT CIRCUIT");
-    for (int i = 0; i < TRACK_COUNT; i++) {
-        float y = 44 + i * 21;
-        if (i == sel) P.fill(8, y - 1, 196, 20, RGBA(255, 150, 40, 230));
-        P.text(14, y, TRACKS[i].name, i == sel ? INK : WHITE, 0.85f);
+    // era tabs
+    for (int e = 0; e < ERA_COUNT; e++) {
+        float x = 8 + e * 50;
+        P.fill(x, 26, 47, 14, e == era ? ACC : RGBA(0, 0, 0, 140));
+        P.textC(x + 23.5f, 27, ERA_SHORT[e], e == era ? INK : DIM, 0.66f);
     }
-    if (previewIdx != sel) { preview.load(&TRACKS[sel], false); previewIdx = sel; }
+    for (int i = 0; i < ERA_ROUNDS; i++) {
+        int ti = eraTrack(era, i);
+        float y = 46 + i * 19.5f;
+        if (i == sel) P.fill(8, y - 1, 196, 18.5f, RGBA(255, 150, 40, 230));
+        snprintf(b, sizeof b, "%d  %s", i + 1, TRACKS[ti].name);
+        P.text(14, y, b, i == sel ? INK : WHITE, 0.74f);
+    }
+    int ti = eraTrack(era, sel);
+    if (previewIdx != ti) { preview.load(&TRACKS[ti], false); previewIdx = ti; }
     P.fill(214, 42, 258, 206, RGBA(0, 0, 0, 120));
     if (preview.n) {
         P.map(preview, 226, 48, 130, WHITE);
-        P.text(366, 52, "Length", DIM, 0.75f);
+        P.text(366, 52, "Lap", DIM, 0.75f);
         snprintf(b, sizeof b, "%.3f km", preview.length / 1000.0f); P.text(366, 66, b, WHITE, 0.9f);
         P.text(366, 90, "Height range", DIM, 0.75f);
         snprintf(b, sizeof b, "%.0f m", preview.elevMax - preview.elevMin); P.text(366, 104, b, WHITE, 0.9f);
-        P.text(366, 128, "Event", DIM, 0.75f);
-        snprintf(b, sizeof b, "%g hours", TRACKS[sel].hours); P.text(366, 142, b, WHITE, 0.9f);
+        P.text(366, 128, "Grand Prix", DIM, 0.75f);
+        snprintf(b, sizeof b, "%d laps", TRACKS[ti].gpLaps); P.text(366, 142, b, WHITE, 0.9f);
+        if (TRACKS[ti].street || TRACKS[ti].floodlit) P.text(366, 160, TRACKS[ti].floodlit ? (TRACKS[ti].street ? "Street, at night" : "Night race") : "Street circuit", ACC, 0.7f);
     } else P.text(240, 120, "circuit data missing", ACC, 0.9f);
-    P.text(224, 190, TRACKS[sel].location, WHITE, 0.85f);
-    P.text(224, 210, "Fictional circuit on real terrain", DIM, 0.72f);
-    P.text(224, 226, "Map data (c) OpenStreetMap  Hills: EU-DEM/SRTM", DIM, 0.62f);
-    P.textC(240, 254, "X  choose     O  back", DIM, 0.8f);
+    snprintf(b, sizeof b, "%s  -  %s", TRACKS[ti].location, ERA_NAME[era]);
+    P.text(224, 190, b, WHITE, 0.72f);
+    P.text(224, 208, "Real layout and heights, today's track", DIM, 0.66f);
+    P.text(224, 222, "Outline: bacinger/f1-circuits  Heights: EU-DEM/SRTM", DIM, 0.58f);
+    P.textC(240, 254, "L/R  era     X  choose     O  back", DIM, 0.8f);
 }
 
 void Game::screenCar(Panel& P, Panel& I) {
     char b[96];
     P.fill(0, 0, P.vw, 22, RGBA(0, 0, 0, 150));
     P.fill(0, 22, P.vw, 2, ACC);
-    P.text(8, 3, champMode ? "SEASON CAR" : "SELECT CAR", WHITE, 0.9f);
-    for (int i = 0; i < CAR_PICK; i++) {
-        float y = 27 + i * 13.0f + (CARS[i].cls == CLASS_GT3 ? 6 : 0);
-        if (i == sel) P.fill(4, y, P.vw - 8, 13, RGBA(255, 150, 40, 230));
-        P.fill(8, y + 3, 7, 7, CARS[i].colour | 0xFF000000u);
-        snprintf(b, sizeof b, "%s %s", CARS[i].make, CARS[i].model);
-        P.text(20, y, b, i == sel ? INK : WHITE, 0.74f);
-        P.textR(P.vw - 8, y + 1, CARS[i].cls == CLASS_HYPER ? "HY" : "GT3", i == sel ? INK : DIM, 0.6f);
+    int e = CARS[sel % CAR_PICK].era;
+    snprintf(b, sizeof b, "%s  %s", champMode ? "SEASON CAR" : "SELECT TEAM", ERA_SHORT[e]);
+    P.text(8, 3, b, WHITE, 0.9f);
+    for (int k = 0; k < TEAMS_PER_ERA; k++) {
+        int i = eraFirstCar(e) + k;
+        float y = 30 + k * 20.0f;
+        if (i == sel) P.fill(4, y - 1, P.vw - 8, 19, RGBA(255, 150, 40, 230));
+        P.fill(8, y + 4, 9, 9, CARS[i].colour | 0xFF000000u);
+        snprintf(b, sizeof b, "%s", CARS[i].team);
+        P.text(22, y, b, i == sel ? INK : WHITE, 0.72f);
     }
-    P.textC(P.vw / 2, 249, "X choose   O back", DIM, 0.66f);
-    const CarDef& d = CARS[sel];
-    snprintf(b, sizeof b, "%s %s  (%s)", d.make, d.model, d.cls == CLASS_HYPER ? "Hypercar" : "LMGT3");
+    P.textC(P.vw / 2, 249, champMode ? "L/R era  X choose  O back" : "X choose   O back", DIM, 0.62f);
+    const CarDef& d = CARS[sel % CAR_PICK];
+    snprintf(b, sizeof b, "%s %s  (%s)", d.make, d.model, ERA_SHORT[d.era]);
     I.text(8, 3, b, WHITE, 0.9f);
     snprintf(b, sizeof b, "%s  #%d & #%d", d.team, d.numbers[0], d.numbers[1]);
     I.text(8, 21, b, DIM, 0.76f);
-    snprintf(b, sizeof b, "%s   %.0f kW   %.0f kg", d.engine, d.powerKW, d.massKg);
+    snprintf(b, sizeof b, "%s   %.0f kW   %.0f kg", d.engine, d.powerKW + Race::phys(d.era).ersKW, d.massKg);
     I.text(8, 38, b, DIM, 0.76f);
 }
 
@@ -757,8 +770,8 @@ void Game::screenChamp(Panel& P) {
     for (int i = 0; i < CHAMP_ROUND_COUNT; i++) {
         const ChampRound& r = CHAMP_ROUNDS[i];
         u32 col = i < champ.round ? DIM : (i == champ.round ? GOLD : WHITE);
-        snprintf(b, sizeof b, "%d  %s  %gh%s", i + 1, TRACKS[champ.trackIndex(i)].name, r.hours, r.mult >= 2 ? " x2" : (r.mult > 1 ? " x1.5" : ""));
-        P.text(14, 44 + i * 17, b, col, 0.68f);
+        snprintf(b, sizeof b, "%d  %s", i + 1, TRACKS[champ.trackIndex(i)].name); (void)r;
+        P.text(14, 44 + i * 14, b, col, 0.64f);
     }
     const char* items[3] = {champ.over() ? "SEASON OVER - new season" : "START NEXT ROUND", "New season", "Back"};
     for (int i = 0; i < 3; i++) {
@@ -769,7 +782,7 @@ void Game::screenChamp(Panel& P) {
     CarClass pc = CARS[champ.base.car].cls;
     int idx[48]; int n = champ.standings(pc, idx, 48);
     P.fill(214, 40, 258, 208, RGBA(0, 0, 0, 120));
-    snprintf(b, sizeof b, "%s STANDINGS  (after %d of %d)", pc == CLASS_HYPER ? "HYPERCAR" : "LMGT3", champ.round, CHAMP_ROUND_COUNT);
+    snprintf(b, sizeof b, "%s STANDINGS  (after %d of %d)", ERA_SHORT[champ.era()], champ.round, CHAMP_ROUND_COUNT);
     P.text(220, 44, b, ACC, 0.7f);
     int me = -1;
     for (int k = 0; k < n; k++) { const ChampEntry& e = champ.e[idx[k]]; if (e.number == CARS[champ.base.car].numbers[0]) me = k; }
@@ -780,7 +793,7 @@ void Game::screenChamp(Panel& P) {
         P.text(222, 62 + k * 17, b, first + k == me ? GOLD : WHITE, 0.72f);
         if (champ.lastPts[idx[first + k]] > 0) { snprintf(b, sizeof b, "+%d", champ.lastPts[idx[first + k]]); P.textR(468, 62 + k * 17, b, RGBA(120, 230, 120), 0.66f); }
     }
-    if (!n) P.text(222, 70, "No points yet - the season starts in Qatar", DIM, 0.68f);
+    if (!n) { snprintf(b, sizeof b, "No points yet - the season opens at %s", TRACKS[champ.trackIndex(0)].name); P.text(222, 70, b, DIM, 0.64f); }
     if (!champ.over()) {
         char a[64], b2[64];
         clockTip(a, b2, sizeof a, champ.roundSettings());
@@ -948,83 +961,7 @@ void Game::screenControls(Panel& P) {
     P.textC(240, 255, rebinding >= 0 ? "Press the new button for this action" : "X  change     O  back", DIM, 0.72f);
 }
 
-// ------------------------------------------------------------------ the Code 4 intro, timed to its theme
-// The theme (Unity AI, Lyria) has a clock ticking every half second all the way through; the music
-// resolves at introMusicEnd and the clock ticks on alone. The second hand steps on every tick, the logo
-// builds on the ticks, flashes when the music resolves, and the game's title comes in over the lone ticking.
-void Game::drawIntro() {
-    float p = introPos;
-    gfx::beginFrame(RGBA(4, 6, 12));
-    gfx::setDepthTest(false); gfx::setBlend(true); gfx::setFog(false, 0, 1, 0);
-    gfx::bindTexture(nullptr);
-    int tick = p < introTicks0 ? 0 : (int)((p - introTicks0) / introTickStep) + 1;
-    float sinceTick = p < introTicks0 ? 1 : fmodf(p - introTicks0, introTickStep);
-    auto fade = [](float x, float a, float b) { return clampf((x - a) / (b - a), 0, 1); };
-    float clockA = fade(p, 0, 2.0f) * (1 - fade(p, introMusicEnd + 3.0f, introMusicEnd + 4.2f));
-    float cx = SCREEN_W / 2, cy = 104, R0 = 62;
-    // the clock: minute dots, hour bars, the second hand stepping on each tick (a flick of light at the tick)
-    if (clockA > 0) {
-        static gfx::Sprite2D d[80];
-        int n = 0;
-        for (int k = 0; k < 60; k++) {
-            float a = k * 6.2832f / 60 - 1.5708f;
-            bool hour = k % 5 == 0;
-            float r = hour ? R0 - 4 : R0;
-            float s = hour ? 4.0f : 2.0f;
-            bool lit = k <= tick % 60 && p < introMusicEnd;
-            u32 col = lit ? RGBA(255, 190, 90, (int)(220 * clockA)) : RGBA(110, 120, 140, (int)(170 * clockA));
-            d[n++] = gfx::Sprite2D{cx + cosf(a) * r - s / 2, cy + sinf(a) * r - s / 2, s, s, 0, 0, 0, 0, col};
-        }
-        gfx::drawSprites2D(d, n);
-        float handPos = p < introMusicEnd ? (float)(tick % 60) : 0.0f;      // at the resolution it points to 12
-        float a = handPos * 6.2832f / 60 - 1.5708f;
-        for (int k = 0; k < 26; k++) {
-            float r = -8 + k * 2.6f;
-            float s = k > 20 ? 2.0f : 3.0f;
-            gfx::drawFill2D(cx + cosf(a) * r - s / 2, cy + sinf(a) * r - s / 2, s, s, RGBA(255, 140, 40, (int)(255 * clockA)));
-        }
-        gfx::drawFill2D(cx - 3, cy - 3, 6, 6, RGBA(255, 255, 255, (int)(255 * clockA)));
-        // the tick itself: a short glow at the hand's tip
-        float g = clampf(1 - sinceTick / 0.12f, 0, 1) * clockA;
-        if (g > 0 && p < introMusicEnd + 6) gfx::drawFill2D(cx + cosf(a) * (R0 - 6) - 4, cy + sinf(a) * (R0 - 6) - 4, 8, 8, RGBA(255, 230, 180, (int)(200 * g)));
-    }
-    // CODE 4: one letter on every fourth tick, STUDIOS after, gold when the music resolves
-    {
-        const char* word = "CODE 4";
-        float logoA = 1 - fade(p, introMusicEnd + 3.0f, introMusicEnd + 4.2f);
-        float sc = 2.2f;
-        float w = R.font.width(word, sc), x = cx - w / 2;
-        bool gold = p >= introMusicEnd;
-        for (int i = 0; word[i]; i++) {
-            char ch[2] = {word[i], 0};
-            float appear = introTicks0 + (3 + i * 4) * introTickStep;
-            float a = fade(p, appear, appear + 0.35f) * logoA;
-            if (a > 0 && word[i] != ' ') {
-                u32 col = gold ? RGBA(255, 205, 90, (int)(255 * a)) : RGBA(235, 240, 250, (int)(255 * a));
-                R.font.draw(x, 176 + (1 - a) * 6, ch, col, sc);
-            }
-            x += R.font.width(ch, sc);
-        }
-        float sa = fade(p, introTicks0 + 26 * introTickStep, introTicks0 + 27 * introTickStep) * logoA;
-        if (sa > 0) R.font.drawCentre(cx, 216, "S T U D I O S", RGBA(160, 175, 200, (int)(255 * sa)), 0.9f);
-        float pa = fade(p, introMusicEnd + 1.2f, introMusicEnd + 1.8f) * logoA;
-        if (pa > 0) R.font.drawCentre(cx, 238, "presents", RGBA(150, 160, 180, (int)(220 * pa)), 0.75f);
-    }
-    // the flash when the music resolves
-    float fl = 1 - fade(p, introMusicEnd, introMusicEnd + 0.9f);
-    if (p >= introMusicEnd && fl > 0) gfx::drawFill2D(0, 0, SCREEN_W, SCREEN_H, RGBA(255, 240, 210, (int)(150 * fl)));
-    // the game's title over the ticking clock
-    float ta = fade(p, introMusicEnd + 4.4f, introMusicEnd + 5.6f) * (1 - fade(p, introLength - 1.4f, introLength - 0.2f));
-    if (ta > 0) {
-        R.font.drawCentre(cx, 98, "FORMULA LEGENDS", RGBA(255, 255, 255, (int)(255 * ta)), 1.7f);
-        R.font.drawCentre(cx, 132, "3D", RGBA(255, 150, 40, (int)(255 * ta)), 1.7f);
-        // the ticks carry on as a row of lights filling up to the end
-        int lit = (int)((p - (introMusicEnd + 4.4f)) / introTickStep);
-        for (int k = 0; k < 16; k++) gfx::drawFill2D(cx - 80 + k * 10, 172, 6, 6, k < lit ? RGBA(255, 150, 40, (int)(255 * ta)) : RGBA(60, 66, 80, (int)(200 * ta)));
-    }
-    if (t > 1.0f) R.font.drawCentre(cx, SCREEN_H - 14, "press any button", RGBA(90, 100, 120), 0.6f);
-    finishFrame();
-}
+// (the intro is in intro.cpp)
 
 // ------------------------------------------------------------------ the pit wall (managing the race)
 // A stand on the pit wall next to our box, looking up the track at the cars coming towards it, with two
