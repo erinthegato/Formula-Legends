@@ -87,6 +87,13 @@ DRS opens by itself when you have it; the DRS box by the speedometer shows it (o
 ## Rebuilding the data
 * Cars: `python3 tools/gen_f1.py [preview dir]` -> `HD/models/car_*.emm`, `wheel_*`, `steering_*`,
   `flap_*`, `livery_career_*.lvy`. Team list and colours are read from `src/data.cpp`.
+* The 2010 car is made in Blender (the first-generation low-poly car: no driver, a hollow cockpit
+  for the steering wheel and its display, a rear wing as wide as the rear floor):
+  `tools/blender/f1_v8_car.py` builds it (three LODs, 942 / 670 / 416 triangles) and exports
+  `tools/blender/f1_v8_car.json`, which `gen_f1.py` paints every 2010 team's livery onto:
+  `blender -b -P tools/blender/f1_v8_car.py -- --export tools/blender/f1_v8_car.json`. After editing the
+  model by hand, re-export with `--export-only`. Its axles, wheel track and rear wing / DRS flap are
+  shared with `gen_f1.py` (`E['v8']`) and `src/render.cpp` (`COCKPIT[1]`, `FLAP_PIVOT[1]`).
 * Circuits: `python3 tools/build_tracks.py` -> `DATA/tracks/*.emt`. Outlines in
   `tools/tracks/circuits/` (bacinger/f1-circuits, MIT). Heights: `tools/tracks/emr/*.emt` (EMR's
   EU-DEM / SRTM profiles for Imola, Spa, Interlagos, COTA, Barcelona, Monza, Lusail, Bahrain) and

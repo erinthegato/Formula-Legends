@@ -19,7 +19,7 @@ livery_career_<era>.lvy.     Usage: python3 tools/gen_f1.py [preview_dir]
 
 Axes: +X forward, +Y left, +Z up, metres, origin on the ground under the middle of the car.
 """
-import os, re, sys, zlib, struct
+import os, re, sys, zlib, json, struct
 import numpy as np
 from PIL import Image, ImageDraw
 
@@ -44,13 +44,15 @@ E = {
                 fw=(1.92, 2.28, 0.82, 0.085, 'flat'), fw_endplate=0.20,
                 rw=(-1.80, -2.15, 0.50, 0.80, 0.18), rw2=True, beam=False, fin=0.0, halo=False, high_nose=True, finger=False,
                 drs=False, groove=True, cover=False, mirrors=(0.30, 0.42, 0.72)),
-    'v8':  dict(L=4.95, xf=1.68, xr=-1.56, R=0.330, wf=0.270, wr=0.375, wheel_y=0.74, wheel_yr=0.72,
-                nose_tip=(2.50, 0.44), nose_hw=0.08, chassis_hw=0.28, chassis_top=0.66, nose_low=0.26,
-                cockpit=(0.45, -0.42), rim=0.72, head=(-0.24, 0.86), airbox=(-0.52, 1.00, 0.14), cover_end=(-1.85, 0.42),
-                pod=(0.30, -1.15, 0.64, 0.54), pod_end_y=0.33, floor_hw=0.70,
-                fw=(2.12, 2.52, 0.90, 0.075, 'cascade'), fw_endplate=0.22,
-                rw=(-2.00, -2.30, 0.375, 0.82, 0.20), rw2=False, beam=False, fin=0.86, halo=False, high_nose=True, finger=False,
-                drs=True, groove=False, cover=False, mirrors=(0.20, 0.50, 0.70)),
+    # 2010: the shape of the Blender car (tools/blender/f1_v8_car.py, the first-generation car); these
+    # numbers place its wheels, DRS flap and livery lines
+    'v8':  dict(L=4.95, xf=1.60, xr=-1.60, R=0.330, wf=0.245, wr=0.325, wheel_y=0.725, wheel_yr=0.71,
+                nose_tip=(2.55, 0.38), nose_hw=0.08, chassis_hw=0.30, chassis_top=0.68, nose_low=0.26,
+                cockpit=(0.78, 0.08), rim=0.69, head=(0.20, 0.72), airbox=(-0.20, 0.95, 0.16), cover_end=(-2.00, 0.40),
+                pod=(0.55, -1.50, 0.62, 0.55), pod_end_y=0.43, floor_hw=0.68,
+                fw=(2.20, 2.68, 0.87, 0.075, 'cascade'), fw_endplate=0.22,
+                rw=(-2.20, -2.60, 0.50, 0.79, 0.26), rw2=False, beam=False, fin=0.86, halo=False, high_nose=True, finger=False,
+                drs=True, groove=False, cover=False, mirrors=(0.72, 0.36, 0.73)),
     'hybrid': dict(L=5.25, xf=1.82, xr=-1.65, R=0.330, wf=0.245, wr=0.325, wheel_y=0.78, wheel_yr=0.76,
                 nose_tip=(2.72, 0.24), nose_hw=0.07, chassis_hw=0.27, chassis_top=0.64, nose_low=0.16,
                 cockpit=(0.45, -0.42), rim=0.70, head=(-0.24, 0.85), airbox=(-0.54, 0.98, 0.15), cover_end=(-1.95, 0.40),
@@ -66,6 +68,38 @@ E = {
                 rw=(-2.22, -2.55, 0.52, 0.82, 0.24), rw2=False, beam=True, fin=0.0, halo=True, high_nose=False, finger=False,
                 drs=True, groove=False, cover=True, mirrors=(0.05, 0.56, 0.72)),
 }
+
+
+# Eras whose body is made in Blender (tools/blender/*.py builds and exports it): the three LODs
+# replace the code-made body, and each team's livery is painted on them the same way.
+BLENDER = {'v8': os.path.join(HERE, 'blender', 'f1_v8_car.json')}
+
+
+def blender_lods(era):
+    """the Blender model's LODs as Meshes, or None. Materials are the swatch names: 'livery' is the
+    projected team livery, '<swatch>_<shade %>' a darker / lighter swatch."""
+    path = BLENDER.get(era)
+    if not path or not os.path.exists(path):
+        return None
+    d = json.load(open(path))
+    mats = []
+    for name in d['materials']:
+        sw, _, shade = name.partition('_')
+        mats.append(('proj' if sw == 'livery' else sw, int(shade) / 100.0 if shade else 1.0))
+    out = []
+    for lod in d['lods']:
+        m = Mesh(E[era]['L'] + 1.2)
+        P = np.array(lod['p'], float).reshape(-1, 3, 3)
+        N = np.array(lod['n'], float).reshape(-1, 3, 3)
+        for i in range(len(P)):
+            fn = np.cross(P[i, 1] - P[i, 0], P[i, 2] - P[i, 0])
+            a = np.linalg.norm(fn)
+            if a < 1e-10:
+                continue
+            uv, shade = mats[lod['m'][i]]
+            m.tris.append((P[i], N[i], uv, 'glass' if lod['g'][i] else 'body', fn / a, shade))
+        out.append(m)
+    return out
 
 
 def sstep(a, b, x):
@@ -583,6 +617,8 @@ def read_cars():
 
 def car_spec(c):
     s = dict(E[c['era']])
+    if c['era'] in BLENDER and os.path.exists(BLENDER[c['era']]):
+        return s                 # one Blender body for the whole grid: the livery follows its shape
     rng = np.random.RandomState(zlib.crc32(c['id'].encode()) & 0x7fffffff)
     # each team's own small differences
     xt, zt = s['nose_tip']
@@ -639,7 +675,11 @@ def main():
             paint_livery(p, dict(c, id='career'), s, look, text=False)
         else:
             paint_livery(p, c, s, look)
-        lods = [(build_body(s, -1), p.img, 512), (build_body(s, 0), p.img, 256), (build_body(s, 2), p.img, 128)]
+        bl = blender_lods(c['era'])
+        if bl:
+            lods = [(bl[0], p.img, 512), (bl[1], p.img, 256), (bl[2], p.img, 128)]
+        else:
+            lods = [(build_body(s, -1), p.img, 512), (build_body(s, 0), p.img, 256), (build_body(s, 2), p.img, 128)]
         # header extras: cabin x (0: the cockpit layout is per era), number panel y / x (airbox side)
         meta = (0.0, s['airbox'][2] + 0.01, s['airbox'][0] - 0.25)
         # EMX1: axles and wheel track, rear wheel radius; flags: bit 2 = open-wheeler (drawn as an F1 car)

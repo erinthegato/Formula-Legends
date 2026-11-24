@@ -15,13 +15,13 @@ struct CockpitLayout { V3 eye; V3 wheel; float wheelTilt; };
 // Formula Legends: the open cockpit of each era (tools/gen_f1.py: the driver's head, the steering wheel)
 static const CockpitLayout COCKPIT[ERA_COUNT] = {
     {V3(-0.12f, 0.0f, 0.855f), V3(0.36f, 0.0f, 0.585f), 0.35f},   // 1998
-    {V3(-0.16f, 0.0f, 0.850f), V3(0.32f, 0.0f, 0.585f), 0.35f},   // 2010
+    {V3(0.10f, 0.0f, 0.840f), V3(0.56f, 0.0f, 0.600f), 0.35f},   // 2010 (the Blender car: no driver, hollow cockpit)
     {V3(-0.16f, 0.0f, 0.840f), V3(0.32f, 0.0f, 0.575f), 0.35f},   // 2016
     {V3(-0.17f, 0.0f, 0.840f), V3(0.31f, 0.0f, 0.575f), 0.35f},   // 2025
 };
 // the DRS flap's hinge on each era's rear wing (tools/gen_f1.py flap_pivot) and the front tyres' width
 // against the rears
-static const V3 FLAP_PIVOT[ERA_COUNT] = {V3(-1.975f, 0, 0.87f), V3(-2.15f, 0, 0.89f), V3(-2.23f, 0, 0.87f), V3(-2.385f, 0, 0.89f)};
+static const V3 FLAP_PIVOT[ERA_COUNT] = {V3(-1.975f, 0, 0.87f), V3(-2.40f, 0, 0.86f), V3(-2.23f, 0, 0.87f), V3(-2.385f, 0, 0.89f)};
 static const float FRONT_W[ERA_COUNT] = {0.78f, 0.72f, 0.75f, 0.75f};
 
 void formatTime(char* out, float t) {
