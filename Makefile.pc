@@ -1,0 +1,8 @@
+# PC test build (software renderer): make -f Makefile.pc && ./fl_test race ardennes 1 1 11 shots 30
+SRC = src/data.cpp src/track.cpp src/race.cpp src/racecontrol.cpp src/champ.cpp src/career.cpp src/settings.cpp src/menu.cpp src/sound.cpp src/render.cpp src/render_fx.cpp src/clip.cpp src/game.cpp src/trophies.cpp src/setups.cpp src/platform_pc.cpp tests/pc_main.cpp
+fl_test: $(SRC) src/*.h
+	$(CXX) -O2 -std=c++17 -Wall -o $@ $(SRC)
+asan: $(SRC) src/*.h
+	$(CXX) -O1 -g -std=c++17 -fsanitize=address,undefined -o fl_test_asan $(SRC)
+clean:
+	rm -f fl_test fl_test_asan

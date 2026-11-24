@@ -1,0 +1,76 @@
+name: Build Vita + PC test
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  vita:
+    runs-on: ubuntu-latest
+    container: vitasdk/vitasdk:latest
+    steps:
+      - name: Tools
+        run: |
+          (apk add --no-cache git cmake make bash 2>/dev/null || (apt-get update && apt-get install -y git cmake make)) || true
+          ls $VITASDK/arm-vita-eabi/lib | grep -i -E "vitagl|vitashark|mathneon|ShaccCgExt" || echo "vitaGL not preinstalled"
+      - uses: actions/checkout@v4
+      - name: vitaGL (if the image lacks it)
+        run: |
+          if [ ! -f $VITASDK/arm-vita-eabi/lib/libvitaGL.a ]; then
+            git clone --depth 1 https://github.com/vitasdk/vdpm /tmp/vdpm && cd /tmp/vdpm && ./vdpm vitaShaRK mathneon SceShaccCgExt vitaGL
+          fi
+      - name: Build VPK
+        run: |
+          cmake -S vita -B build-vita -DCMAKE_BUILD_TYPE=Release
+          cmake --build build-vita -j4
+          ls -la build-vita/*.vpk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: FormulaLegends-Vita
+          path: build-vita/FormulaLegends.vpk
+
+  pc-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build PC test (address + UB sanitizer)
+        run: make -f Makefile.pc asan
+      - name: Menus
+        env:
+          ASAN_OPTIONS: detect_leaks=0
+        run: mkdir -p shots && ./fl_test_asan menus shots
+      - name: The intro
+        env:
+          ASAN_OPTIONS: detect_leaks=0
+        run: ./fl_test_asan intro shots 2>&1 | tail -4
+      - name: One lap at every circuit (each era's cars)
+        env:
+          ASAN_OPTIONS: detect_leaks=0
+          EMR_WX: 1
+        run: |
+          i=0
+          for t in interlagos imola monaco barcelona montreal magnycours hungaroring spa monza suzuka bahrain melbourne sepang shanghai istanbul singapore abudhabi sochi baku redbullring silverstone hockenheim cota mexico jeddah miami zandvoort lasvegas lusail; do
+            car=$(( (i % 4) * 10 + (i % 7) )); i=$((i+1))
+            ./fl_test_asan race $t $car 1 7 shots 20 | grep -E "^P1 |player" | head -2
+          done
+      - name: Races with race control (rain, safety car / VSC, pit stops, DRS)
+        env:
+          ASAN_OPTIONS: detect_leaks=0
+        run: |
+          EMR_WX=3 ./fl_test_asan race spa 2 4 11 shots | grep -E "^P1 |SAFETY|VIRTUAL|Stop|DRS" | head -8
+          EMR_WX=1 ./fl_test_asan race bahrain 31 5 11 shots | grep -E "^P1 |DRS|Stop" | head -8
+      - name: Time trial (ghost saved and reloaded)
+        env:
+          ASAN_OPTIONS: detect_leaks=0
+        run: ./fl_test_asan timetrial 3 2 3 shots 2>&1 | grep -E "^lap|reload"
+      - name: Cars, replay, steering help
+        env:
+          ASAN_OPTIONS: detect_leaks=0
+        run: |
+          ./fl_test_asan cars shots
+          ./fl_test_asan replay suzuka shots 2>&1 | grep -E "recorded|did not|back on"
+          for h in 0 1; do ./fl_test_asan steer monza $h; done
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pc-test-shots
+          path: shots
