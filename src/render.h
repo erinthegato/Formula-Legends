@@ -108,7 +108,7 @@ struct Renderer {
 
 private:
     void drawCar(const Car& c, const V3& eye, const V3& fwd, float tanH, float tanV, bool inside = false);
-    void drawWheels(const CarDef& d, const M4& place, int wl, float steer, float spin, bool frontOnly = false);
+    void drawWheels(const CarDef& d, const M4& place, int wl, float steer, float spin, bool frontOnly = false, const Car* car = nullptr, const V3* eye = nullptr);
     bool visible(const V3& rel, float radius, const Camera& cam, float tanH, float tanV, float maxDist) const;
 };
 

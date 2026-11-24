@@ -211,25 +211,112 @@ void Race::plan() {
     }
 }
 
-void Race::pose(Car& c) const {
+// the surface under the car: the road (with the grade), the verge sloping up or down to the barrier,
+// the kerbs (raised 4 cm, ramping up over their first 35 cm). fwd / left follow the surface.
+void Race::surfaceFrame(const Car& c, V3& pos, V3& fwd, V3& left) const {
     V3 p, t, l; float hw;
     track.frame(c.s, p, t, l, hw);
     float th = atan2f(t.y, t.x) + c.yaw;
     float grade = track.gradeAt(c.s);
     float cp = 1.0f / sqrtf(1 + grade * grade), sp = grade * cp;
-    c.fwd = V3(cosf(th) * cp, sinf(th) * cp, sp);
-    c.left = V3(-sinf(th), cosf(th), 0);
-    // off the tarmac the car sits on the grass / gravel, which slopes up or down to the barrier
+    fwd = V3(cosf(th) * cp, sinf(th) * cp, sp);
+    left = V3(-sinf(th), cosf(th), 0);
     float k = 0, gz = inPitLane(c) ? 0 : track.groundAt(c.s, c.d, &k);
     if (gz != 0 || k != 0) {
         V3 g = l * (c.d >= 0 ? k : -k);                // uphill direction across the verge, metres up per metre
-        c.fwd = norm(c.fwd + V3(0, 0, c.fwd.x * g.x + c.fwd.y * g.y));
-        c.left = norm(c.left + V3(0, 0, c.left.x * g.x + c.left.y * g.y));
+        fwd = norm(fwd + V3(0, 0, fwd.x * g.x + fwd.y * g.y));
+        left = norm(left + V3(0, 0, left.x * g.x + left.y * g.y));
     }
-    c.up = cross(c.fwd, c.left);
-    c.pos = p + l * c.d + V3(0, 0, c.lift + gz);
+    pos = p + l * c.d + V3(0, 0, gz);
     float ad = fabsf(c.d);
-    if (ad > hw && ad < hw + 1.3f && track.pts[track.index(c.s)].kerb && !inPitLane(c)) c.pos.z += 0.04f;
+    if (ad > hw && ad < hw + 1.3f && track.pts[track.index(c.s)].kerb && !inPitLane(c)) pos.z += 0.04f * clampf((ad - hw) / 0.35f, 0, 1);
+}
+
+void Race::pose(Car& c) const {
+    V3 p, f, l;
+    surfaceFrame(c, p, f, l);
+    V3 u = cross(f, l);
+    c.body.gPos = p + V3(0, 0, c.lift); c.body.gUp = u;
+    // the body on its springs: pitched and rolled against the road, and above it in the air
+    const CarBody& b = c.body;
+    if (b.pitch != 0 || b.roll != 0) {
+        float cp = cosf(b.pitch), sp = sinf(b.pitch);
+        V3 f2 = f * cp + u * sp, u2 = u * cp - f * sp;
+        float cr = cosf(b.roll), sr = sinf(b.roll);
+        V3 l2 = l * cr + u2 * sr;
+        f = norm(f2); l = norm(l2); u = cross(f, l);
+    }
+    c.fwd = f; c.left = l; c.up = u;
+    c.pos = p + V3(0, 0, c.lift + fmaxf(b.hOff, -0.03f));      // (pressed down by downforce: a few cm at most)
+}
+
+// The car's body on its suspension. It is not glued to the road: the springs push it along the
+// surface, but over a crest (or off a kerb) it keeps its upward speed and flies until weight and
+// downforce bring it down; in the air it holds its pitch while the road falls away beneath it, and
+// the tyres carry less (or none) of the load, so there is less grip (none in the air). Dips press it
+// down and give a little more. Braking dips the nose, accelerating squats, corners roll it outwards.
+void Race::bodyUpdate(Car& c, float dt, float gEff, float accLong, float accLat) {
+    CarBody& b = c.body;
+    V3 sp, sf, sl;
+    surfaceFrame(c, sp, sf, sl);
+    float zs = sp.z, ps = asinf(clampf(sf.z, -1, 1)), rs = asinf(clampf(sl.z, -1, 1));
+    if (!b.init || fabsf(zs - b.zPrev) > 1.5f || c.lift > 0 || dt <= 0) {
+        // first step, or the car was put somewhere new (pits, a restart, the intro): sit on the road
+        b = CarBody(); b.init = true; b.zPrev = zs; b.psPrev = ps; b.rsPrev = rs;
+        return;
+    }
+    const float W = 2 * 3.14159f * 3.2f, K = W * W, C = 2 * 0.75f * W, E0 = G / K;   // ~3 Hz ride, well damped
+    const float WP = 2 * 3.14159f * 2.6f;
+    int n = (int)ceilf(dt / (1.0f / 60) - 0.01f); if (n < 1) n = 1; if (n > 4) n = 4;
+    float h = dt / n;
+    float zsDot = (zs - b.zPrev) / dt, psDot = (ps - b.psPrev) / dt, rsDot = (rs - b.rsPrev) / dt;
+    float F = 0;
+    for (int i = 0; i < n; i++) {
+        float z0 = b.zPrev + zsDot * h * i, z1 = z0 + zsDot * h;
+        float e = b.hOff, er = b.vz - zsDot;
+        F = 0;
+        if (e < E0) F = fmaxf(0, K * (E0 - e) - C * er);            // the tyres push, they never pull
+        if (e < -0.06f) F += 4 * K * (-0.06f - e);                    // bump stops / the plank
+        b.vz += (F - gEff) * h;
+        float zw = z0 + e + b.vz * h;
+        b.hOff = zw - z1;
+        if (b.hOff < -0.10f) { b.hOff = -0.10f; if (b.vz < zsDot) b.vz = zsDot; }
+        bool inAir = F <= 0 && b.hOff > E0;
+        if (inAir) {
+            // the body holds its angle while the road changes under it; the nose drops a touch
+            b.pitch -= psDot * h + 0.04f * h; b.roll -= rsDot * h;
+        } else {
+            float tp = clampf(accLong * 0.0006f, -0.03f, 0.012f), tr = clampf(accLat * 0.0005f, -0.03f, 0.03f);
+            b.pitchV += (WP * WP * (tp - b.pitch) - 2 * 0.8f * WP * b.pitchV) * h; b.pitch += b.pitchV * h;
+            b.rollV += (WP * WP * (tr - b.roll) - 2 * 0.8f * WP * b.rollV) * h; b.roll += b.rollV * h;
+        }
+        b.air = inAir ? b.air + h : 0;
+    }
+    b.pitch = clampf(b.pitch, -0.35f, 0.35f); b.roll = clampf(b.roll, -0.35f, 0.35f);
+    float ratio = clampf(F / fmaxf(gEff, 1.0f), 0, 1.6f);
+    b.load += (ratio - b.load) * (1 - expf(-dt / 0.10f));     // the tyres take ~0.1 s to answer
+    b.zPrev = zs; b.psPrev = ps; b.rsPrev = rs;
+}
+
+// A barrier hit (sg: +1 the left-hand barrier, -1 the right). The car keeps its speed along the
+// wall less the scrub of the impact, and bounces off a little, instead of being turned to run parallel
+// to it; the nose is knocked away from the wall. Returns the speed into the wall (m/s), 0 if moving away.
+float Race::wallHit(Car& c, float sg) {
+    float travel = c.yaw - c.drift;
+    float along = c.v * cosf(travel), into = c.v * sinf(travel) * sg;
+    if (into <= 0) return 0;
+    float out = -0.22f * into;                                         // a little bounce
+    float scrub = 0.45f * 1.22f * into;                                // friction against the barrier
+    along = along > 0 ? fmaxf(0, along - scrub) : fminf(0, along + scrub);
+    float nt = atan2f(out * sg, along);
+    c.v = sqrtf(along * along + out * out);
+    if (c.v < 0.5f) { c.v = 0; nt = 0; }
+    // the hit turns the nose away from the wall: a glancing blow is a twitch, a big one can spin it
+    float kick = c.human && !c.spinning ? -sg * clampf(into * 0.018f, 0, 0.7f) : 0;
+    c.drift = wrapPi(c.drift * 0.4f + kick);
+    c.yaw = wrapPi(nt + c.drift);
+    if (c.human && fabsf(c.drift) > 0.62f && c.v > 12) c.spinning = true;
+    return into;
 }
 
 void Race::physics(Car& c, float dt) {
@@ -274,7 +361,10 @@ void Race::physics(Car& c, float dt) {
     float suspK = DRY[c.su.susp] + (WETK[c.su.susp] - DRY[c.su.susp]) * wet;
     float gripMul = (off ? (gravel ? 0.42f : 0.55f) : (onKerb ? KERB[c.su.susp] : 1.0f)) * c.def->grip * tyreGrip(c) * (1 - 0.25f * c.dmg[DM_SUSP]) * suspK;
     if (!off) gripMul *= rubberGrip(c);
-    float latMax = p.muBase * gripScale * surfaceGrip() * G * aeroK * gripMul;
+    // the tyres' share of the load (CarBody): light over a crest, none in the air, a little more in a dip
+    // (tyres grip less than in proportion to load, so ~load^0.7)
+    float loadK = c.body.init ? powf(clampf(c.body.load, 0, 1.4f), 0.7f) : 1.0f;
+    float latMax = p.muBase * gripScale * surfaceGrip() * G * aeroK * gripMul * loadK;
     if (c.player) playerLatMax = latMax;
 
     // ---- longitudinal
@@ -285,7 +375,7 @@ void Race::physics(Car& c, float dt) {
     float rpmFrac = c.rpm / c.def->maxRpm;
     float powerFrac = rpmFrac > 1.0f ? 0.0f : clampf(0.55f + 0.6f * rpmFrac, 0, 1);
     float force = c.throttle * P * powerFrac / fmaxf(c.v, 6.0f);
-    float traction = 1.25f * mass * G * aeroK * gripMul;
+    float traction = 1.25f * mass * G * aeroK * gripMul * loadK;
     if (force > traction) force = traction;
     float dragK = (1 + 0.12f * (c.dmg[DM_NOSE] + c.dmg[DM_LEFT] + c.dmg[DM_RIGHT]) - (c.wingOff ? 0.06f : 0)) * wingDrag * (c.drs ? 0.84f : 1.0f);
     float drag = 0.5f * 1.2f * p.cdA * c.def->aero * dragK * c.v * c.v + 0.015f * mass * G;
@@ -295,11 +385,12 @@ void Race::physics(Car& c, float dt) {
     // brakes: the pressures set the strength; the best split is about 63 % front
     float bias = c.su.bias();
     float brakeK = fminf(1.0f, (c.su.brakeF + c.su.brakeR) / 115.0f) * (1 - 1.4f * fabsf(bias - 0.63f));
-    float brakeDec = c.brake * p.brakeG * G * fminf(aeroK, 2.6f) * (off ? 0.6f : 1.0f) * fminf(1.0f, tyreGrip(c) + 0.15f) * brakeK;
+    float brakeDec = c.brake * p.brakeG * G * fminf(aeroK, 2.6f) * (off ? 0.6f : 1.0f) * fminf(1.0f, tyreGrip(c) + 0.15f) * brakeK * fminf(loadK, 1.1f);
     acc -= c.v > 0.1f ? brakeDec : 0;
     if (off) acc -= (gravel ? 4.0f + 0.05f * c.v : 1.2f + 0.012f * c.v) * (c.v > 1 ? 1 : 0);
     c.v += acc * dt;
     if (c.v < 0) c.v = 0;
+    float accLong = acc;
 
     // ---- steering / yaw (c.yawRate holds the wanted rate, set by player input or AI)
     float want = c.yawRate + (c.dmg[DM_SUSP] * 0.04f * c.v / 30.0f) * (c.dmg[DM_LEFT] > c.dmg[DM_RIGHT] ? 1 : -1) * (c.player ? 1 : 0);
@@ -309,7 +400,10 @@ void Race::physics(Car& c, float dt) {
     {
         float ex = fabsf(want) > maxRate ? fabsf(want) / maxRate - 1 : 0;   // how far past the grip the steering asks
         float sgW = want > 0 ? 1.0f : -1.0f;
-        if (ex > 0) {
+        if (ex > 0 && loadK < 0.45f) {
+            // light or in the air: the wheels can't turn the car, it keeps going the way it was
+            want = sgW * maxRate; ex = 0;
+        } else if (ex > 0) {
             c.slip = clampf(ex, 0, 1);
             want = sgW * maxRate * (1 + 0.12f * c.slip);
             c.v -= c.slip * 4.0f * dt * (c.v > 5 ? 1 : 0);
@@ -412,22 +506,21 @@ void Race::physics(Car& c, float dt) {
     if (c.d > 0 && wallZone) {
         // pit wall between the track and the pit lane
         float pw = hw + 2.3f;
-        if (!pitLane && c.d > pw - 1.0f) { c.d = pw - 1.0f; if (c.yaw > 0) { c.v *= 0.7f; c.yaw *= 0.3f; addDamage(c, DM_LEFT, 0.05f + c.v * 0.002f); } }
+        if (!pitLane && c.d > pw - 1.0f) { c.d = pw - 1.0f; float hit = wallHit(c, 1.0f); if (hit > 0) addDamage(c, DM_LEFT, 0.05f + hit * 0.01f); }
         if (pitLane && c.d < pw + 1.0f && c.pit != PIT_NONE) c.d = pw + 1.0f;
         wall = boxD + 3.0f;
     }
     if (fabsf(c.d) > wall) {
         float sg = c.d > 0 ? 1.0f : -1.0f;
         c.d = sg * wall;
-        float into = sinf(c.yaw - c.drift) * sg;
-        if (into > 0) {
-            float hit = c.v * into;
-            if (hit > 4) addDamage(c, sg > 0 ? DM_LEFT : DM_RIGHT, hit * 0.012f);
-            if (hit > 12) { addDamage(c, DM_SUSP, hit * 0.006f); addDamage(c, frand() < 0.5f ? DM_NOSE : DM_WING, hit * 0.008f); }
-            c.v *= 1.0f - clampf(into * 1.6f, 0.1f, 0.7f); c.yaw *= 0.25f; c.drift *= 0.25f;
-        }
+        float hit = wallHit(c, sg);
+        if (hit > 4) addDamage(c, sg > 0 ? DM_LEFT : DM_RIGHT, hit * 0.012f);
+        if (hit > 12) { addDamage(c, DM_SUSP, hit * 0.006f); addDamage(c, frand() < 0.5f ? DM_NOSE : DM_WING, hit * 0.008f); }
     }
     if (fabsf(c.yaw) > 1.4f && !c.player) c.yaw *= 0.98f;
+
+    // ---- the body on its springs (and off the ground over crests)
+    bodyUpdate(c, dt, G * aeroK, accLong, c.yawRate * c.v);
 
     // ---- gears
     if (!c.player || !set.manualGears) {

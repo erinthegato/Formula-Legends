@@ -136,6 +136,7 @@ void Game::introPlace(Car& c, float s, float d, float v) {
     c.hold = false; c.throttle = v > 1 ? 1 : 0; c.brake = 0; c.avoid = 0; c.mistake = 0;
     c.drs = false; c.drsZone = -1; c.drsFlap = 0; c.slip = 0; c.offTrack = false;
     for (float& x : c.dmg) x = 0;
+    c.body = CarBody();
     c.noseOff = c.wingOff = false; c.fuel = 0.6f; c.wear = 0.2f; c.tyre = race.wet > 0.4f ? TY_WET : TY_MEDIUM;
     c.gear = (int)clampf(v / 13.0f + 1, 1, 7);
     race.pose(c);

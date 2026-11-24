@@ -1202,7 +1202,7 @@ void Game::replayRecord() {
         RepCar* f = &rep[(size_t)repHead * n];
         for (int i = 0; i < n; i++) {
             const Car& c = race.cars[i];
-            f[i] = RepCar{c.s, c.d, c.yaw, c.lift, c.steer, c.wheelSpin, c.v, c.noseOff, c.wingOff};
+            f[i] = RepCar{c.s, c.d, c.yaw, c.lift, c.steer, c.wheelSpin, c.v, c.noseOff, c.wingOff, c.body.hOff, c.body.pitch, c.body.roll};
         }
         repHead = (repHead + 1) % REP_N; if (repCount < REP_N) repCount++;
         repNext += 0.1f;
@@ -1237,6 +1237,8 @@ void Game::replayApply() {
         c.steer = f0[i].steer + (f1[i].steer - f0[i].steer) * a; c.wheelSpin = f0[i].spin + (f1[i].spin - f0[i].spin) * a;
         c.v = f0[i].v + (f1[i].v - f0[i].v) * a;
         c.noseOff = f0[i].nose; c.wingOff = f0[i].wing;
+        c.body.hOff = f0[i].hOff + (f1[i].hOff - f0[i].hOff) * a;
+        c.body.pitch = f0[i].pitch + (f1[i].pitch - f0[i].pitch) * a; c.body.roll = f0[i].roll + (f1[i].roll - f0[i].roll) * a;
         race.pose(c);
     }
 }

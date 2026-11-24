@@ -324,7 +324,7 @@ static void axles(const CarDef& d, float& front, float& rear) {
     else { front = d.lengthM * 0.29f; rear = -front; }
 }
 
-void Renderer::drawWheels(const CarDef& d, const M4& place, int wl, float steer, float spin, bool frontOnly) {
+void Renderer::drawWheels(const CarDef& d, const M4& place, int wl, float steer, float spin, bool frontOnly, const Car* car, const V3* eye) {
     const Model& wm = eraWheel[d.era % ERA_COUNT].lodCount ? eraWheel[d.era % ERA_COUNT] : wheel;
     if (!wm.lodCount) return;
     if (wl >= wm.lodCount) wl = wm.lodCount - 1;
@@ -340,6 +340,12 @@ void Renderer::drawWheels(const CarDef& d, const M4& place, int wl, float steer,
         bool front = k < 2, leftSide = (k & 1) == 0;
         // open wheels: the front tyres are narrower, the rear track a touch narrower than the front
         M4 w = place * M4::translate(V3(front ? xf : xr, (leftSide ? 1 : -1) * (front ? y : y - 0.015f), rad));
+        if (car && eye) {
+            // the body dives, rolls and squats on its springs; the tyres stay on the road (in the air they hang with it)
+            V3 wc(w.m[12], w.m[13], w.m[14]), g = car->body.gPos - *eye, n = car->body.gUp;
+            float pen = (wc.x - g.x) * n.x + (wc.y - g.y) * n.y + (wc.z - g.z) * n.z - rad;
+            if (pen < 0) { w.m[12] -= n.x * pen; w.m[13] -= n.y * pen; w.m[14] -= n.z * pen; }
+        }
         if (front) w = w * M4::rotZ(-steer * 0.30f);
         if (!leftSide) w = w * M4::rotZ(3.14159265f);
         w = w * M4::rotY(leftSide ? spin : -spin);
@@ -387,8 +393,8 @@ void Renderer::drawCar(const Car& c, const V3& eye, const V3& fwd, float tanH, f
     if (!c.wingOff) part(ps.wingFirst, ps.wingCount);
     if (!inside) part(ps.glassFirst, ps.glassCount);
     if (!c.wingOff && lod < 2 && !inside) drawFlap(c, place, d < 9);
-    if (inside) { drawWheels(*c.def, place, 0, c.steer, c.wheelSpin, true); return; }    // open wheels: the fronts are in view
-    if (d < (sceneLite ? 40 : 160)) drawWheels(*c.def, place, sceneLite ? 2 : (d < 12 ? 0 : (d < 28 ? 1 : 2)), c.steer, c.wheelSpin);
+    if (inside) { drawWheels(*c.def, place, 0, c.steer, c.wheelSpin, true, &c, &eye); return; }    // open wheels: the fronts are in view
+    if (d < (sceneLite ? 40 : 160)) drawWheels(*c.def, place, sceneLite ? 2 : (d < 12 ? 0 : (d < 28 ? 1 : 2)), c.steer, c.wheelSpin, false, &c, &eye);
     // the race number on the airbox sides (near cars only)
     if (lod == 0 && c.number > 0) {
         char b[12]; snprintf(b, sizeof b, "%d", c.number);

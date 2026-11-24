@@ -1023,7 +1023,7 @@ bool Race::save(const char* path) const {
     FILE* f = fopen(path, "wb");
     if (!f) return false;
     SaveHead h; memset((void*)&h, 0, sizeof h);
-    memcpy(h.magic, "EMS1", 4); h.version = 6;   // v6: tyre temperatures at the end of the Car record; v5: spins, slow zones, hybrid
+    memcpy(h.magic, "EMS1", 4); h.version = 7;   // v7: the body on its springs (CarBody) at the end of the Car record; v6: tyre temperatures at the end of the Car record; v5: spins, slow zones, hybrid
     h.set = set; h.session = session; h.playerIdx = playerIdx; h.carCount = (int)cars.size();
     h.time = time; h.countdown = countdown; h.timeScale = timeScale; h.consumeScale = consumeScale; h.startHour = startHour; h.timeAccel = timeAccel; h.greenTime = greenTime;
     h.rain = rain; h.wet = wet; h.rainTarget = rainTarget; h.rainTimer = rainTimer; h.scCooldown = scCooldown;
@@ -1042,13 +1042,15 @@ bool Race::load(const char* path) {
     FILE* f = fopen(path, "rb");
     if (!f) return false;
     SaveHead h;
-    if (fread(&h, sizeof h, 1, f) != 1 || memcmp(h.magic, "EMS1", 4) || (h.version != 5 && h.version != 6) || h.carCount <= 0 || h.carCount > 64) { fclose(f); return false; }
+    if (fread(&h, sizeof h, 1, f) != 1 || memcmp(h.magic, "EMS1", 4) || (h.version < 5 || h.version > 7) || h.carCount <= 0 || h.carCount > 64) { fclose(f); return false; }
     std::vector<Car> cs(h.carCount);
     for (auto& c : cs) {
         int def = 0;
-        size_t recSize = h.version == 6 ? sizeof(Car) : offsetof(Car, tyreT);   // version 5: no tyre temperatures
+        // version 5: no tyre temperatures; 6: no CarBody (it starts on the road)
+        size_t recSize = h.version == 7 ? sizeof(Car) : (h.version == 6 ? offsetof(Car, body) : offsetof(Car, tyreT));
         if (fread(&def, 4, 1, f) != 1 || fread(&c, recSize, 1, f) != 1 || def < 0 || def >= CAR_COUNT) { fclose(f); return false; }
         if (h.version == 5) for (float& t : c.tyreT) t = 80;
+        if (h.version < 7) c.body = CarBody();
         c.def = &CARS[def];
     }
     fclose(f);

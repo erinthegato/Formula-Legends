@@ -61,6 +61,19 @@ static const int DRIVERS_PER_CAR = 3;
 static const float MAX_STINT_H = 4.0f;      // longest stint one driver may do (hours of race time)
 static const float MAX_DRIVE_H = 14.0f;     // most one driver may drive in the whole race
 
+// the body on its springs (save version 7): height above the road, vertical speed, pitch and roll
+// relative to the road, how much of its weight + downforce the tyres carry, time in the air
+struct alignas(alignof(void*)) CarBody {
+    float hOff = 0, vz = 0;            // m above the road's surface (0 = normal ride height), m/s up (world)
+    float pitch = 0, pitchV = 0;       // rad nose up, relative to the road
+    float roll = 0, rollV = 0;         // rad left side up, relative to the road
+    float load = 1;                    // tyre load / (weight + downforce): 1 normal, 0 in the air
+    float air = 0;                     // seconds with the wheels off the ground
+    float zPrev = 0, psPrev = 0, rsPrev = 0;   // the road under the car last step: height, pitch, roll
+    bool init = false;
+    V3 gPos, gUp;                      // (pose) the road under the car: a point and its normal (wheels stay on it)
+};
+
 struct Car {
     const CarDef* def = nullptr;
     int number = 0;
@@ -131,6 +144,7 @@ struct Car {
     // in that zone and not braking; drsFlap animates the flap 0 (shut) .. 1 (open)
     int drsZone = -1; bool drs = false; float drsFlap = 0;
     bool hold = false;            // the intro: this car stands still where it was put (not driven)
+    CarBody body;                 // (save version 7) suspension and the car in the air
 
     float damage() const { float m = 0; for (float x : dmg) m = m > x ? m : x; return m; }
 };
@@ -263,6 +277,9 @@ struct Race {
     Car& player() { return cars[playerIdx]; }
     const Car& player() const { return cars[playerIdx]; }
     void pose(Car& c) const;
+    void surfaceFrame(const Car& c, V3& pos, V3& fwd, V3& left) const;   // the road (or verge) under the car
+    void bodyUpdate(Car& c, float dt, float gEff, float accLong, float accLat);
+    float wallHit(Car& c, float sg);
     static const ClassPhys& phys(int era);
     int era = 0;                                // the generation of car racing (all cars the same)
     const ClassPhys& ep() const { return phys(era); }

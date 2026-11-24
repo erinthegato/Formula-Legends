@@ -50,7 +50,7 @@ struct Game {
     bool raceLoaded = false;
     int cam = CAM_CHASE;
     // replay: every car's place 10 times a second for the last minute (a ring of REP_N frames)
-    struct RepCar { float s, d, yaw, lift, steer, spin, v; bool nose, wing; };
+    struct RepCar { float s, d, yaw, lift, steer, spin, v; bool nose, wing; float hOff, pitch, roll; };
     static const int REP_N = 600;
     std::vector<RepCar> rep; int repCars = 0, repHead = 0, repCount = 0; float repNext = 0;
     float repT = 0; bool repPlay = true; int repCam = 0, repFocus = 0, repLivePlayer = 0;

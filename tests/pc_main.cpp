@@ -94,6 +94,34 @@ int main(int argc, char** argv) {
         fprintf(stderr, "after a button: screen %d (title %d)\n", (int)g.screen, (int)SCR_TITLE);
         return 0;
     }
+    if (mode == "physlap") {
+        // physlap <track id> <era 0-3> <laps>: the AI drives the era's first car alone (time trial
+        // rules, dry), no drawing; lap times and how often the car went light / left the ground
+        std::string tid = argv[2]; int era = atoi(argv[3]), laps = atoi(argv[4]);
+        int tr = 0; for (int i = 0; i < TRACK_COUNT; i++) if (tid == TRACKS[i].id) tr = i;
+        g.ttMode = true; g.set.track = tr; g.set.car = eraFirstCar(era); g.aiDrivesPlayer = true; g.set.weather = WX_DRY;
+        g.startSession(SES_PRACTICE);
+        g.race.toGarage(); g.race.flyingLap(g.set.setup);
+        Race& r = g.race;
+        float simT = 0, light = 0, minLoad = 9, maxAir = 0, maxLift = 0; int lastLap = 0; float best = 1e9f;
+        while (r.player().lap < laps && simT < 1500) {
+            r.update(1.0f / 60, 0, 0, 0, 0, true); simT += 1.0f / 60;
+            r.sfxEvents.clear();
+            Car& me = r.player();
+            if (me.v > 20) { if (me.body.load < 0.5f) light += 1.0f / 60; minLoad = fminf(minLoad, me.body.load); maxAir = fmaxf(maxAir, me.body.air); maxLift = fmaxf(maxLift, me.body.hOff); }
+            if (getenv("FL_TRACE") && me.lap == 2) {
+                float a = 0, b = 0; sscanf(getenv("FL_TRACE"), "%f %f", &a, &b);
+                if (me.s >= a && me.s <= b) printf("trace %.1f %.3f %.4f %.4f\n", me.s, me.body.load, me.body.hOff, me.body.pitch);
+            }
+            if (getenv("FL_DBG") && me.v > 20 && me.body.load < 0.6f && me.lap == 2) {
+                int i = r.track.index(me.s);
+                fprintf(stderr, "s %6.0f d %5.1f hw %4.1f kerb %d v %3.0f load %.2f hOff %+.3f vz %+.2f grade %+.3f\n", me.s, me.d, r.track.pts[i].hw, (int)r.track.pts[i].kerb, me.v * 3.6f, me.body.load, me.body.hOff, me.body.vz, r.track.gradeAt(me.s));
+            }
+            if (me.lap != lastLap) { lastLap = me.lap; if (me.lap >= 2) best = fminf(best, me.lastLap); }
+        }
+        printf("%-12s era %d  best %.3f  light %.2f s  min load %.2f  max air %.2f s  max rise %.2f m\n", tid.c_str(), era, best, light, minLoad, maxAir, maxLift);
+        return 0;
+    }
     if (mode == "barriers") {   // barrier lines of a circuit (x y per point, left then right), with / without the run-off cut
         std::string tid = argv[2]; FILE* f = fopen(argv[3], "w");
         for (int cut = 0; cut < 2; cut++) {

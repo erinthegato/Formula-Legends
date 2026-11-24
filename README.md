@@ -31,6 +31,14 @@ engine (physics, circuits, trackside scenery, pit crews and their animations). N
   | 2016 | 1:21.3 (1:21.1) | 1:44.5 (1:46.7) | 1:12.0 (1:13.6) | 1:31.2 (1:30.6) |
   | 2025 | 1:19.4 (1:18.8) | 1:40.3 (1:40.5) | 1:09.5 (1:10.0) | 1:27.2 (1:27.0) |
 
+  The cars are not glued to the road (`Race::bodyUpdate`, `CarBody`): the body rides on ~3 Hz
+  springs, keeps its upward speed over crests and kerbs and only comes down under its weight and
+  downforce, holds its angle in the air, and the tyres' grip follows the load they carry (light
+  over a crest, none in the air, a touch more in a dip). Braking dips the nose, corners roll the
+  body, the tyres stay on the road. Barrier hits keep the speed along the wall and bounce off,
+  instead of turning the car parallel. `./fl_test physlap <track> <era> <laps>` times the AI with no
+  drawing and reports how long the car was light or in the air (these changes cost it 0.1-1.2 %).
+
 * **Modes**: quick race, time trial (ghost), championship (an era's 10-round season), career (your own
   two-car team in an era: sponsors, a team-mate and a reserve, upgrades, livery), race weekends
   (practice, qualifying, race), replays and photo mode, trophies.
