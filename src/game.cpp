@@ -382,7 +382,8 @@ void Game::updateRace(float dt, const Pad& p) {
     if (fabsf(p.stickX) > DZ) {
         static const float EXPO[3] = {1.0f, 1.6f, 2.2f};
         float m = clampf((fabsf(p.stickX) - DZ) / (FULL - DZ), 0, 1);
-        target = (p.stickX > 0 ? 1.0f : -1.0f) * powf(m, EXPO[1]);
+        target = (p.stickX > 0 ? 1.0f : -1.0f) * powf(m, 2.0f);       // (less twitchy: a softer centre)
+        (void)EXPO;
     }
     else if (p.right || p.left) target = (p.right ? 1.0f : 0) - (p.left ? 1.0f : 0);
     else if (cfg.tilt && p.hasTilt) {
@@ -393,8 +394,10 @@ void Game::updateRace(float dt, const Pad& p) {
         a = fabsf(a) < 0.03f ? 0 : a - (a > 0 ? 0.03f : -0.03f);
         target = clampf(a / RANGE[cfg.tilt], -1, 1);
     }
-    // how fast the wheel follows the input: sharp turn-in (F1 06 style)
-    float rate = (fabsf(target) > fabsf(steer) && target * steer >= 0) ? 6.5f : 9.0f;
+    // how fast the wheel follows the input: quick at low speed, calmer as the speed builds (an F1 car
+    // at 300 km/h needs only a touch of lock), always quicker back to the centre
+    float vk = raceLoaded ? clampf(race.player().v / 85.0f, 0, 1) : 0;
+    float rate = (fabsf(target) > fabsf(steer) && target * steer >= 0) ? 4.2f - 2.0f * vk : 6.5f - 2.0f * vk;
     steer += clampf(target - steer, -rate * dt, rate * dt);
     // R accelerates and L brakes as well as the bound buttons (only while driving)
     float thr = held(p, ACT_ACCEL) || p.r ? 1.0f : (p.stickY < -0.4f ? -p.stickY : 0);

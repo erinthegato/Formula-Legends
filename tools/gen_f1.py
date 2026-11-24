@@ -131,8 +131,8 @@ def build_body(s, lod):
     L = s['L']
     m = Mesh(L + 1.2)
     xt = s['nose_tip'][0]; xe = s['cover_end'][0]
-    nst = {-1: 34, 0: 20, 2: 9}[lod]
-    nr = {-1: 16, 0: 12, 2: 8}[lod]
+    nst = {-1: 34, 0: 15, 2: 9}[lod]
+    nr = {-1: 16, 0: 10, 2: 8}[lod]
     xs = list(np.linspace(xt, xe, nst))
     rings = []
     for x in xs:
@@ -484,6 +484,8 @@ def build_wheel(era, sides, detail):
     R = s['R']; hw = s['wr'] / 2
     rim = 0.235 if era == 'ge' else 0.17         # 18-inch vs 13-inch
     prof = [(-hw, rim + 0.01), (-hw, R - 0.04), (-hw + 0.04, R), (hw - 0.04, R), (hw, R - 0.04), (hw, rim + 0.01)]
+    if sides <= 8:       # far wheel: a square-shouldered tyre (3 bands instead of 5)
+        prof = [(-hw, rim + 0.01), (-hw + 0.02, R), (hw - 0.02, R), (hw, rim + 0.01)]
     rings = []
     for k in range(sides + 1):
         a = k * 2 * np.pi / sides
@@ -505,7 +507,8 @@ def build_wheel(era, sides, detail):
     if s['cover']:       # wheel cover: a flat disc nearly flush with the tyre
         m.part(np.array([(0, hw - 0.01, 0)] + [(rim * np.cos(a), hw - 0.012, rim * np.sin(a)) for a in ang]),
                [[0, k + 1, k + 2] for k in range(sides)], uv='carbon', flat=True, shade=0.8)
-        m.cyl((0, hw - 0.012, 0), (0, hw + 0.004, 0), 0.05, sides=8, uv='grey', shade=1.1)
+        if sides > 8:
+            m.cyl((0, hw - 0.012, 0), (0, hw + 0.004, 0), 0.05, sides=8, uv='grey', shade=1.1)
     else:
         m.part(np.array([(0, hw - 0.07, 0)] + [(rim * np.cos(a), hw - 0.02, rim * np.sin(a)) for a in ang]),
                [[0, k + 1, k + 2] for k in range(sides)], uv='grey', flat=True, shade=0.65)
@@ -513,7 +516,8 @@ def build_wheel(era, sides, detail):
             for k in range(6):
                 a = k * 2 * np.pi / 6
                 m.tube([(0.04 * np.cos(a), hw - 0.06, 0.04 * np.sin(a)), (rim * np.cos(a), hw - 0.02, rim * np.sin(a))], 0.012, sides=4, uv='grey', shade=1.0)
-        m.cyl((0, hw - 0.06, 0), (0, hw - 0.01, 0), 0.04, sides=8, uv='red', shade=1.1)
+        if detail or sides > 8:
+            m.cyl((0, hw - 0.06, 0), (0, hw - 0.01, 0), 0.04, sides=8, uv='red', shade=1.1)
     m.part(np.array([(0, -hw, 0)] + [(R * np.cos(a), -hw, R * np.sin(a)) for a in ang]), [[0, k + 2, k + 1] for k in range(sides)], uv='carbon', flat=True, shade=0.35)
     if detail:
         m.cyl((0, -0.03, 0), (0, 0.0, 0), rim - 0.03, sides=sides, uv='cage', shade=0.6)     # brake disc
@@ -650,7 +654,7 @@ def main():
     t.swatches(dict(glass=(0.08, 0.11, 0.16), white=(0.92, 0.92, 0.88), red=(0.85, 0.08, 0.06), carbon=(0.09, 0.09, 0.10),
                     cage=(0.50, 0.52, 0.56), second=(0.8, 0.1, 0.1), panel=(0.9, 0.1, 0.1), paint=(0.10, 0.10, 0.11), **G.HD_SWATCH))
     for era in ERAS:
-        print('wheel', era, write_emm(os.path.join(OUT, f'wheel_{era}.emm'), [(build_wheel(era, 18, True), t.img, 128), (build_wheel(era, 12, False), t.img, 64), (build_wheel(era, 8, False), t.img, 32)]))
+        print('wheel', era, write_emm(os.path.join(OUT, f'wheel_{era}.emm'), [(build_wheel(era, 18, True), t.img, 128), (build_wheel(era, 10, False), t.img, 64), (build_wheel(era, 7, False), t.img, 32)]))
         print('flap', era, write_emm(os.path.join(OUT, f'flap_{era}.emm'), [(build_flap(era), t.img, 64)]))
         print('steering', era, write_emm(os.path.join(OUT, f'steering_{era}.emm'), [(build_steering(era), t.img, 256)]))
     # the career cars' livery sets

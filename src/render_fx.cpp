@@ -64,7 +64,7 @@ void Renderer::buildPit(const Race& r) {
     auto P = [&](float rel, float d, float z) { V3 p = t.world(r.pitIn + rel, d, z); return p - pitOrigin; };
     float wallFrom = r.pitRel(r.pitWallFrom), wallTo = r.pitRel(r.pitWallTo);
     const float STEP = 10;
-    for (float a = -20; a < 620; a += STEP) {
+    for (float a = -20; a < PIT_LANE_LEN + 20; a += STEP) {
         float b = a + STEP;
         // lane surface (narrower at the entry / exit), white line along the wall
         float in0 = a < wallFrom ? hw + 0.3f : wallD + 0.3f, in1 = b < wallFrom ? hw + 0.3f : wallD + 0.3f;
@@ -83,10 +83,12 @@ void Renderer::buildPit(const Race& r) {
             addBox(pitVerts, P(a, wallD, 1.1f), P(b, wallD, 1.1f), P(b, wallD, 3.4f), P(a, wallD, 3.4f), RGBA(120, 130, 140, 255));
         }
     }
-    // garages: one 16 m box per team, door in the team colour
-    for (int team = 0; team < CAR_COUNT; team++) {
-        float a = 160.0f + team * 16.0f - 7.5f, b = a + 15.0f;
-        u32 door = CARS[team].colour | 0xFF000000u;
+    // garages: one 16 m box per team of this era (+ the career team), door in the team colour
+    int era = r.era;
+    for (int team = 0; team <= TEAMS_PER_ERA; team++) {
+        float a = PIT_BOX0 + team * 16.0f - 7.5f, b = a + 15.0f;
+        const CarDef& cd = team < TEAMS_PER_ERA ? CARS[eraFirstCar(era) + team] : CARS[careerCarIndex(era)];
+        u32 door = cd.colour | 0xFF000000u;
         // open garage: team-colour lintel over the door, floor, side and back walls, ceiling
         addBox(pitVerts, P(a, garage, 3.6f), P(b, garage, 3.6f), P(b, garage, 4.6f), P(a, garage, 4.6f), door);
         addBox(pitVerts, P(a, garage, 0.03f), P(b, garage, 0.03f), P(b, garage + 12, 0.03f), P(a, garage + 12, 0.03f), RGBA(120, 124, 132));
@@ -101,11 +103,11 @@ void Renderer::buildPit(const Race& r) {
         addBox(pitVerts, P(b - 2.3f, r.boxD - 2.2f, 0.09f), P(b - 2, r.boxD - 2.2f, 0.09f), P(b - 2, r.boxD + 2.2f, 0.09f), P(b - 2.3f, r.boxD + 2.2f, 0.09f), RGBA(250, 210, 40));
     }
     // pit building above the garages
-    for (float a = 140; a < 440; a += 20)
+    for (float a = PIT_BOX0 - 20; a < PIT_BOX0 + 16 * (TEAMS_PER_ERA + 1); a += 20)
         addBox(pitVerts, P(a, garage + 1, 4.6f), P(a + 20, garage + 1, 4.6f), P(a + 20, garage + 1, 11), P(a, garage + 1, 11), RGBA(70, 90, 120));
     // start-light gantry over the track just past the line
     {
-        float g = 358;      // metres after the pit entry = 8 m past the line
+        float g = PIT_IN_BEFORE + 8;      // metres after the pit entry = 8 m past the line
         float hw0 = t.pts[t.index(8)].hw;
         for (int sd = -1; sd <= 1; sd += 2) {
             float d0 = sd * (hw0 + 0.8f);
@@ -123,7 +125,7 @@ void Renderer::buildPit(const Race& r) {
 
 void Renderer::drawPit(const Race& r, const Camera& cam) {
     if (pitVerts.empty()) return;
-    V3 centre = r.track.world(r.pitIn + 300, r.boxD);
+    V3 centre = r.track.world(r.pitIn + PIT_LANE_LEN * 0.5f, r.boxD);
     float d = len(centre - cam.eye);
     if (d > 900) return;
     gfx::bindTexture(nullptr);

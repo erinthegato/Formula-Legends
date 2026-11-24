@@ -18,7 +18,7 @@ static uint32_t rseed = 99;
 static float rnd() { rseed = rseed * 1664525u + 1013904223u; return (rseed >> 8) * (1.0f / 16777216.0f); }
 
 static const float PIT_LIMIT = 22.22f;      // 80 km/h (Formula 1)
-static const float LANE_LEN = 600.0f;       // pit entry .. pit exit
+static const float LANE_LEN = PIT_LANE_LEN; // pit entry .. pit exit (track.h)
 
 // ------------------------------------------------------------------ clock and conditions
 float Race::clockHour() const {
@@ -139,11 +139,12 @@ void Race::message(const char* text, u32 color, int radio) {
 
 // ------------------------------------------------------------------ pit lane layout
 void Race::setupPit() {
-    // the pit lane runs down the left of the main straight: in 350 m before the line, out 250 m after
-    pitIn = track.wrap(-350.0f);
-    pitOut = track.wrap(LANE_LEN - 350.0f);
-    pitWallFrom = track.wrap(-260.0f);
-    pitWallTo = track.wrap(LANE_LEN - 350.0f - 80.0f);
+    // the pit lane runs down the left of the main straight: in 290 m before the line, out 190 m after
+    // (Formula 1 pit lanes are short: the 11 garages of one era fill 176 m)
+    pitIn = track.wrap(-PIT_IN_BEFORE);
+    pitOut = track.wrap(LANE_LEN - PIT_IN_BEFORE);
+    pitWallFrom = track.wrap(-PIT_IN_BEFORE + 80.0f);
+    pitWallTo = track.wrap(LANE_LEN - PIT_IN_BEFORE - 70.0f);
     float hw = track.pts[0].hw;
     laneD = hw + 6.0f;
     boxD = hw + 9.5f;
@@ -251,8 +252,7 @@ void Race::blueFlags(float dt) {
 }
 
 float Race::boxS(const Car& c) const {
-    int team = (int)(c.def - CARS);
-    return track.wrap(pitIn + 160.0f + team * 16.0f + (c.number % 2) * 6.0f);
+    return track.wrap(pitIn + PIT_BOX0 + pitSlot(c.def) * 16.0f + (c.number % 2) * 6.0f);
 }
 
 bool Race::playerAtBox() const { return session == SES_RACE && player().pit == PIT_STOP && player().pitPhase == -2; }

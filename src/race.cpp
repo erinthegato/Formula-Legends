@@ -329,7 +329,7 @@ void Race::physics(Car& c, float dt) {
                 float load = maxRate > 0 ? clampf((fabsf(want) / maxRate - 0.7f) * 3.5f, 0, 1) : 0;
                 float slow = clampf((42.0f - c.v) / 22.0f, 0, 1);
                 float kick = playerStab * load * slow * clampf((c.throttle - 0.7f) * 3.3f, 0, 1);
-                if (kick > 0 && c.v > 8) rot += sgW * kick * 0.9f * dt;
+                if (kick > 0 && c.v > 8) rot += sgW * kick * 0.5f * dt;
             }
             float sd = c.drift > 0 ? 1.0f : -1.0f, ad = fabsf(c.drift);
             bool counter = fabsf(c.yawRate) > 0.02f && (c.yawRate > 0 ? 1.0f : -1.0f) != sd;
@@ -645,11 +645,13 @@ void Race::update(float dt, float steer, float throttle, float brake, int shift,
         c.human = human && c.startDelay <= 0;
         if (human && c.startDelay <= 0) {
             c.throttle = throttle; c.brake = brake;
-            // F1 06-style handling: a little more lock at medium speed for sharp turn-in
-            float lock = 0.34f / (1 + c.v / 20.0f) + 0.03f;
+            // the lock falls away with speed (less twitchy at high speed), and the car takes ~0.1 s to
+            // answer the wheel, so a flick of the stick doesn't jerk the nose round
+            float lock = 0.30f / (1 + c.v / 13.0f) + 0.014f;
             float delta = -steer * lock;
             c.steer = steer;
-            c.yawRate = c.v * tanf(delta) / WHEELBASE;
+            float wantRate = c.v * tanf(delta) / WHEELBASE;
+            c.yawRate += (wantRate - c.yawRate) * (1 - expf(-dt / 0.10f));
             // steering help: never ask for (much) more turn than the tyres can hold, so a twitch of the
             // stick doesn't step the rear out. Light leaves a little slide; strong keeps it on the grip
             if (steerHelp > 0 && c.v > 8 && playerLatMax > 0) {

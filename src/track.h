@@ -36,7 +36,12 @@ enum { PROP_GRANDSTAND, PROP_TREE_PINE, PROP_TREE_ROUND, PROP_TYRES, PROP_BILLBO
        PROP_CONTROL, PROP_BRIDGE, PROP_TVTOWER, PROP_HOSPITALITY, PROP_COUNT };
 
 // pit area (distances from the line) kept flat at road level on the left of the straight
-const float PIT_FROM = -390, PIT_TO = 290, PIT_W = 28;
+// the pit lane: entry PIT_IN_BEFORE m before the line, PIT_LANE_LEN long; garages from PIT_BOX0 m after
+// the entry, 16 m each (10 teams of the era + the career team). PIT_FROM..PIT_TO: the flat pit area
+const float PIT_IN_BEFORE = 290, PIT_LANE_LEN = 480, PIT_BOX0 = 105;
+const float PIT_FROM = -320, PIT_TO = 215, PIT_W = 28;
+// a car's garage slot in its era's pit lane: 0..9 the teams, 10 the career team
+inline int pitSlot(const CarDef* d) { int i = (int)(d - CARS); return i >= CAR_PICK ? TEAMS_PER_ERA : i % TEAMS_PER_ERA; }
 
 struct Track {
     const TrackDef* def = nullptr;
