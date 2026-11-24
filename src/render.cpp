@@ -1067,6 +1067,16 @@ void Renderer::drawHUD(const Race& r, int mode) {
     font.drawRight(SCREEN_W - 12, 37, b, dim, 0.8f);
     // speed + gear (the cockpit has its own displays, unless its wheel is hidden)
     if (mode != CAM_COCKPIT || cfg.hideWheel) drawSpeedBox(c);
+    // DRS: grey when the zones are live, outlined green when this car has it for the next zone, solid when open
+    if (r.ep().drs && r.session != SES_RACE ? true : r.drsOn) {
+        if (r.ep().drs) {
+            bool have = c.drsZone >= 0, open = c.drs;
+            float x = SCREEN_W - 172, y = SCREEN_H - 30;
+            gfx::drawFill2D(x, y, 40, 18, open ? RGBA(40, 200, 90, 230) : RGBA(0, 0, 0, 140));
+            if (have && !open) { gfx::drawFill2D(x, y, 40, 2, RGBA(40, 200, 90)); gfx::drawFill2D(x, y + 16, 40, 2, RGBA(40, 200, 90)); }
+            font.drawCentre(x + 20, y + 1, "DRS", open || have ? RGBA(255, 255, 255) : RGBA(130, 130, 140), 0.85f);
+        }
+    }
     // map
     gfx::drawFill2D(6, SCREEN_H - 86, 80, 80, RGBA(0, 0, 0, 90));
     drawMap(r.track, &r, 10, SCREEN_H - 82, 72, RGBA(230, 230, 230, 200));
