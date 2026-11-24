@@ -37,15 +37,14 @@ ERAS = ['90s', 'v8', 'hybrid', 'ge']
 # ---------------------------------------------------------------------------------------------- era shapes
 # x stations are metres from the middle of the car. wheel_y = the wheel centre's distance from the middle.
 E = {
-    '90s': dict(L=4.45, xf=1.52, xr=-1.43, R=0.330, wf=0.285, wr=0.365, wheel_y=0.73, wheel_yr=0.71,
-                nose_tip=(2.22, 0.36), nose_hw=0.07, chassis_hw=0.29, chassis_top=0.64, nose_low=0.20,
-                cockpit=(0.42, -0.38), rim=0.74, head=(-0.20, 0.86), airbox=(-0.48, 1.00, 0.16), cover_end=(-1.62, 0.44),
-                pod=(0.28, -1.05, 0.70, 0.56), pod_end_y=0.42, floor_hw=0.70,
-                fw=(1.92, 2.28, 0.82, 0.085, 'flat'), fw_endplate=0.20,
-                rw=(-1.80, -2.15, 0.50, 0.80, 0.18), rw2=True, beam=False, fin=0.0, halo=False, high_nose=True, finger=False,
-                drs=False, groove=True, cover=False, mirrors=(0.30, 0.42, 0.72)),
-    # 2010: the shape of the Blender car (tools/blender/f1_v8_car.py, the first-generation car); these
-    # numbers place its wheels, DRS flap and livery lines
+    # 1998 (the Blender car, tools/blender/f1_eras.py): these numbers place its wheels, top flap and livery lines
+    '90s': dict(L=4.45, xf=1.48, xr=-1.50, R=0.330, wf=0.305, wr=0.38, wheel_y=0.725, wheel_yr=0.71,
+                nose_tip=(2.42, 0.35), nose_hw=0.07, chassis_hw=0.29, chassis_top=0.66, nose_low=0.30,
+                cockpit=(0.62, 0.04), rim=0.68, head=(0.20, 0.72), airbox=(-0.25, 0.93, 0.16), cover_end=(-1.92, 0.34),
+                pod=(0.45, -1.40, 0.60, 0.52), pod_end_y=0.42, floor_hw=0.65,
+                fw=(1.88, 2.38, 0.70, 0.075, 'flat'), fw_endplate=0.20,
+                rw=(-1.6745, -1.9655, 0.4925, 0.66, 0.18), rw2=True, beam=False, fin=0.0, halo=False, high_nose=True, finger=False,
+                drs=False, groove=True, cover=False, mirrors=(0.50, 0.36, 0.66)),
     'v8':  dict(L=4.95, xf=1.60, xr=-1.60, R=0.330, wf=0.305, wr=0.38, wheel_y=0.725, wheel_yr=0.71,
                 nose_tip=(2.55, 0.38), nose_hw=0.08, chassis_hw=0.30, chassis_top=0.68, nose_low=0.26,
                 cockpit=(0.78, 0.08), rim=0.69, head=(0.20, 0.72), airbox=(-0.20, 0.95, 0.16), cover_end=(-2.00, 0.40),
@@ -53,26 +52,31 @@ E = {
                 fw=(2.20, 2.68, 0.87, 0.075, 'cascade'), fw_endplate=0.22,
                 rw=(-1.85, -2.18, 0.375, 0.80, 0.20), rw2=False, beam=False, fin=0.86, halo=False, high_nose=True, finger=False,
                 drs=True, groove=False, cover=False, mirrors=(0.72, 0.36, 0.73)),
-    'hybrid': dict(L=5.25, xf=1.82, xr=-1.65, R=0.330, wf=0.245, wr=0.325, wheel_y=0.78, wheel_yr=0.76,
-                nose_tip=(2.72, 0.24), nose_hw=0.07, chassis_hw=0.27, chassis_top=0.64, nose_low=0.16,
-                cockpit=(0.45, -0.42), rim=0.70, head=(-0.24, 0.85), airbox=(-0.54, 0.98, 0.15), cover_end=(-1.95, 0.40),
-                pod=(0.25, -1.20, 0.62, 0.52), pod_end_y=0.30, floor_hw=0.70,
-                fw=(2.32, 2.76, 0.90, 0.070, 'cascade'), fw_endplate=0.23,
-                rw=(-2.08, -2.38, 0.375, 0.80, 0.21), rw2=False, beam=True, fin=0.70, halo=False, high_nose=False, finger=True,
-                drs=True, groove=False, cover=False, mirrors=(0.15, 0.52, 0.68)),
-    'ge':  dict(L=5.62, xf=1.84, xr=-1.76, R=0.360, wf=0.305, wr=0.405, wheel_y=0.80, wheel_yr=0.79,
-                nose_tip=(2.90, 0.22), nose_hw=0.16, chassis_hw=0.28, chassis_top=0.66, nose_low=0.18,
-                cockpit=(0.45, -0.42), rim=0.70, head=(-0.25, 0.85), airbox=(-0.56, 0.98, 0.16), cover_end=(-2.05, 0.42),
-                pod=(0.28, -1.30, 0.78, 0.56), pod_end_y=0.32, floor_hw=0.82,
-                fw=(2.45, 2.92, 1.00, 0.065, 'arch'), fw_endplate=0.24,
-                rw=(-2.22, -2.55, 0.52, 0.82, 0.24), rw2=False, beam=True, fin=0.0, halo=True, high_nose=False, finger=False,
-                drs=True, groove=False, cover=True, mirrors=(0.05, 0.56, 0.72)),
+    # 2016 (the Blender car, tools/blender/f1_eras.py)
+    'hybrid': dict(L=5.25, xf=1.70, xr=-1.55, R=0.330, wf=0.305, wr=0.38, wheel_y=0.725, wheel_yr=0.71,
+                nose_tip=(2.82, 0.17), nose_hw=0.05, chassis_hw=0.30, chassis_top=0.66, nose_low=0.12,
+                cockpit=(0.72, 0.06), rim=0.69, head=(0.20, 0.72), airbox=(-0.25, 0.94, 0.16), cover_end=(-1.95, 0.32),
+                pod=(0.55, -1.45, 0.66, 0.55), pod_end_y=0.30, floor_hw=0.68,
+                fw=(2.25, 2.70, 0.825, 0.075, 'cascade'), fw_endplate=0.20,
+                rw=(-1.902, -2.138, 0.3675, 0.75, 0.20), rw2=False, beam=True, fin=0.0, halo=False, high_nose=False, finger=True,
+                drs=True, groove=False, cover=False, mirrors=(0.66, 0.42, 0.66)),
+    # 2025 (the Blender car, tools/blender/f1_eras.py)
+    'ge':  dict(L=5.62, xf=1.85, xr=-1.75, R=0.3625, wf=0.36, wr=0.45, wheel_y=0.788, wheel_yr=0.773,
+                nose_tip=(2.95, 0.16), nose_hw=0.08, chassis_hw=0.31, chassis_top=0.68, nose_low=0.12,
+                cockpit=(0.80, 0.08), rim=0.70, head=(0.20, 0.72), airbox=(-0.25, 0.95, 0.17), cover_end=(-2.20, 0.36),
+                pod=(0.70, -1.50, 0.76, 0.62), pod_end_y=0.30, floor_hw=0.80,
+                fw=(2.36, 2.98, 0.94, 0.06, 'arch'), fw_endplate=0.27,
+                rw=(-2.171, -2.389, 0.4875, 0.79, 0.24), rw2=False, beam=True, fin=0.88, halo=True, high_nose=False, finger=False,
+                drs=True, groove=False, cover=True, mirrors=(0.62, 0.55, 0.68)),
 }
 
 
 # Eras whose body is made in Blender (tools/blender/*.py builds and exports it): the three LODs
 # replace the code-made body, and each team's livery is painted on them the same way.
-BLENDER = {'v8': os.path.join(HERE, 'blender', 'f1_v8_car.json')}
+BLENDER = {'90s': os.path.join(HERE, 'blender', 'f1_1998_car.json'),       # tools/blender/f1_eras.py
+           'v8': os.path.join(HERE, 'blender', 'f1_v8_car.json'),          # tools/blender/f1_v8_car.py
+           'hybrid': os.path.join(HERE, 'blender', 'f1_2016_car.json'),    # tools/blender/f1_eras.py
+           'ge': os.path.join(HERE, 'blender', 'f1_2025_car.json')}        # tools/blender/f1_eras.py
 
 
 def blender_lods(era):

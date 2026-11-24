@@ -517,6 +517,8 @@ def stats(year):
     for lod in (0, 1, 2):
         n = 0
         for ob in lod_objects(year, lod):
+            if any(k in ob.name for k in GAME_DRAWS):
+                continue
             ev = ob.evaluated_get(dg); me = ev.to_mesh()
             n += sum(len(p.vertices) - 2 for p in me.polygons)
             ev.to_mesh_clear()
@@ -524,8 +526,13 @@ def stats(year):
     return out
 
 
+# the rear wing's top element: the game draws it itself (its DRS flap model) so it can open
+GAME_DRAWS = ('RWFlap', 'RWTop')
+
+
 def export_json(year, path):
-    """one car's three LODs, relative to its empty, in the same format as the 2010 car"""
+    """one car's three LODs, relative to its empty, in the same format as the 2010 car (without the
+    parts the game draws itself: wheels, the rear wing's top flap)"""
     mats = []; lods = []
     dg = bpy.context.evaluated_depsgraph_get()
     root = bpy.data.objects.get('FL_%s' % year)
@@ -533,6 +540,8 @@ def export_json(year, path):
     for lod in (0, 1, 2):
         P, N, M, G = [], [], [], []
         for ob in lod_objects(year, lod):
+            if any(k in ob.name for k in GAME_DRAWS):
+                continue
             ev = ob.evaluated_get(dg); me = ev.to_mesh()
             bm = bmesh.new(); bm.from_mesh(me); ev.to_mesh_clear()
             bm.transform((to_car @ ob.matrix_world) if to_car else ob.matrix_world)

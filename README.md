@@ -94,8 +94,11 @@ DRS opens by itself when you have it; the DRS box by the speedometer shows it (o
   `blender -b -P tools/blender/f1_v8_car.py -- --export tools/blender/f1_v8_car.json`. After editing the
   model by hand, re-export with `--export-only`. Its axles, wheel track and rear wing / DRS flap are
   shared with `gen_f1.py` (`E['v8']`) and `src/render.cpp` (`COCKPIT[1]`, `FLAP_PIVOT[1]`).
-* `tools/blender/f1_eras.py` builds 1998, 2016 and 2025 cars in the same style (Blender only, not in
-  the game yet), sized to each season's technical regulations; `export_json(year, path)` exports one.
+* `tools/blender/f1_eras.py` builds the 1998, 2016 and 2025 cars in the same style, sized to each
+  season's technical regulations; `export_json(year, path)` exports one to `tools/blender/f1_<year>_car.json`,
+  which `gen_f1.py` paints every team's livery onto (all four eras are Blender cars now).
+* The F1 engine loops (`DATA/audio/f1_*.raw`) were generated with ElevenLabs sound effects;
+  `tools/audio/make_engine_loops.py <folder of takes>` picks the steadiest take per era and cuts the loop.
 * Circuits: `python3 tools/build_tracks.py` -> `DATA/tracks/*.emt`. Outlines in
   `tools/tracks/circuits/` (bacinger/f1-circuits, MIT). Heights: `tools/tracks/emr/*.emt` (EMR's
   EU-DEM / SRTM profiles for Imola, Spa, Interlagos, COTA, Barcelona, Monza, Lusail, Bahrain) and
