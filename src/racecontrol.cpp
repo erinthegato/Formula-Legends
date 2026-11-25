@@ -1174,7 +1174,7 @@ bool Race::load(const char* path) {
     }
     fclose(f);
     set = h.set; session = (Session)h.session;
-    real = cfg.real; era = CARS[set.car].era;
+    real = cfg.real; era = CARS[set.car].era; hand.clear();
     if (!track.load(&TRACKS[set.track])) return false;
     plan(); setupPit();
     cars = cs; playerIdx = h.playerIdx;

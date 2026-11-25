@@ -24,11 +24,12 @@ const ClassPhys& Race::phys(int era) {
                                      {327, 1.390f, 47, 1.95f, 1.35f, 3.4f, 100, 120, true,  false, true}};   // 2025 ground effect
     // The game's own pecking order (not the real one): 2010 is the quickest, 2016 a little slower,
     // 2025 the heaviest and slowest of the modern cars; the 1980 wing cars, with ~360 kW, are slowest of all.
-    // AI on Hard, dry, best of 3 laps (Monza / Spa / Monaco / Suzuka):
-    //   1980 1:32.3 1:58.4 1:19.1 1:43.3   (about what the 1979-80 cars did at Monza and Monaco)
-    //   2010 1:22.3 1:44.9 1:11.7 1:29.8
-    //   2016 1:22.3 1:45.0 1:12.7 1:31.2
-    //   2025 1:23.4 1:46.0 1:13.0 1:32.1
+    // AI on Hard, dry, best of 3 laps (Monza / Spa / Monaco / Suzuka), with the shared tyre grip,
+    // weight transfer, 1980 skirts and gear changes (HAND below):
+    //   1980 1:32.6 1:58.4 1:21.3 1:43.4   (about what the 1979-80 cars did at Monza and Monaco)
+    //   2010 1:21.8 1:44.3 1:12.4 1:29.3
+    //   2016 1:22.0 1:44.3 1:13.5 1:30.8
+    //   2025 1:22.8 1:45.3 1:13.7 1:31.2
 #ifndef PLATFORM_VITA
     // tests: FL_PHYS="era mu dfV cdA cap" overrides one era's numbers (lap-time tuning)
     static bool once = false;
@@ -52,10 +53,37 @@ const ClassPhys& Race::phys(int era) {
 struct EraFeel { float stepOut, stepRate, feed, settle, spin, kick, turnIn, slowGrip; };
 static const EraFeel FEEL[ERA_COUNT] = {
     //  stepOut stepRate feed  settle spin   kick  turnIn slowGrip
-    {   0.36f,  1.50f,  0.85f, 3.0f,  0.60f, 0.90f, 10.0f, 0.94f },   // 1980
+    {   0.36f,  1.50f,  0.85f, 3.0f,  0.60f, 0.90f, 10.0f, 0.965f },   // 1980
     {   0.42f,  1.50f,  0.75f, 3.4f,  0.62f, 0.85f, 16.0f, 1.00f },   // 2010
     {   0.40f,  1.00f,  0.45f, 4.2f,  0.62f, 0.95f, 11.0f, 0.97f },   // 2016
-    {   0.42f,  0.85f,  0.40f, 4.6f,  0.62f, 0.60f,  7.5f, 0.92f }};  // 2025
+    {   0.42f,  0.85f,  0.40f, 4.6f,  0.62f, 0.60f,  7.5f, 0.945f }};  // 2025
+
+// the chassis and tyres (all cars, the AI too; Race::physics):
+//   transfer  how much braking / accelerating moves grip between the axles
+//   circleB/T how much braking / full traction takes from the cornering grip (the tyres share one grip)
+//   rotate    how much a loaded nose (trail braking, lifting) turns the car in (the player's car)
+//   power     how readily the throttle slides the rear out of a corner (the player's car)
+//   shift     drive cut on an upshift (1980: a manual box; later: seamless)
+//   dirty     front downforce lost right behind another car
+struct HandEra { float transfer, circleB, circleT, rotate, power, shift, dirty; };
+static const HandEra HAND[ERA_COUNT] = {
+    //  transfer circleB circleT rotate power  shift  dirty
+    {   0.16f,  0.66f,  0.55f,  2.2f,  1.6f,  0.10f, 0.20f },   // 1980: light, loose, a lever gearbox
+    {   0.12f,  0.64f,  0.50f,  1.8f,  1.0f,  0.04f, 0.28f },   // 2010
+    {   0.11f,  0.64f,  0.50f,  1.5f,  1.3f,  0.03f, 0.30f },   // 2016: hybrid torque out of slow corners
+    {   0.09f,  0.62f,  0.45f,  1.1f,  0.8f,  0.03f, 0.14f }};  // 2025: heavy, planted; the rules cut the dirty air
+
+// tyre grip from temperature (as in tyreGrip): full between 80 and 105 deg C
+static inline float sqf(float x) { return x * x; }
+
+// standing water (0..1) and the speed past which a car's tyres start to aquaplane (puddles in places)
+float Race::standingWater() const { return clampf((wet - 0.55f) / 0.45f, 0, 1) * clampf((rain - 0.4f) / 0.4f, 0.3f, 1); }
+float Race::aquaSpeed(const Car& c, int i) const {
+    float vA = c.tyre == TY_WET ? 72 : (c.tyre == TY_INTER ? 58 : 40);       // m/s (~260 / 210 / 145 km/h)
+    if (((unsigned)i * 2654435761u >> 28) < 3) vA *= 0.8f;
+    return vA;
+}
+static float tempGrip(float T) { return T < 80 ? 1 - fminf(0.08f, (80 - T) * 0.0025f) : (T > 105 ? 1 - fminf(0.06f, (T - 105) * 0.003f) : 1.0f); }
 
 static uint32_t seed = 7;
 static float frand() { seed = seed * 1664525u + 1013904223u; return (seed >> 8) * (1.0f / 16777216.0f); }
@@ -79,6 +107,10 @@ bool Race::start(const RaceSettings& s0, Session ses, const std::vector<int>* gr
     if (!track.load(&TRACKS[s.track])) return false;
     era = CARS[s.car].era;
     real = cfg.real;
+    hand.clear();
+#ifndef PLATFORM_VITA
+    if (getenv("FL_GRIP")) gripScale = (float)atof(getenv("FL_GRIP"));   // tests
+#endif
     plan();
     setupPit();
     setupDrs();
@@ -352,6 +384,16 @@ void Race::physics(Car& c, float dt) {
     float wingD = (c.su.wing - 3) * 0.06f, wingDrag = 1 + (c.su.wing - 3) * 0.045f;
     float P = c.def->powerKW * 1000 * (1 - 0.45f * c.dmg[DM_ENGINE]) * MAP_POWER[map];
     if (c.fuel <= 0) P *= 0.08f;                         // out of fuel: crawling on the last drops
+    Handling& H = handOf(c);
+    const HandEra& HE = HAND[era % ERA_COUNT];
+#ifndef PLATFORM_VITA
+    static int hoff = getenv("FL_HOFF") ? atoi(getenv("FL_HOFF")) : 0;   // tests: switch parts off (1 grip circle, 2 axle balance, 4 traction, 8 AI brake limit)
+#else
+    const int hoff = 0;
+#endif
+    // a 1980 turbo: the boost builds a moment after the throttle goes down (lag), then arrives all at once
+    bool turboLag = c.def->era == ERA_90S && c.def->engine && strstr(c.def->engine, "urbo");
+    if (turboLag) { H.boost += (c.throttle - H.boost) * fminf(1.0f, dt / (c.throttle > H.boost ? 0.7f : 0.15f)); P *= 0.5f + 0.5f * H.boost * H.boost; }
     // mechanical problems: a dead turbo, an overheating engine, a throttle that cuts out
     P *= c.rel.powerK;
     if (c.rel.engT > 115) P *= fmaxf(0.7f, 1 - (c.rel.engT - 115) * 0.015f);
@@ -393,19 +435,43 @@ void Race::physics(Car& c, float dt) {
 
     // damage: aero parts cost downforce, body panels add drag, suspension costs grip
     float aeroLoss = 0.35f * c.dmg[DM_NOSE] + 0.3f * c.dmg[DM_WING] + (c.noseOff ? 0.15f : 0) + (c.wingOff ? 0.25f : 0);
-    float aeroK = fminf(1 + (c.v / p.downforceV) * (c.v / p.downforceV) * (1 - aeroLoss) * (1 + wingD) * (c.drs ? 0.9f : 1.0f), p.aeroCap * (1 + wingD));
+    // 1980 wing cars: the sliding skirts seal the underbody; a kerb or a crest breaks the seal for a moment
+    if (c.def->era == ERA_90S) {
+        bool kerbNow = tp.kerb && ad > hw + 0.5f && ad < hw + 1.3f && c.v > 25;     // right up on the kerb
+        if (kerbNow || (c.body.init && c.body.load < 0.6f && c.v > 30)) H.skirt = 0.25f;
+        else H.skirt = fmaxf(0, H.skirt - dt);
+    }
+    float aeroExtra = (H.skirt > 0 && !(hoff & 16) ? 0.30f : 0) + H.dirty * HE.dirty;   // downforce lost (skirts, turbulent air)
+    float aeroK = fminf(1 + (c.v / p.downforceV) * (c.v / p.downforceV) * (1 - aeroLoss) * (1 - aeroExtra) * (1 + wingD) * (c.drs ? 0.9f : 1.0f), p.aeroCap * (1 + wingD));
     // suspension: soft rides kerbs and a wet track better, stiff is sharper on smooth dry tarmac
     static const float KERB[3] = {0.96f, 0.90f, 0.84f}, DRY[3] = {0.985f, 1.0f, 1.012f}, WETK[3] = {1.03f, 1.0f, 0.97f};
     float suspK = DRY[c.su.susp] + (WETK[c.su.susp] - DRY[c.su.susp]) * wet;
     float gripMul = (off ? (gravel ? 0.42f : 0.55f) : (onKerb ? KERB[c.su.susp] : 1.0f)) * c.def->grip * tyreGrip(c) * (1 - 0.25f * c.dmg[DM_SUSP]) * suspK;
     if (!off) gripMul *= rubberGrip(c);
     if (c.rel.flat >= 0) gripMul *= 0.55f;               // running on a flat tyre
+    // standing water: past a speed the tyre rides up on the water (wets clear far more than slicks)
+    {
+        float water = standingWater();
+        float vA = aquaSpeed(c, i);
+        float want = water * clampf((c.v - vA) / 20.0f, 0, 1);
+        H.aqua += (want - H.aqua) * fminf(1.0f, dt * 5);
+        gripMul *= 1 - 0.5f * H.aqua;
+    }
+    if (c.wear < 0.001f) H.flatSpot = 0;                  // new tyres
+    gripMul *= 1 - 0.04f * H.flatSpot;
     // the tyres' share of the load (CarBody): light over a crest, none in the air, a little more in a dip
     // (tyres grip less than in proportion to load, so ~load^0.7)
     float loadK = c.body.init ? powf(clampf(c.body.load, 0, 1.4f), 0.7f) : 1.0f;
     // ground-effect / heavy cars: less grip in slow corners (fades out by ~180 km/h)
     float slowK = 1 - (1 - FEEL[era % ERA_COUNT].slowGrip) * clampf((50.0f - c.v) / 25.0f, 0, 1);
-    float latMax = p.muBase * gripScale * surfaceGrip() * G * aeroK * gripMul * loadK * slowK;
+    float latMax0 = p.muBase * gripScale * surfaceGrip() * G * aeroK * gripMul * loadK * slowK;
+    // the tyres share their grip: braking or full traction leaves less for cornering (last frame's use)
+    float latMax = (hoff & 1) ? latMax0 : latMax0 * sqrtf(fmaxf(0.1f, 1 - sqf(HE.circleB * fminf(H.uB, 1.0f))) * fmaxf(0.1f, 1 - sqf(HE.circleT * fminf(H.uT, 1.0f))));
+    // weight transfer: braking loads the nose (it bites), accelerating the tail (it pushes)
+    H.wt += (clampf(-H.accPrev / (G * 1.8f), -1, 1) - H.wt) * fminf(1.0f, dt / 0.12f);
+    float gAvg = tempGrip(c.tyreTemp());
+    float frontK = (1 + HE.transfer * H.wt) * tempGrip((c.tyreT[0] + c.tyreT[1]) * 0.5f) / gAvg * (1 - 0.5f * H.dirty * HE.dirty);
+    float rearK = (1 - HE.transfer * H.wt) * tempGrip((c.tyreT[2] + c.tyreT[3]) * 0.5f) / gAvg;
     if (c.player) playerLatMax = latMax;
 
     // ---- longitudinal
@@ -414,9 +480,20 @@ void Race::physics(Car& c, float dt) {
     float gearTop = vt * 1.03f * GEAR[c.gear] * RATIO[c.su.gearing];
     c.rpm = fmaxf(c.def->idleRpm, c.def->maxRpm * c.v / fmaxf(gearTop, 1));
     float rpmFrac = c.rpm / c.def->maxRpm;
+    // a downshift too early over-revs the engine and locks the rear wheels for a moment
+    if (c.human && c.gear < H.lastGear && rpmFrac > 1.04f) {
+        H.rearLock = 0.45f;
+        if (c.def->era == ERA_90S) c.dmg[DM_ENGINE] = fminf(1.0f, c.dmg[DM_ENGINE] + 0.02f);   // a "money shift"
+    }
+    H.rearLock = fmaxf(0, H.rearLock - dt);
     float powerFrac = rpmFrac > 1.0f ? 0.0f : clampf(0.55f + 0.6f * rpmFrac, 0, 1);
     float force = c.throttle * P * powerFrac / fmaxf(c.v, 6.0f);
-    float traction = 1.25f * mass * G * aeroK * gripMul * loadK;
+    float traction = 1.25f * mass * G * aeroK * gripMul * loadK * ((hoff & 4) ? 1.0f : clampf(rearK, 0.8f, 1.2f) * sqrtf(fmaxf(0.2f, 1 - sqf(0.6f * fminf(H.latUse, 1.0f)))));
+    // gear changes: the 1980 lever box cuts the drive for a moment
+    if (c.gear != H.lastGear) { if (c.gear > H.lastGear && !(hoff & 32)) H.cut = HE.shift; H.lastGear = c.gear; }
+    if (H.cut > 0) { H.cut -= dt; force = 0; }
+    if (c.rel.cut > 0) force = 0;
+    H.uT = traction > 0 ? fminf(force / traction, 1.0f) * c.throttle : 0;
     if (force > traction) force = traction;
     float dragK = (1 + 0.12f * (c.dmg[DM_NOSE] + c.dmg[DM_LEFT] + c.dmg[DM_RIGHT]) - (c.wingOff ? 0.06f : 0)) * wingDrag * (c.drs ? 0.84f : 1.0f) * (1 - 0.32f * c.rel.tow);
     float drag = 0.5f * 1.2f * p.cdA * c.def->aero * dragK * c.v * c.v + 0.015f * mass * G;
@@ -433,18 +510,36 @@ void Race::physics(Car& c, float dt) {
         if (c.rel.brakeWeak) k2 *= 0.5f;
         brakeDec *= k2;
     }
+    {   // the most the tyres can stop the car (less while cornering); past it the wheels lock
+        float avail = p.muBase * gripScale * surfaceGrip() * G * aeroK * gripMul * loadK * 1.32f * sqrtf(fmaxf(0.2f, 1 - sqf(0.7f * fminf(H.latUse, 1.0f))));
+        float tol = steerHelp >= 2 ? 1e9f : (steerHelp == 1 ? 1.2f : 1.08f);   // steering help keeps the wheels turning
+        H.frontLock = bias >= 0.6f;
+        if (c.human && c.v > 4 && brakeDec > avail * tol) {
+            H.lock = fminf(1.0f, H.lock + dt * 6);
+            brakeDec = avail * 0.86f;                              // a locked tyre slides: it stops worse
+            H.flatSpot = fminf(1.0f, H.flatSpot + dt * 0.08f * H.lock);
+            if (H.flatSpot > 0.5f && H.flatSpot - dt * 0.08f <= 0.5f) message("Flat-spotted the tyres - vibration", RGBA(255, 150, 60));
+        } else {
+            H.lock = fmaxf(0, H.lock - dt * 8);
+            if (!c.human && !(hoff & 8)) brakeDec = fminf(brakeDec, avail * 1.2f);   // the AI never locks up (it brakes as hard as light help allows)
+        }
+        H.uB = avail > 0 ? brakeDec / avail * (c.v > 0.1f ? 1 : 0) : 0;
+    }
     acc -= c.v > 0.1f ? brakeDec : 0;
     if (off) acc -= (gravel ? 4.0f + 0.05f * c.v : 1.2f + 0.012f * c.v) * (c.v > 1 ? 1 : 0);
     c.v += acc * dt;
     if (c.v < 0) c.v = 0;
     float accLong = acc;
+    H.accPrev = acc;
 
     // ---- steering / yaw (c.yawRate holds the wanted rate, set by player input or AI)
     if (c.human) c.yawCmd += (c.yawRate - c.yawCmd) * fminf(1.0f, dt * FEEL[era % ERA_COUNT].turnIn);
     else c.yawCmd = c.yawRate;
     if (c.rel.steerT > 0) c.yawCmd *= 0.25f;            // broken steering rod: the wheel barely turns the car
     float want = c.yawCmd + (c.dmg[DM_SUSP] * 0.04f * c.v / 30.0f) * (c.dmg[DM_LEFT] > c.dmg[DM_RIGHT] ? 1 : -1) * (c.player ? 1 : 0);
-    float maxRate = c.v > 1 ? latMax / c.v : 3.0f;
+    float maxRate = c.v > 1 ? latMax * ((hoff & 2) ? 1.0f : clampf(frontK, 0.75f, 1.25f)) / c.v : 3.0f;
+    if (H.lock > 0 && H.frontLock) maxRate *= 1 - 0.65f * H.lock;      // locked fronts don't steer
+    H.latUse = maxRate > 0 ? fabsf(c.yawRate) / (latMax / fmaxf(c.v, 1.0f)) : 0;
     c.slip = 0;
     float travel = c.yaw;                       // direction the car moves in (relative to the track)
     {
@@ -476,6 +571,17 @@ void Race::physics(Car& c, float dt) {
                 float kick = playerStab * load * slow * clampf((c.throttle - 0.7f) * 3.3f, 0, 1);
                 if (kick > 0 && c.v > 8) rot += sgW * kick * 0.5f * F.kick * dt;
             }
+            {
+                // the chassis: a loaded nose (trail braking, lifting) turns the car in; the throttle out of
+                // a corner slides the rear (how readily depends on the era); locked rears snap it round
+                float helpK = steerHelp >= 2 ? 0.0f : (steerHelp == 1 ? 0.6f : 1.0f);
+                float load2 = maxRate > 0 ? clampf((fabsf(want) / maxRate - 0.5f) * 2.5f, 0, 1) : 0;
+                float bal = frontK - rearK;
+                if (bal > 0.03f && c.v > 15) rot += sgW * (bal - 0.03f) * load2 * HE.rotate * helpK * dt;
+                float pw = clampf((H.uT - 0.8f) * 5, 0, 1) * load2 * clampf(c.throttle * 1.25f - 0.25f, 0, 1);
+                if (pw > 0 && c.v > 6) rot += sgW * pw * HE.power * 0.35f / clampf(rearK, 0.8f, 1.2f) * helpK * dt;
+                if ((H.rearLock > 0 || (H.lock > 0.3f && !H.frontLock)) && c.v > 10) rot += sgW * 0.7f * helpK * dt;
+            }
             float sd = c.drift > 0 ? 1.0f : -1.0f, ad = fabsf(c.drift);
             bool counter = fabsf(c.yawRate) > 0.02f && (c.yawRate > 0 ? 1.0f : -1.0f) != sd;
             if (ad > 0.12f && !counter) rot += sd * ad * (0.9f + c.throttle * 1.6f) * F.feed * dt;   // a big slide feeds itself (more on the throttle)
@@ -505,6 +611,8 @@ void Race::physics(Car& c, float dt) {
         travel = c.yaw - c.drift;
     }
     if (c.brake > 0.5f && c.v > 30 && fabsf(c.yaw) > 0.05f) c.slip = fmaxf(c.slip, 0.3f);
+    if (H.lock > 0.2f || H.rearLock > 0) c.slip = fmaxf(c.slip, 0.8f);    // tyre smoke and squeal
+    if (H.rearLock > 0) c.v = fmaxf(0, c.v - 2.5f * dt);
 
     // ---- move along the track
     float k = track.curvAt(c.s);
@@ -607,10 +715,11 @@ void Race::drive(Car& c, float dt) {
     // a tired driver's slip: off the line and off the pace for a moment
     if (c.mistake > 0) { target = clampf(target + c.mistakeSide * 2.5f, -(hw - 0.6f), hw - 0.6f); vt *= 0.86f; }
     // wet track / worn tyres / damage: the AI eases off as much as the grip has gone
-    vt *= sqrtf(fmaxf(0.3f, tyreGrip(c)));
+    vt *= sqrtf(fmaxf(0.3f, tyreGrip(c))) * (1 - 0.05f * wet);   // (and brakes earlier in the wet)
     // sliding wide: lift and let the front bite again
     if (c.slip > 0.2f) vt = fminf(vt, c.v * (1 - 0.12f * c.slip));
     if (c.offTrack) vt = fminf(vt, 30);
+    if (standingWater() > 0.05f) vt = fminf(vt, aquaSpeed(c, ib) + 6 * (1 - standingWater()));   // easing off through the standing water
     if (c.fuel <= 0) vt = fminf(vt, 12);
     // FCY / slow zone: 80 km/h (a touch under), braking for a zone that starts ahead
     if (fcy > 0 || !zones.empty()) {
@@ -690,6 +799,12 @@ void Race::drive(Car& c, float dt) {
     if (c.v < vt - 1.0f) { c.throttle = 1; c.brake = 0; }
     else if (c.v > vt + 0.8f) { c.throttle = 0; c.brake = clampf((c.v - vt) / 5.0f, 0.25f, 1); }
     else { c.throttle = vt < 1 ? 0 : 0.55f; c.brake = vt < 1 ? 1 : 0; }
+    // the tyres share their grip: ease off the brakes as the car turns in, feed the throttle in on the way out
+    {
+        const Handling& H = handOf(c);
+        if (c.brake > 0 && H.latUse > 0.55f) c.brake *= clampf(1.0f - (H.latUse - 0.55f) * 1.3f, 0.35f, 1.0f);
+        if (c.throttle > 0.6f && H.latUse > 0.85f) c.throttle = fmaxf(0.6f, 1 - (H.latUse - 0.85f) * 2.5f);
+    }
     if (countdown > 0) { c.throttle = 0; c.brake = 1; }
 
     float wantYaw = atan2f(target - c.d, la);

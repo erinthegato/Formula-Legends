@@ -380,9 +380,29 @@ struct Race {
     std::vector<GhostPt> ghost, ghostRec;    // the record lap, the lap being driven
     float ghostLap = 0;                      // the record's lap time (0 = none yet)
     bool lapInvalid = false;                 // this lap went off the track: no time
-    float gripScale = 1.08f;                 // all cars' cornering grip (the F1 06-style handling: planted)
+    float gripScale = 1.11f;                 // all cars' cornering grip (the F1 06-style handling: planted)
     float surfaceGrip() const { return track.def && track.def->street ? 0.92f : 1.0f; }   // dusty public roads
     float playerThrPrev = 0, playerStab = 0; // (the throttle stab detector)
+    // the tyres and the chassis between frames (not saved: it settles again in a moment)
+    struct Handling {
+        float wt = 0;            // weight transfer: + nose loaded (braking), - tail loaded (accelerating)
+        float accPrev = 0;       // last frame's acceleration along the car, m/s^2
+        float latUse = 0, uT = 0, uB = 0;   // how much of the cornering / traction / braking grip is in use (0..1+)
+        float boost = 1;         // turbo boost built up (1980 turbo: lag)
+        float cut = 0;           // gear change: drive cut for this long
+        float lock = 0;          // wheels locked under braking (0..1)
+        bool frontLock = true;   // the fronts lock (else the rears)
+        float rearLock = 0;      // rears locked by a downshift (s)
+        float skirt = 0;         // 1980 wing car: the skirts have lost their seal (s)
+        float dirty = 0;         // 0..1 in another car's turbulent air
+        float aqua = 0;          // 0..1 aquaplaning
+        float flatSpot = 0;      // from lockups (vibration, a little grip)
+        int lastGear = 1;
+    };
+    std::vector<Handling> hand;
+    float standingWater() const;
+    float aquaSpeed(const Car& c, int i) const;
+    Handling& handOf(const Car& c) { size_t i = (size_t)(&c - cars.data()); if (hand.size() != cars.size()) hand.assign(cars.size(), Handling()); return hand[i < hand.size() ? i : 0]; }
     int steerHelp = 0;                       // the player's steering help: 0 off, 1 light, 2 strong (set by the game)
     // the steering lock at speed v (rad at full wheel), and how much of the wheel gives a lateral pull
     static float steerLock(float v) { return 0.30f / (1 + v / 13.0f) + 0.014f; }

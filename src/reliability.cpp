@@ -23,6 +23,17 @@ static bool turbo(const Car& c) { return c.def->era >= ERA_HYBRID || (c.def->eng
 void Race::slipstream(float dt) {
     bool on = real.on(real.slipstream);
     for (auto& c : cars) {
+        // turbulent air: close behind another car the front loses downforce (always on: it's the aero)
+        float dirty = 0;
+        if (c.v > 20 && !c.rel.retired && c.pit == PIT_NONE)
+            for (auto& o : cars) {
+                if (&o == &c || o.rel.retired || o.pit != PIT_NONE) continue;
+                float gap = o.total - c.total;
+                if (gap < 3 || gap > 30 || fabsf(o.d - c.d) > 2.6f) continue;
+                dirty = fmaxf(dirty, (1 - (gap - 3) / 27.0f) * (1 - fabsf(o.d - c.d) / 2.6f * 0.5f));
+            }
+        Handling& H = handOf(c);
+        H.dirty += (dirty - H.dirty) * fminf(1.0f, dt * 4);
         float want = 0;
         if (on && c.v > 25 && !c.rel.retired && c.pit == PIT_NONE) {
             // the closest car up to 40 m ahead, nearly in line
