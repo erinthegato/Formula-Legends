@@ -224,7 +224,7 @@ void Renderer::drawPit(const Race& r, const Camera& cam) {
         // A Formula 1 crew. At each wheel: the gun man (crouched in close), the man who takes the old
         // wheel off and carries it away, and the man who brings the new one; the front and rear jack men
         // with their jacks; a man steadying each side; and the release: a lollipop man in front of the
-        // car (1998) or the light gantry over its nose (2010 on: red while they work, green to go).
+        // car (1980) or the light gantry over its nose (2010 on: red while they work, green to go).
         int ph = stopped ? c.pitPhase : (after ? 3 : -9);       // -9: waiting for the car; after it leaves: 3
         bool wheels = ph == 1, done = (stopped || after) && ph >= 2 && !(ph == 2 && c.plan.repair);
         static const float SWAP[ERA_COUNT] = {1.6f, 3.2f, 2.6f, 2.3f};   // as Race::pitStop
@@ -263,7 +263,7 @@ void Renderer::drawPit(const Race& r, const Camera& cam) {
         };
         // the jack men keep out of the car's way: the rear one waits beside the box (garage side, away
         // from the fast lane) until the car has stopped, then steps in behind it; the front one -- and
-        // the 1998 lollipop man -- pull out to the garage side as the car drops off its jacks to leave
+        // the 1980 lollipop man -- pull out to the garage side as the car drops off its jacks to leave
         const float ASIDE = 1.7f;
         float rearIn = stopped ? clampf(c.pitTotal / 0.2f, 0, 1) : (after ? 1.0f : 0.0f);
         float frontOut = after ? 1.0f : (stopped && ph == 3 ? clampf(c.pitTimer / 0.3f, 0, 1) : 0.0f);
@@ -331,7 +331,7 @@ void Renderer::drawPit(const Race& r, const Camera& cam) {
         // the release
         bool go = done && ph == 3;
         if (era == 0) {
-            // 1998: the lollipop man in front of the nose; the board comes up when the car may go, and he
+            // 1980: the lollipop man in front of the nose; the board comes up when the car may go, and he
             // steps aside with the front jack man
             float hx = hl + 1.4f, hy = 0.35f + frontOut * (ASIDE + 0.6f);
             V3 m = person(hx, hy, 3.14159f, ANIM_IDLE, tt * 0.33f + 3.0f, 17, 1);
@@ -610,7 +610,7 @@ u32 Renderer::skyColour(const Race& r) const {
 
 // ---- the F1 rear light. Position: the tail of each era's rear crash structure (tools/blender: the
 // RainLight lens). Modes, by the rules of the time:
-//   rain     every era: on in the wet (inters / wets fitted, or real rain): steady in 1998, flashing later
+//   rain     every era: on in the wet (inters / wets fitted, or real rain): flashing (none on the 1980 cars)
 //   harvest  hybrid eras (2016, 2025): flashes fast while the MGU-K recovers energy under braking
 //   limiter  2016, 2025: flashes slowly while the pit lane speed limiter is on
 const V3 Renderer::REAR_LIGHT[ERA_COUNT] = {V3(-1.94f, 0, 0.25f), V3(-2.02f, 0, 0.28f), V3(-1.97f, 0, 0.24f), V3(-2.22f, 0, 0.26f)};
@@ -620,7 +620,8 @@ int Renderer::rearLightMode(const Race& r, const Car& c) const {
     bool hybrid = era >= 2;
     if (hybrid && c.pit != PIT_NONE && r.inPitLane(c)) return RL_LIMITER;
     if (hybrid && c.pit == PIT_NONE && c.brake > 0.1f && c.v > 8 && c.ers < 0.999f) return RL_HARVEST;
-    if (c.tyre == TY_INTER || c.tyre == TY_WET || r.rain > 0.35f) return era == 0 ? RL_RAIN_STEADY : RL_RAIN;
+    if (era == 0) return RL_OFF;           // 1980: no rear light on the cars
+    if (c.tyre == TY_INTER || c.tyre == TY_WET || r.rain > 0.35f) return RL_RAIN;
     return RL_OFF;
 }
 

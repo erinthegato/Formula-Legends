@@ -8,16 +8,16 @@ static u32 C(float r, float g, float b) { return RGBA((int)(r * 255), (int)(g * 
 // pecking order, then the career cars (your own team, one per era).
 CarDef CARS[] = {
     // id                make        model   team                      numbers  class        era         engine                         sound                  idle  max     kg   kW    gain    aero   grip   len    colour                    wheels
-    {"m98_marchetti", "Marchetti", "F98", "Scuderia Rosso Marchetti", {3, 4}, CLASS_HYPER, ERA_90S, "3.0 V10 naturally aspirated", "f1_90s", 4000, 17500, 600, 571, 0.000f, 1.005f, 1.007f, 4.45f, C(0.80f, 0.03f, 0.03f), false},
-    {"m98_wexford", "Wexford", "W20", "Wexford Grand Prix", {1, 2}, CLASS_HYPER, ERA_90S, "3.0 V10 naturally aspirated", "f1_90s", 4000, 17500, 600, 566, 0.000f, 0.999f, 1.008f, 4.45f, C(0.06f, 0.12f, 0.42f), false},
-    {"m98_woking", "Woking", "WK-13", "Woking Silver Racing", {7, 8}, CLASS_HYPER, ERA_90S, "3.0 V10 naturally aspirated", "f1_90s", 4000, 17500, 600, 568, 0.000f, 0.989f, 1.007f, 4.45f, C(0.72f, 0.74f, 0.78f), false},
-    {"m98_benedetto", "Benedetto", "B198", "Benedetto Formula", {5, 6}, CLASS_HYPER, ERA_90S, "3.0 V10 naturally aspirated", "f1_90s", 4000, 17500, 600, 562, 0.000f, 1.000f, 1.001f, 4.45f, C(0.20f, 0.45f, 0.85f), false},
-    {"m98_shamrock", "Shamrock", "S198", "Shamrock Grand Prix", {9, 10}, CLASS_HYPER, ERA_90S, "3.0 V10 naturally aspirated", "f1_90s", 4000, 17500, 600, 562, 0.000f, 0.992f, 1.001f, 4.45f, C(0.98f, 0.82f, 0.05f), false},
-    {"m98_bleu", "Bleu", "AP01", "Equipe Bleu", {11, 12}, CLASS_HYPER, ERA_90S, "3.0 V10 naturally aspirated", "f1_90s", 4000, 17500, 600, 556, 0.000f, 1.014f, 0.999f, 4.45f, C(0.10f, 0.28f, 0.75f), false},
-    {"m98_arrowfield", "Arrowfield", "A19", "Arrowfield Racing", {16, 17}, CLASS_HYPER, ERA_90S, "3.0 V10 naturally aspirated", "f1_90s", 4000, 17500, 600, 557, 0.000f, 1.006f, 0.996f, 4.45f, C(0.08f, 0.08f, 0.09f), false},
-    {"m98_tartan", "Tartan", "TG2", "Tartan Grand Prix", {18, 19}, CLASS_HYPER, ERA_90S, "3.0 V10 naturally aspirated", "f1_90s", 4000, 17500, 600, 557, 0.000f, 0.986f, 0.997f, 4.45f, C(0.95f, 0.95f, 0.95f), false},
-    {"m98_hinwil", "Hinwil", "C17", "Hinwil Sauberwerk", {14, 15}, CLASS_HYPER, ERA_90S, "3.0 V10 naturally aspirated", "f1_90s", 4000, 17500, 600, 553, 0.000f, 1.009f, 0.996f, 4.45f, C(0.12f, 0.22f, 0.55f), false},
-    {"m98_faenza", "Faenza", "M198", "Faenza Corse", {22, 23}, CLASS_HYPER, ERA_90S, "3.0 V10 naturally aspirated", "f1_90s", 4000, 17500, 600, 554, 0.000f, 0.990f, 0.992f, 4.45f, C(0.06f, 0.06f, 0.07f), false},
+    {"m98_marchetti", "Marchetti", "T5", "Scuderia Rosso Marchetti", {1, 2}, CLASS_HYPER, ERA_90S, "3.0 flat-12 naturally aspirated", "f1_80s", 3200, 11000, 645, 382, 0.000f, 1.005f, 0.998f, 4.30f, C(0.82f, 0.04f, 0.04f), false},
+    {"m98_wexford", "Wexford", "W07B", "Wexford Grand Prix Engineering", {27, 28}, CLASS_HYPER, ERA_90S, "3.0 V8 naturally aspirated", "f1_80s", 3200, 11000, 645, 364, 0.000f, 1.004f, 1.010f, 4.30f, C(0.93f, 0.94f, 0.91f), false},
+    {"m98_woking", "Woking", "M29", "Woking Racing", {7, 8}, CLASS_HYPER, ERA_90S, "3.0 V8 naturally aspirated", "f1_80s", 3200, 11000, 645, 360, 0.000f, 0.996f, 0.994f, 4.30f, C(0.86f, 0.08f, 0.10f), false},
+    {"m98_benedetto", "Chessington", "BT49", "Chessington Racing", {5, 6}, CLASS_HYPER, ERA_90S, "3.0 V8 naturally aspirated", "f1_80s", 3200, 11000, 645, 364, 0.000f, 1.002f, 1.006f, 4.30f, C(0.07f, 0.14f, 0.45f), false},
+    {"m98_shamrock", "Hethel", "H81", "Team Hethel", {11, 12}, CLASS_HYPER, ERA_90S, "3.0 V8 naturally aspirated", "f1_80s", 3200, 11000, 645, 360, 0.000f, 0.998f, 0.998f, 4.30f, C(0.05f, 0.08f, 0.26f), false},
+    {"m98_bleu", "Bleu", "JS15", "Equipe Bleu", {25, 26}, CLASS_HYPER, ERA_90S, "3.0 V8 naturally aspirated", "f1_80s", 3200, 11000, 645, 362, 0.000f, 1.006f, 1.004f, 4.30f, C(0.30f, 0.58f, 0.92f), false},
+    {"m98_arrowfield", "Arrowfield", "A3", "Arrowfield Racing", {29, 30}, CLASS_HYPER, ERA_90S, "3.0 V8 naturally aspirated", "f1_80s", 3200, 11000, 645, 358, 0.000f, 0.996f, 0.995f, 4.30f, C(0.80f, 0.62f, 0.14f), false},
+    {"m98_tartan", "Ockham", "O10", "Ockham Racing", {3, 4}, CLASS_HYPER, ERA_90S, "3.0 V8 naturally aspirated", "f1_80s", 3200, 11000, 645, 358, 0.000f, 0.994f, 0.996f, 4.30f, C(0.14f, 0.24f, 0.62f), false},
+    {"m98_hinwil", "Viry", "RE20", "Equipe Viry Turbo", {15, 16}, CLASS_HYPER, ERA_90S, "1.5 V6 turbo", "f1_80s", 3200, 11000, 645, 388, 0.000f, 1.008f, 0.996f, 4.30f, C(0.98f, 0.80f, 0.05f), false},
+    {"m98_faenza", "Biscione", "B179", "Biscione Corse", {22, 23}, CLASS_HYPER, ERA_90S, "3.0 V12 naturally aspirated", "f1_80s", 3200, 11000, 650, 386, 0.000f, 0.998f, 0.992f, 4.30f, C(0.58f, 0.05f, 0.08f), false},
 
     {"m10_marchetti", "Marchetti", "F10", "Scuderia Rosso Marchetti", {7, 8}, CLASS_HYPER, ERA_V8, "2.4 V8 naturally aspirated", "f1_v8", 4500, 18000, 620, 571, 0.000f, 0.987f, 1.012f, 4.95f, C(0.82f, 0.03f, 0.03f), false},
     {"m10_woking", "Woking", "WK-25", "Woking Silver Racing", {1, 2}, CLASS_HYPER, ERA_V8, "2.4 V8 naturally aspirated", "f1_v8", 4500, 18000, 620, 569, 0.000f, 0.988f, 1.011f, 4.95f, C(0.76f, 0.78f, 0.82f), false},
@@ -53,7 +53,7 @@ CarDef CARS[] = {
     {"m25_wexford", "Wexford", "W47", "Wexford Grand Prix", {23, 55}, CLASS_HYPER, ERA_GE, "1.6 V6 turbo hybrid", "f1_ge", 4000, 13000, 800, 590, 0.000f, 1.012f, 0.993f, 5.62f, C(0.05f, 0.18f, 0.55f), false},
 
     // career mode: your own team's car, one per era (name, number, livery and upgrades set by the career)
-    {"career_90s", "Your", "Grand Prix car", "Your Team", {0, 0}, CLASS_HYPER, ERA_90S, "3.0 V10 naturally aspirated", "f1_90s", 4000, 17500, 604, 554, 0.000f, 1.000f, 0.995f, 4.45f, C(0.90f, 0.45f, 0.05f), false, 1.0f, true},
+    {"career_90s", "Your", "Grand Prix car", "Your Team", {0, 0}, CLASS_HYPER, ERA_90S, "3.0 V8 naturally aspirated", "f1_80s", 3200, 11000, 649, 356, 0.000f, 1.000f, 0.995f, 4.30f, C(0.90f, 0.45f, 0.05f), false, 1.0f, true},
     {"career_v8", "Your", "Grand Prix car", "Your Team", {0, 0}, CLASS_HYPER, ERA_V8, "2.4 V8 naturally aspirated", "f1_v8", 4500, 18000, 624, 554, 0.000f, 1.000f, 0.995f, 4.95f, C(0.90f, 0.45f, 0.05f), false, 1.0f, true},
     {"career_hybrid", "Your", "Grand Prix car", "Your Team", {0, 0}, CLASS_HYPER, ERA_HYBRID, "1.6 V6 turbo hybrid", "f1_hybrid", 4000, 15000, 706, 594, 0.000f, 1.000f, 0.995f, 5.25f, C(0.90f, 0.45f, 0.05f), false, 1.0f, true},
     {"career_ge", "Your", "Grand Prix car", "Your Team", {0, 0}, CLASS_HYPER, ERA_GE, "1.6 V6 turbo hybrid", "f1_ge", 4000, 13000, 804, 594, 0.000f, 1.000f, 0.995f, 5.62f, C(0.90f, 0.45f, 0.05f), false, 1.0f, true},
@@ -98,8 +98,8 @@ const TrackDef TRACKS[] = {
 };
 const int TRACK_COUNT = sizeof(TRACKS) / sizeof(TRACKS[0]);
 
-const char* ERA_NAME[ERA_COUNT] = {"1990s V10 era", "2010 V8 era", "2016 hybrid era", "2025 ground-effect era"};
-const char* ERA_SHORT[ERA_COUNT] = {"1998", "2010", "2016", "2025"};
+const char* ERA_NAME[ERA_COUNT] = {"1980 wing car era", "2010 V8 era", "2016 hybrid era", "2025 ground-effect era"};
+const char* ERA_SHORT[ERA_COUNT] = {"1980", "2010", "2016", "2025"};
 const char* ERA_ID[ERA_COUNT] = {"90s", "v8", "hybrid", "ge"};
 
 static int T(const char* id) { for (int i = 0; i < TRACK_COUNT; i++) if (!strcmp(TRACKS[i].id, id)) return i; return 0; }

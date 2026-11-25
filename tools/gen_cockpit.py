@@ -22,7 +22,7 @@ sys.path.insert(0, HERE)
 from build_models import swizzle                 # noqa: E402
 
 SRC = os.path.join(HERE, 'blender', 'cockpit_parts.json')
-ERA = {'1998': '90s', '2010': 'v8', '2016': 'hybrid', '2025': 'ge'}
+ERA = {'1998': '90s', '2010': 'v8', '2016': 'hybrid', '2025': 'ge'}    # ('1998': the 1980 parts, see main)
 ROLES = ('suit', 'accent', 'helmet', 'stripe')   # palette entries 1-4 (team colours)
 # the wheels' sidewall stripe takes all four role slots (the game paints it in the compound's colour);
 # the flap: 1 / 3 the team's main colour, 2 / 4 its second colour
@@ -81,6 +81,12 @@ def write(path, parts, palette, roles=()):
 
 def main(prev=None):
     d = json.load(open(SRC))
+    # the 1980 era (internal id 90s) has its own parts, built in code (tools/gen_parts_1980.py)
+    p80 = json.load(open(os.path.join(HERE, 'blender', 'parts_1980.json')))
+    d['palette'].update(p80['palette'])
+    d['steering']['1998'] = p80['steering']
+    d['wheels']['1998'] = p80['wheels']
+    d['flaps']['1998'] = p80['flap']
     for folder in ('HD/models',):            # the F1 game's models are Vita (HD) only
         out = os.path.join(ROOT, folder)
         for year, era in ERA.items():
@@ -89,6 +95,8 @@ def main(prev=None):
                 print(f'steering {year}: {tris[0]} triangles, {dims} m, {size / 1024:.0f} KB')
         size, tris, dims = write(os.path.join(out, 'driver.emm'), d['driver'], d['palette'], ROLES)
         print(f'driver: triangles {tris}, {dims} m, {size / 1024:.0f} KB')
+        size, tris, dims = write(os.path.join(out, 'driver_90s.emm'), p80['driver'], d['palette'], ROLES)
+        print(f'driver 1980 (no HANS): triangles {tris}, {size / 1024:.0f} KB')
         for year, era in ERA.items():
             size, tris, dims = write(os.path.join(out, f'wheel_{era}.emm'), d['wheels'][year], d['palette'], WHEEL_ROLES)
             print(f'wheel {year}: triangles {tris}, {dims} m, {size / 1024:.0f} KB')

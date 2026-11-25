@@ -7,20 +7,24 @@
 static const float G = 9.81f;
 static const float WHEELBASE = 2.9f;
 static const float CAR_LEN = 4.8f, CAR_W = 1.95f;
-static const float GEAR[8] = {0, 0.36f, 0.49f, 0.60f, 0.70f, 0.79f, 0.89f, 1.0f};
+static const float GEAR7[8] = {0, 0.36f, 0.49f, 0.60f, 0.70f, 0.79f, 0.89f, 1.0f};
+static const float GEAR5[8] = {0, 0.42f, 0.57f, 0.71f, 0.85f, 1.0f, 1.0f, 1.0f};
+// 1980 cars had a five-speed Hewland gearbox; from the 1990s on, six and then seven speeds
+static int topGear(const Car& c) { return c.def->era == ERA_90S ? 5 : 7; }
+#define GEAR (c.def->era == ERA_90S ? GEAR5 : GEAR7)
 
 const ClassPhys& Race::phys(int era) {
     // tuned so the AI on Hard laps close to each era's real pole times (see tests: Monza, Spa, Suzuka)
     //                                  top   mu     dfV   brake  cdA    cap   fuel  ers   drs    refuel vsc
     // (mu +1 % with the momentum physics, which costs a few tenths over crests and kerbs)
-    static ClassPhys E[ERA_COUNT] = {{350, 1.333f, 52, 1.95f, 1.08f, 3.0f, 95,  0,   false, true,  false},   // 1998 V10
+    static ClassPhys E[ERA_COUNT] = {{318, 1.550f, 70, 1.95f, 1.05f, 3.4f, 150, 0,   false, false, false},   // 1980 wing car (no refuelling)
                                      {335, 1.424f, 48, 2.10f, 1.15f, 3.1f, 160, 0,   false, false, false},   // 2010 V8
                                      {331, 1.415f, 50, 2.05f, 1.30f, 3.2f, 100, 120, true,  false, true},    // 2016 hybrid
                                      {327, 1.390f, 47, 1.95f, 1.35f, 3.4f, 100, 120, true,  false, true}};   // 2025 ground effect
     // The game's own pecking order (not the real one): 2010 is the quickest, 2016 a little slower,
-    // 2025 the heaviest and slowest; 1998 is close to 2010 on fast tracks, slower in slow corners.
+    // 2025 the heaviest and slowest of the modern cars; the 1980 wing cars, with ~360 kW, are slowest of all.
     // AI on Hard, dry, best of 3 laps (Monza / Spa / Monaco / Suzuka):
-    //   1998 1:22.6 1:47.1 1:14.5 1:33.2
+    //   1980 1:32.3 1:58.4 1:19.1 1:43.3   (about what the 1979-80 cars did at Monza and Monaco)
     //   2010 1:22.3 1:44.9 1:11.7 1:29.8
     //   2016 1:22.3 1:45.0 1:12.7 1:31.2
     //   2025 1:23.4 1:46.0 1:13.0 1:32.1
@@ -39,14 +43,15 @@ const ClassPhys& Race::phys(int era) {
 }
 
 // how each era's car behaves at and past the limit (the player's car; the AI drives on the line)
-//   1998: grooved tyres, little downforce: always on the edge, slides early and the slides grow
+//   1980: the wing car: huge grip in fast corners while the skirts seal, little in slow ones; stiff,
+//         heavy unassisted steering, and it lets go suddenly when it does
 //   2010: lots of grip right up to the edge, a quick turn-in; it bites back, but less than 1998
 //   2016: hybrid torque, stable and forgiving, a touch of understeer
 //   2025: the heaviest: slower to turn in and to stop, planted in fast corners, understeer in slow ones
 struct EraFeel { float stepOut, stepRate, feed, settle, spin, kick, turnIn, slowGrip; };
 static const EraFeel FEEL[ERA_COUNT] = {
     //  stepOut stepRate feed  settle spin   kick  turnIn slowGrip
-    {   0.28f,  1.20f,  0.95f, 2.6f,  0.75f, 1.10f, 14.0f, 1.00f },   // 1998
+    {   0.36f,  1.50f,  0.85f, 3.0f,  0.60f, 0.90f, 10.0f, 0.94f },   // 1980
     {   0.42f,  1.50f,  0.75f, 3.4f,  0.62f, 0.85f, 16.0f, 1.00f },   // 2010
     {   0.40f,  1.00f,  0.45f, 4.2f,  0.62f, 0.95f, 11.0f, 0.97f },   // 2016
     {   0.42f,  0.85f,  0.40f, 4.6f,  0.62f, 0.60f,  7.5f, 0.92f }};  // 2025
@@ -556,7 +561,7 @@ void Race::physics(Car& c, float dt) {
 
     // ---- gears
     if (!c.player || !set.manualGears) {
-        if (rpmFrac > 0.965f && c.gear < 7) c.gear++;
+        if (rpmFrac > 0.965f && c.gear < topGear(c)) c.gear++;
         else if (c.gear > 1 && c.rpm < c.def->maxRpm * 0.6f && !c.slowLim) {
             float lower = c.def->maxRpm * c.v / (vt * 1.03f * GEAR[c.gear - 1] * RATIO[c.su.gearing]);
             if (lower < c.def->maxRpm * 0.93f) c.gear--;
@@ -787,7 +792,7 @@ void Race::update(float dt, float steer, float throttle, float brake, int shift,
                 float cap = playerLatMax / c.v * (steerHelp == 1 ? 1.18f : 1.0f);
                 c.yawRate = clampf(c.yawRate, -cap, cap);
             }
-            if (shift > 0 && c.gear < 7) c.gear++;
+            if (shift > 0 && c.gear < topGear(c)) c.gear++;
             if (shift < 0 && c.gear > 1) c.gear--;
         } else {
             if (c.player && c.startDelay > 0) { c.throttle = 0; c.brake = 1; }
@@ -809,7 +814,7 @@ void Race::update(float dt, float steer, float throttle, float brake, int shift,
                 if (c.slowLim && !set.manualGears) {
                     float frac = c.rpm / c.def->maxRpm * GEAR[c.gear];
                     int gBest = 1;
-                    for (int gg = 7; gg >= 1; gg--) if (frac / GEAR[gg] >= 0.35f) { gBest = gg; break; }
+                    for (int gg = topGear(c); gg >= 1; gg--) if (frac / GEAR[gg] >= 0.35f) { gBest = gg; break; }
                     c.gear = gBest;
                 }
             }

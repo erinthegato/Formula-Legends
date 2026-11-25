@@ -6,7 +6,7 @@
 enum CarClass { CLASS_HYPER = 0, CLASS_GT3 = 1 };   // (Formula Legends: every car is CLASS_HYPER, one class)
 // the four generations of Formula 1 car in the game
 enum Era { ERA_90S = 0, ERA_V8 = 1, ERA_HYBRID = 2, ERA_GE = 3, ERA_COUNT = 4 };
-extern const char* ERA_NAME[ERA_COUNT];     // "1990s V10", ...
+extern const char* ERA_NAME[ERA_COUNT];     // "1980 wing car era", ...
 extern const char* ERA_SHORT[ERA_COUNT];    // "1998", "2010", "2016", "2025"
 extern const char* ERA_ID[ERA_COUNT];       // "90s", "v8", "hybrid", "ge" (files)
 

@@ -37,14 +37,16 @@ ERAS = ['90s', 'v8', 'hybrid', 'ge']
 # ---------------------------------------------------------------------------------------------- era shapes
 # x stations are metres from the middle of the car. wheel_y = the wheel centre's distance from the middle.
 E = {
-    # 1998 (the Blender car, tools/blender/f1_eras.py): these numbers place its wheels, top flap and livery lines
-    '90s': dict(L=4.45, xf=1.48, xr=-1.50, R=0.330, wf=0.305, wr=0.38, wheel_y=0.725, wheel_yr=0.71,
-                nose_tip=(2.42, 0.35), nose_hw=0.07, chassis_hw=0.29, chassis_top=0.66, nose_low=0.30,
-                cockpit=(0.62, 0.04), rim=0.68, head=(0.20, 0.72), airbox=(-0.25, 0.93, 0.16), cover_end=(-1.92, 0.34),
-                pod=(0.45, -1.40, 0.60, 0.52), pod_end_y=0.42, floor_hw=0.65,
-                fw=(1.88, 2.38, 0.70, 0.075, 'flat'), fw_endplate=0.20,
-                rw=(-1.6745, -1.9655, 0.4925, 0.66, 0.18), rw2=True, beam=False, fin=0.0, halo=False, high_nose=True, finger=False,
-                drs=False, groove=True, cover=False, mirrors=(0.50, 0.36, 0.66)),
+    # 1980 (the wing car built in code, tools/gen_car_1980.py; the era's id is still "90s"): these numbers
+    # place its wheels, top flap and livery lines. Wheels: rear 0.335 m radius, 0.42 m wide; the game draws
+    # the fronts smaller (0.30 m) and narrower (0.28 m), on a wider track (0.869 m against 0.80 m)
+    '90s': dict(L=4.32, xf=1.32, xr=-1.37, R=0.335, wf=0.28, wr=0.42, wheel_y=0.869, wheel_yr=0.80,
+                nose_tip=(2.10, 0.20), nose_hw=0.06, chassis_hw=0.28, chassis_top=0.64, nose_low=0.12,
+                cockpit=(1.05, 0.18), rim=0.62, head=(0.32, 0.86), airbox=(-0.30, 0.66, 0.21), cover_end=(-1.10, 0.40),
+                pod=(1.02, -0.95, 0.465, 0.40), pod_end_y=0.465, floor_hw=0.67,
+                fw=(1.74, 2.08, 0.58, 0.13, 'flat'), fw_endplate=0.22,
+                rw=(-1.98, -2.20, 0.5425, 0.88, 0.06), rw2=False, beam=False, fin=0.0, halo=False, high_nose=False, finger=False,
+                drs=False, groove=False, cover=False, mirrors=(0.80, 0.40, 0.66)),
     'v8':  dict(L=4.95, xf=1.60, xr=-1.60, R=0.330, wf=0.305, wr=0.38, wheel_y=0.725, wheel_yr=0.71,
                 nose_tip=(2.55, 0.38), nose_hw=0.08, chassis_hw=0.30, chassis_top=0.68, nose_low=0.26,
                 cockpit=(0.78, 0.08), rim=0.69, head=(0.20, 0.72), airbox=(-0.20, 0.95, 0.16), cover_end=(-2.00, 0.40),
@@ -73,7 +75,7 @@ E = {
 
 # Eras whose body is made in Blender (tools/blender/*.py builds and exports it): the three LODs
 # replace the code-made body, and each team's livery is painted on them the same way.
-BLENDER = {'90s': os.path.join(HERE, 'blender', 'f1_1998_car.json'),       # tools/blender/f1_eras.py
+BLENDER = {'90s': os.path.join(HERE, 'blender', 'f1_1980_car.json'),       # tools/gen_car_1980.py (built in code)
            'v8': os.path.join(HERE, 'blender', 'f1_v8_car.json'),          # tools/blender/f1_v8_car.py
            'hybrid': os.path.join(HERE, 'blender', 'f1_2016_car.json'),    # tools/blender/f1_eras.py
            'ge': os.path.join(HERE, 'blender', 'f1_2025_car.json')}        # tools/blender/f1_eras.py
@@ -403,16 +405,16 @@ def helmet(m, s, lod):
 
 # ---------------------------------------------------------------------------------------------- liveries
 STYLES = {      # per car: (second colour, accent colour, style)
-    'm98_marchetti': ((0.95, 0.95, 0.95), (0.98, 0.85, 0.10), 'classic'),
-    'm98_wexford': ((0.95, 0.95, 0.95), (0.85, 0.10, 0.10), 'band'),
-    'm98_woking': ((0.08, 0.08, 0.09), (0.85, 0.10, 0.10), 'split'),
-    'm98_benedetto': ((0.95, 0.95, 0.95), (0.98, 0.82, 0.10), 'band'),
-    'm98_shamrock': ((0.08, 0.08, 0.09), (0.10, 0.60, 0.25), 'nose'),
-    'm98_bleu': ((0.95, 0.95, 0.95), (0.85, 0.10, 0.10), 'classic'),
-    'm98_arrowfield': ((0.82, 0.62, 0.15), (0.95, 0.95, 0.95), 'stripe'),
-    'm98_tartan': ((0.12, 0.18, 0.45), (0.85, 0.10, 0.10), 'tartan'),
-    'm98_hinwil': ((0.40, 0.65, 0.95), (0.95, 0.95, 0.95), 'split'),
-    'm98_faenza': ((0.98, 0.82, 0.10), (0.15, 0.30, 0.75), 'nose'),
+    'm98_marchetti': ((0.95, 0.95, 0.95), (0.10, 0.10, 0.10), 'classic'),
+    'm98_wexford': ((0.05, 0.42, 0.22), (0.80, 0.10, 0.10), 'band'),
+    'm98_woking': ((0.95, 0.95, 0.95), (0.95, 0.95, 0.95), 'split'),
+    'm98_benedetto': ((0.95, 0.95, 0.95), (0.85, 0.10, 0.10), 'stripe'),
+    'm98_shamrock': ((0.75, 0.77, 0.80), (0.85, 0.10, 0.10), 'band'),
+    'm98_bleu': ((0.95, 0.95, 0.95), (0.10, 0.20, 0.55), 'twotone'),
+    'm98_arrowfield': ((0.08, 0.08, 0.09), (0.95, 0.95, 0.95), 'stripe'),
+    'm98_tartan': ((0.95, 0.95, 0.95), (0.85, 0.10, 0.10), 'nose'),
+    'm98_hinwil': ((0.95, 0.95, 0.95), (0.08, 0.08, 0.09), 'split'),
+    'm98_faenza': ((0.95, 0.95, 0.95), (0.10, 0.55, 0.25), 'band'),
     'm10_marchetti': ((0.95, 0.95, 0.95), (0.10, 0.10, 0.10), 'classic'),
     'm10_woking': ((0.85, 0.08, 0.08), (0.10, 0.10, 0.10), 'split'),
     'm10_taurus': ((0.85, 0.10, 0.12), (0.98, 0.80, 0.10), 'bull'),

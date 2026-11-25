@@ -5,7 +5,10 @@ engine (physics, circuits, trackside scenery, pit crews and their animations). N
 
 ## What's in it
 * **Four eras**, ten fictional teams each, two cars per team:
-  * **1998 V10**: narrow cars, raised noses, tall airboxes, grooved tyres, refuelling at the stops
+  * **1980 wing cars**: venturi sidepods with sliding skirts, small winglets, exposed V8s, big rear
+    tyres, a round three-spoke wheel and analogue dials, five-speed gearboxes, no refuelling, no safety
+    car (double yellows only), slow tyre stops, 9-6-4-3-2-1 points; the car is built in code
+    (`tools/gen_car_1980.py`, its parts in `tools/gen_parts_1980.py`)
   * **2010 V8**: long high noses, shark fins, no refuelling
   * **2016 hybrid**: low "finger" noses, ERS boost, DRS
   * **2025 ground effect**: the halo, wide low noses, 18-inch wheels with covers, ERS, DRS (three zones)
@@ -19,14 +22,15 @@ engine (physics, circuits, trackside scenery, pit crews and their animations). N
   Lusail. Each era has a 10-round calendar of circuits it really raced at. Street circuits get walls,
   debris fences and city blocks; night races are under floodlights. The layouts are today's versions.
 * **F1 rules**: standing starts with the five red lights, DRS (from lap 3, within a second of the car
-  ahead at the detection point, dry, no safety car), refuelling only in the 1990s, a virtual safety
-  car from 2016 (the safety car before), tyres and fuel sized to the race distance, the 1990s
-  10-6-4-3-2-1 points and the 25-18-15-... points after.
-* **Physics per era**, tuned so the AI on Hard laps close to each era's real pole times:
+  ahead at the detection point, dry, no safety car), no refuelling, a virtual safety
+  car from 2016 (the safety car in 2010, none in 1980), tyres and fuel sized to the race distance, the
+  1980 9-6-4-3-2-1 points and the 25-18-15-... points after.
+* **Physics per era** (each era's own pecking order: 2010 quickest, then 2016 and 2025, the 1980 wing
+  cars slowest). AI on Hard, as first tuned to real pole times; the 1980 row is the AI's own times:
 
   | AI on Hard (real pole) | Monza | Spa | Monaco | Suzuka |
   |---|---|---|---|---|
-  | 1998 | 1:23.9 (1:25.3) | 1:49.5 (1:48.7) | 1:15.7 (1:19.8) | 1:36.4 (1:36.3) |
+  | 1980 | 1:32.3 | 1:58.4 | 1:19.1 | 1:43.3 |
   | 2010 | 1:22.7 (1:21.9) | 1:45.4 (1:45.8) | 1:12.8 (1:13.8) | 1:31.4 (1:30.8) |
   | 2016 | 1:21.3 (1:21.1) | 1:44.5 (1:46.7) | 1:12.0 (1:13.6) | 1:31.2 (1:30.6) |
   | 2025 | 1:19.4 (1:18.8) | 1:40.3 (1:40.5) | 1:09.5 (1:10.0) | 1:27.2 (1:27.0) |
@@ -44,14 +48,14 @@ engine (physics, circuits, trackside scenery, pit crews and their animations). N
   (practice, qualifying, race), replays and photo mode, trophies.
 * **The intro**, cut to *Kickstart My Heart* (the copy in `DATA/music/intro.emu`, the first 64 s):
   "CODE 4 STUDIOS" flashing on the motorcycle revs, then from the band's first beat a highlight reel
-  of the four eras in the game itself (2025 at Suzuka, 1998 at Monaco, 2010 in a storm at Spa, 2016
+  of the four eras in the game itself (2025 at Suzuka, 1980 at Monaco, 2010 in a storm at Spa, 2016
   at the Red Bull Ring): empty-track crane shots, DRS trains, overtakes, pit stops, crashes, a grid
   start, era title cards (the next circuit loads behind them) and FORMULA LEGENDS at the end. Any
   button skips it. The script is `src/intro.cpp` (shots in bars of four beats, 178 BPM).
 * **The attract movie**: leave the title screen alone (Options: "Attract screen after", 10 s by
   default) and a second movie plays to the whole of *Lose My Mind* (Don Toliver feat. Doja Cat,
   `DATA/music/attract.emu`, 110 BPM), cut on the bar lines and one era per section of the song:
-  1998 at Imola from the drop, 2010 at night in Singapore for the chorus, 2016 at Silverstone (DRS)
+  1980 at Imola from the drop, 2010 at night in Singapore for the chorus, 2016 at Silverstone (DRS)
   and in the rain at Interlagos, 2025 on the Las Vegas Strip for the Doja Cat verse and Zandvoort,
   then the title over the outro. It loops with the song until a button is pressed. Same script
   file, `ATTRACT_SHOTS`.
@@ -80,7 +84,7 @@ DRS opens by itself when you have it; the DRS box by the speedometer shows it (o
 * PS Vita: `cmake -S vita -B build-vita && cmake --build build-vita` with VitaSDK + vitaGL
   (GitHub Actions builds the VPK on every push).
 * PC test build: `make -f Makefile.pc`, then from this folder e.g.
-  `./fl_test race monza 0 3 9 shots 20 60` (car 0 = the 1998 Marchetti; AI drives your car,
+  `./fl_test race monza 0 3 9 shots 20 60` (car 0 = the 1980 Marchetti; AI drives your car,
   screenshots at 20 s and 60 s), `./fl_test intro shots` (frames of the intro), `./fl_test menus shots`.
   The PC build reads `HD/` (the Vita's models) unless `FL_LOWRES` is set.
 
@@ -111,7 +115,7 @@ DRS opens by itself when you have it; the DRS box by the speedometer shows it (o
 * Track life: the marshal light panels flash yellow at incidents, under the VSC and the safety car, and
   blue for blue flags; fans wave flags in the teams' colours; a crowd loop plays near the stands
   (`DATA/sfx/crowd_stands.raw`); pit crews wait in the box, carry the wheels, hold the jacks, and
-  release the car with a lollipop (1998) or the light gantry (2010 on), with a shout (`pit_crew_go.raw`).
+  release the car with a lollipop (1980) or the light gantry (2010 on), with a shout (`pit_crew_go.raw`).
   Test modes: `fl_test screel <dir> <era>`, `fl_test pitreel <dir> <era>`.
 * `tools/blender/pit_crew.py` builds the rigged pit crew member (full-face helmet, wheel gun) and his
   four motions, keyed on the timeline (idle 1-10, wheel gun 11-20, push 21-30, celebrate 31-40);
@@ -143,4 +147,4 @@ Music: 'Take On The World' by All Good Folks on #Uppbeat https://uppbeat.io/c/al
 Music: 'Salsa' by Hey Pluto! on #Uppbeat https://uppbeat.io/c/hey-pluto  License code: CCZCUH212QC10SVI (2025 era menu music)
 2016 era menu music: six songs from Uppbeat (uppbeat.io) and one from Epidemic Sound (epidemicsound.com)
 2025 era menu music: Salsa and twelve more songs from Uppbeat (uppbeat.io)
-1998 era menu music: 'Home in A Minor', 'Midnight Walker', 'Midnight Resolve' and 'Fast Flying Lap', made for Formula Legends; three songs by Ruzer from Epidemic Sound (epidemicsound.com) and one from Uppbeat (uppbeat.io)
+1980 era menu music: 'Home in A Minor', 'Midnight Walker', 'Midnight Resolve' and 'Fast Flying Lap', made for Formula Legends; three songs by Ruzer from Epidemic Sound (epidemicsound.com) and one from Uppbeat (uppbeat.io)

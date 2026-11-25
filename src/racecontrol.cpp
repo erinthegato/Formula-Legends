@@ -523,6 +523,13 @@ static void deploySC(Race& r, bool rain);
 void Race::testSafetyCar() { deploySC(*this, false); }   // (the PC test: fl_test screel)
 static void deploySC(Race& r, bool rain) {
     if (r.sc.state || r.session != SES_RACE || r.scCooldown > 0 || r.formation) return;
+    if (r.era == ERA_90S) {
+        // 1980: no safety car in Formula 1 (it came in 1993); the marshals wave double yellows and the
+        // race goes on (the scCooldown keeps the message from repeating)
+        r.scCooldown = 40;
+        r.message(rain ? "Heavy rain - race continues" : "Double yellow flags", RGBA(255, 220, 60));
+        return;
+    }
     const Car* lead = nullptr;
     for (auto& c : r.cars) if (c.pit == PIT_NONE && (!lead || c.total > lead->total)) lead = &c;
     if (!lead) return;
@@ -813,8 +820,9 @@ void Race::pitStop(Car& c, float dt) {
         case 1: {                                  // up on the jacks, four wheels
             if (!c.plan.tyres) { c.pitPhase = 2; c.pitTimer = 0; break; }
             c.lift = fminf(0.12f, c.lift + dt * 2.5f);
-            // Formula 1: four wheel crews at once. 1998 ~4 s, 2010 ~3.2 s, 2016 ~2.6 s, 2025 ~2.3 s
-            static const float SWAP[ERA_COUNT] = {1.6f, 3.2f, 2.6f, 2.3f};   // (1990s: mostly done while refuelling)
+            // Formula 1: four wheel crews at once. 1980 ~11 s (stops were rare and unrehearsed: hand
+            // jacks, big nuts), 2010 ~3.2 s, 2016 ~2.6 s, 2025 ~2.3 s
+            static const float SWAP[ERA_COUNT] = {11.0f, 3.2f, 2.6f, 2.3f};
             float sw = SWAP[era];
             static const float GUN[2] = {0.25f, 0.45f};
             for (float g : GUN) if (c.pitTimer >= g * sw && c.pitTimer - t < g * sw && me) sfxEvents.push_back(SFX_WHEELGUN);

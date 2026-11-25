@@ -10,9 +10,9 @@ const ChampRound CHAMP_ROUNDS[] = {
 };
 const int CHAMP_ROUND_COUNT = sizeof(CHAMP_ROUNDS) / sizeof(CHAMP_ROUNDS[0]);
 
-// points: 1991-2002 the top six scored 10-6-4-3-2-1; from 2010 the top ten 25-18-15-12-10-8-6-4-2-1
+// points: in 1980 the top six scored 9-6-4-3-2-1; from 2010 the top ten 25-18-15-12-10-8-6-4-2-1
 static const float PTS[2][10] = {
-    {10, 6, 4, 3, 2, 1, 0, 0, 0, 0},
+    {9, 6, 4, 3, 2, 1, 0, 0, 0, 0},
     {25, 18, 15, 12, 10, 8, 6, 4, 2, 1},
 };
 

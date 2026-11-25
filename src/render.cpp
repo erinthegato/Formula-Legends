@@ -17,17 +17,20 @@ static const float FAR_TRACK = 820, FAR_TERRAIN = 1300, FAR_CARS = 650;
 struct CockpitLayout { V3 eye; V3 wheel; float wheelTilt; };
 // Formula Legends: the open cockpit of each era (tools/gen_f1.py: the driver's head, the steering wheel)
 static const CockpitLayout COCKPIT[ERA_COUNT] = {
-    // the Blender cars (tools/blender): no driver, a hollow cockpit with room for the wheel and display
-    {V3(0.12f, 0.0f, 0.820f), V3(0.50f, 0.0f, 0.580f), 0.35f},    // 1998
+    // the cars (tools/blender, tools/gen_car_1980.py): a hollow cockpit with room for the wheel and display
+    {V3(0.36f, 0.0f, 0.770f), V3(0.76f, 0.0f, 0.560f), 0.30f},    // 1980 (built in code, tools/gen_car_1980.py): the driver well forward
     {V3(0.10f, 0.0f, 0.840f), V3(0.56f, 0.0f, 0.600f), 0.35f},    // 2010
     {V3(0.08f, 0.0f, 0.840f), V3(0.52f, 0.0f, 0.590f), 0.35f},    // 2016
     {V3(0.10f, 0.0f, 0.840f), V3(0.58f, 0.0f, 0.600f), 0.35f},    // 2025 (looking past the halo's pillar)
 };
 // the DRS flap's hinge on each era's rear wing (tools/gen_f1.py flap_pivot) and the front tyres' width
 // against the rears
-static const V3 FLAP_PIVOT[ERA_COUNT] = {V3(-1.82f, 0, 0.73f), V3(-2.015f, 0, 0.87f), V3(-2.02f, 0, 0.82f), V3(-2.28f, 0, 0.86f)};
+static const V3 FLAP_PIVOT[ERA_COUNT] = {V3(-1.98f, 0, 0.875f), V3(-2.015f, 0, 0.87f), V3(-2.02f, 0, 0.82f), V3(-2.28f, 0, 0.86f)};
 extern const float FRONT_W[ERA_COUNT];
-const float FRONT_W[ERA_COUNT] = {0.78f, 0.72f, 0.75f, 0.75f};
+const float FRONT_W[ERA_COUNT] = {0.667f, 0.72f, 0.75f, 0.75f};
+// the front tyres' radius against the rears (1980: 25 in fronts, much taller rears) and how much narrower
+// the rear track is than the front
+static const float FRONT_R[ERA_COUNT] = {0.896f, 1.0f, 1.0f, 1.0f}, REAR_DY[ERA_COUNT] = {0.069f, 0.015f, 0.015f, 0.015f};
 
 void formatTime(char* out, float t) {
     if (t <= 0) { strcpy(out, "-:--.---"); return; }
@@ -71,6 +74,7 @@ bool Renderer::loadCommon() {
             if (!pose[a][f].lod[0].tex.w && pose[0][0].lodCount) pose[a][f].lod[0].tex = pose[0][0].lod[0].tex;
     fuelRig.load("DATA/models/fuel_rig.emm");
     driver.load("DATA/models/driver.emm");
+    driverEra[ERA_90S].load("DATA/models/driver_90s.emm");
     // a soft round blob (16x16, alpha falls off from the centre) for smoke, spray and lights
     for (int i = 0; i < 256; i++) puffPal[i] = RGBA(255, 255, 255, i);
     for (int y = 0; y < 16; y++) for (int x = 0; x < 16; x++) {
@@ -417,20 +421,22 @@ void Renderer::drawWheels(const CarDef& d, const M4& place, int wl, float steer,
         wt = teamTexture(wt, sc, sc);
     }
     gfx::bindTexture(wt);
+    int we = d.era % ERA_COUNT;
     for (int k = 0; k < (frontOnly ? 2 : 4); k++) {
         bool front = k < 2, leftSide = (k & 1) == 0;
-        // open wheels: the front tyres are narrower, the rear track a touch narrower than the front
-        M4 w = place * M4::translate(V3(front ? xf : xr, (leftSide ? 1 : -1) * (front ? y : y - 0.015f), rad));
+        // open wheels: the front tyres are narrower (and in 1980 smaller), the rear track narrower than the front
+        float wr = front ? rad * FRONT_R[we] : rad;
+        M4 w = place * M4::translate(V3(front ? xf : xr, (leftSide ? 1 : -1) * (front ? y : y - REAR_DY[we]), wr));
         if (car && eye) {
             // the body dives, rolls and squats on its springs; the tyres stay on the road (in the air they hang with it)
             V3 wc(w.m[12], w.m[13], w.m[14]), g = car->body.gPos - *eye, n = car->body.gUp;
-            float pen = (wc.x - g.x) * n.x + (wc.y - g.y) * n.y + (wc.z - g.z) * n.z - rad;
+            float pen = (wc.x - g.x) * n.x + (wc.y - g.y) * n.y + (wc.z - g.z) * n.z - wr;
             if (pen < 0) { w.m[12] -= n.x * pen; w.m[13] -= n.y * pen; w.m[14] -= n.z * pen; }
         }
         if (front) w = w * M4::rotZ(-steer * 0.30f);
         if (!leftSide) w = w * M4::rotZ(3.14159265f);
         w = w * M4::rotY(leftSide ? spin : -spin);
-        if (front) w = w * M4::scale(1, fw, 1);
+        if (front) w = w * M4::scale(FRONT_R[we], fw, FRONT_R[we]);
         statVerts[4] += wm.lod[wl].count;
         gfx::drawModel(wm.lod[wl].verts, wm.lod[wl].count, wm.matrix(w));
     }
@@ -481,7 +487,7 @@ void Renderer::drawCar(const Car& c, const V3& eye, const V3& fwd, float tanH, f
     // the race number on the airbox sides (near cars only)
     if (lod == 0 && c.number > 0) {
         char b[12]; snprintf(b, sizeof b, "%d", c.number);
-        float px = m.panelX, py = m.panelY, pz = 0.84f;
+        float px = m.panelX, py = m.panelY, pz = c.def->era == ERA_90S ? 0.50f : 0.84f;   // (1980: on the engine cover's side)
         text3D(place * M4::basis(V3(-1, 0, 0), V3(0, 0, 1), V3(0, 1, 0), V3(px, py, pz)), b, 0.15f, RGBA(255, 255, 255), true);
         text3D(place * M4::basis(V3(1, 0, 0), V3(0, 0, 1), V3(0, -1, 0), V3(px, -py, pz)), b, 0.15f, RGBA(255, 255, 255), true);
     }
@@ -734,10 +740,39 @@ void Renderer::drawCockpit(const Race& r, const Camera& cam) {
     float rpmF = clampf((c.rpm - c.def->idleRpm) / (c.def->maxRpm - c.def->idleRpm), 0, 1);
     bool timed = r.set.raceMin > 0 && r.session == SES_RACE;
     const bool newDash = (cockpit[cls].flags & 2) != 0;   // Unity AI interior (Vita): the new instruments
+    // ---- 1980: no screen on the wheel; analogue instruments on the dash behind it -- a big rev counter
+    // in the middle (red from 10,500), oil pressure and water temperature either side, a gear number
+    // under the rev counter (the game's only concession) and the race-control light on the left
+    const bool dash80 = c.def->era == ERA_90S;
+    if (dash80) {
+        const CockpitLayout& L = COCKPIT[0];
+        // (sitting on the cowl at the front of the cockpit, tilted back towards the driver)
+        Display d{*this, car * M4::translate(V3(L.wheel.x + 0.15f, 0, 0.625f)) * M4::rotY(-0.55f) * FACE * M4::scale(1.25f, 1.25f, 1.25f)};
+        d.box(-0.125f, -0.048f, 0.125f, 0.048f, RGBA(14, 14, 16));
+        auto dial = [&](float cx, float R0, float v, int ticks, int redFrom) {
+            d.box(cx - R0 - 0.004f, -R0 - 0.004f, cx + R0 + 0.004f, R0 + 0.004f, RGBA(30, 30, 34), 0.0012f);
+            for (int k = 0; k <= ticks; k++) {
+                float a = 3.93f - k * (4.71f / ticks);          // a 270-degree sweep from bottom left
+                Display tk{*this, d.m * M4::translate(V3(cx, 0, 0)) * M4::rotZ(a)};
+                tk.box(R0 - 0.010f, -0.0018f, R0, 0.0018f, k >= redFrom ? RGBA(255, 60, 40) : white, 0.002f);
+            }
+            Display nd{*this, d.m * M4::translate(V3(cx, 0, 0)) * M4::rotZ(3.93f - clampf(v, 0, 1) * 4.71f)};
+            nd.box(-0.004f, -0.0015f, R0 - 0.004f, 0.0015f, RGBA(255, 150, 40), 0.003f);
+            d.box(cx - 0.004f, -0.004f, cx + 0.004f, 0.004f, RGBA(60, 60, 66), 0.004f);
+        };
+        dial(0.0f, 0.040f, c.rpm / 12000.0f, 12, 11);                             // rev counter, 0-12,000
+        dial(-0.080f, 0.022f, 0.55f + 0.1f * rpmF, 6, 7);                          // oil pressure
+        dial(0.080f, 0.022f, 0.48f + 0.05f * sinf(r.time * 0.02f), 6, 5);          // water temperature
+        snprintf(b, sizeof b, "%d", c.gear);
+        d.box(0.050f, 0.026f, 0.068f, 0.044f, black, 0.004f);     // (top right, clear of the wheel rim)
+        d.text(0.059f, 0.035f, b, 0.014f, RGBA(255, 220, 60));
+        const char* fw0; u32 fc0 = flagColour(r, c, fw0);
+        if (fw0[0]) d.box(-0.118f, 0.030f, -0.100f, 0.044f, fc0, 0.004f);   // the flag light
+    }
     // ---- on the wheel: gear, speed, rev bar, shift lights
-    if (!newDash && !cfg.hideWheel) {
+    if (!newDash && !cfg.hideWheel && !dash80) {
         bool hy = cls == CLASS_HYPER;
-        // each era's wheel has its own screen (tools/blender/cockpit_parts.py SCREENS): 1998 a small LCD
+        // each era's wheel has its own screen (tools/blender/cockpit_parts.py SCREENS): 1980: no screen (dials on the dash), 1998 a small LCD
         // at the top of the hub, 2010 a small screen, 2016 and 2025 the big screen
         static const float WS_Z[ERA_COUNT] = {0.046f, 0.030f, 0.006f, 0.004f}, WS_K[ERA_COUNT] = {0.42f, 0.55f, 0.72f, 0.72f};
         int we = c.def->era % ERA_COUNT;
@@ -821,7 +856,7 @@ void Renderer::drawCockpit(const Race& r, const Camera& cam) {
     if (newDash) { drawNewInstruments(r, c, car, wheelM, rpmF, fc, fw); return; }
     if (carModel[c.def - CARS].flags & 4) {
         // open cockpit: the flag colour and race-control messages on a strip at the top of the wheel
-        if (cfg.hideWheel) return;
+        if (cfg.hideWheel || dash80) { (void)messages; (void)carState; (void)position; (void)progress; (void)t2; (void)amber; return; }
         Display mb{*this, wheelM * M4::translate(V3(-0.014f, 0, 0.092f)) * FACE};
         mb.box(-0.10f, -0.014f, 0.10f, 0.014f, fc, 0.003f);
         if (fw[0]) mb.text(0, 0, fw, 0.018f, RGBA(10, 10, 10));
@@ -1256,8 +1291,9 @@ const Texture* Renderer::teamTexture(const Texture* tex, u32 main, u32 second) {
 
 // the driver in his seat: at the era's eye point, leaning a little into the corners
 void Renderer::drawDriver(const Car& c, const M4& place, int lod, bool near) {
-    if (!driver.lodCount) return;
     int e = c.def->era % ERA_COUNT;
+    const Model& driver = driverEra[e].lodCount ? driverEra[e] : this->driver;   // (1980: no HANS)
+    if (!driver.lodCount) return;
     if (lod >= driver.lodCount) lod = driver.lodCount - 1;
     // the helmet's centre sits a little behind and below the eye
     // (the helmet sits above the camera's eye point: the eye is set low to see over the nose)

@@ -24,6 +24,7 @@ SPACING = 1.0      # metres between the cars' widest points
 
 COLOURS = {   # one look per car in Blender (the game paints its own liveries)
     '1998': dict(livery=(0.03, 0.30, 0.12), second=(0.95, 0.95, 0.93)),
+    '1980': dict(livery=(0.95, 0.95, 0.93), second=(0.05, 0.40, 0.20)),
     '2016': dict(livery=(0.26, 0.06, 0.40), second=(1.00, 0.80, 0.05)),
     '2025': dict(livery=(0.40, 0.04, 0.08), second=(0.95, 0.95, 0.95)),
 }
@@ -301,6 +302,69 @@ def car_1998(B):
     mirrors(B, 0.50, 0.36, 0.66, ay=0.18, az=0.45)
     c = CAR_1998
     suspension(B, c['xf'], c['xr'], c['yf'], c['yr'], c['R'])
+
+
+# ------------------------------------------------------------------ 1980: the ground-effect wing car
+# 1980 rules (FIA): 3.0 litres without a compressor or 1.5 litres with one, 575 kg; the cars of the year
+# (Williams FW07B: 2692 mm wheelbase, 1738 / 1600 mm track, Goodyear 25 in fronts and wide rears on 13 in
+# rims). A narrow aluminium monocoque with the driver well forward, a wedge nose with small winglets,
+# full-length venturi sidepods sealed to the ground by sliding skirts, a low engine cover over an exposed
+# Cosworth V8 and Hewland gearbox, a tall roll hoop, and a wide rear wing hung behind the gearbox.
+CAR_1980 = dict(xf=1.32, xr=-1.37, R=0.335, Rf=0.30, yf=0.869, yr=0.80, wf=0.28, wr=0.42, rim=0.17, half=1.01)
+
+
+def car_1980(B):
+    lod = B.lod; n = {0: 8, 1: 6, 2: 4}[lod]
+    # the monocoque: a wedge nose rising to the front bulkhead, the cockpit well forward
+    tub_and_cockpit(B, [(2.10, 0.06, 0.12, 0.20), (1.90, 0.10, 0.10, 0.28), (1.60, 0.15, 0.09, 0.38),
+                        (1.30, 0.20, 0.08, 0.48), (1.00, 0.24, 0.08, 0.58), (0.60, 0.27, 0.08, 0.62),
+                        (0.20, 0.28, 0.08, 0.64), (-0.15, 0.27, 0.08, 0.66)], (1.05, 0.18, 0.23), n)
+    # the fuel tank's top and a low engine cover over the front of the engine (no airbox)
+    B.loft('EngineCover', [(0.18, 0.20, 0.55, 0.70), (-0.15, 0.22, 0.45, 0.72), (-0.55, 0.20, 0.30, 0.62),
+                           (-0.95, 0.15, 0.22, 0.47), (-1.10, 0.11, 0.20, 0.40)], 'livery', n=n)
+    # the exposed Cosworth V8 and the Hewland gearbox behind it
+    B.box('Engine', (-1.30, -0.17, 0.12), (-0.60, 0.17, 0.40), ('grey', 70))
+    B.box('Gearbox', (-1.85, -0.13, 0.10), (-1.30, 0.13, 0.34), ('grey', 55))
+    if lod < 2:
+        for s_ in (1, -1):
+            B.box('CamCover%d' % s_, (-1.25, s_ * 0.06 - 0.05, 0.40), (-0.80, s_ * 0.06 + 0.05, 0.47), ('red', 80))
+        B.box('Trumpets', (-1.15, -0.09, 0.47), (-0.85, 0.09, 0.52), ('grey', 110))
+        B.box('OilTank', (-1.95, -0.10, 0.12), (-1.85, 0.10, 0.30), ('grey', 80))
+    if lod == 0:
+        for s_ in (1, -1):        # the exhausts sweep out of the vee and back over the gearbox
+            for k in range(2):
+                y = s_ * (0.10 + 0.04 * k)
+                B.rod('Exhaust%d%d' % (s_ > 0, k), (-0.85 - 0.12 * k, y, 0.40), (-1.70, s_ * 0.18, 0.40 + 0.02 * k), 0.022, ('grey', 120))
+    for s, sn in ((1, 'L'), (-1, 'R')):
+        # venturi sidepods from behind the front wheels to the rear wheels, flat-topped, the radiator
+        # intake at the front; skirts along the bottom of their outer walls seal them to the track
+        B.loft('Sidepod' + sn, [(1.02, 0.16, 0.06, 0.30), (0.85, 0.20, 0.04, 0.40), (0.00, 0.20, 0.04, 0.40),
+                                (-0.60, 0.19, 0.04, 0.37), (-0.95, 0.15, 0.04, 0.30)], 'livery', yc=s * 0.465, n=n, e=0.25)
+        B.prism('Skirt' + sn, [(1.00, 0.0), (-0.95, 0.0), (-0.95, 0.10), (1.00, 0.10)], 0.012, s * 0.672, ('carbon', 60))
+        if lod < 2:
+            B.box('PodIntake' + sn, (1.00, s * 0.465 - 0.14, 0.10), (1.04, s * 0.465 + 0.14, 0.34), ('carbon', 30))
+        # winglets on the sides of the nose, small endplates
+        B.prism('Winglet' + sn, [(2.06, 0.13), (1.95, 0.17), (1.80, 0.18), (1.74, 0.16), (1.95, 0.12)], 0.48, s * 0.34, 'second')
+        B.prism('WingletPlate' + sn, [(2.08, 0.08), (2.08, 0.22), (1.72, 0.22), (1.72, 0.08)], 0.012, s * 0.585, 'livery')
+        # the rear wing's big endplates, from the gearbox up past the wing
+        B.prism('RWEndplate' + sn, [(-1.62, 0.42), (-1.62, 0.98), (-2.22, 0.98), (-2.22, 0.42)], 0.015, s * 0.55, 'livery')
+        if lod < 2:      # twin struts from the gearbox to the wing
+            B.prism('RWStrut' + sn, [(-1.62, 0.30), (-1.72, 0.82), (-1.82, 0.82), (-1.78, 0.30)], 0.02, s * 0.12, 'carbon')
+    # the rear wing: a wide main plane and the top flap (the game draws the flap: RWTop)
+    B.prism('RWMain', [(-1.66, 0.82), (-1.72, 0.85), (-1.90, 0.86), (-2.02, 0.84), (-1.85, 0.81)], 1.085, 0, 'livery')
+    B.prism('RWTop', [(-1.98, 0.88), (-2.05, 0.91), (-2.18, 0.94), (-2.20, 0.92), (-2.06, 0.87)], 1.085, 0, 'second')
+    B.box('Floor', (-1.00, -0.28, 0.035), (1.30, 0.28, 0.08), 'carbon')
+    # the roll hoop behind the driver's head, braced back to the engine
+    if lod < 2:
+        for s_ in (1, -1):
+            B.rod('Hoop%d' % (s_ > 0), (0.05, s_ * 0.14, 0.62), (0.03, s_ * 0.10, 0.98), 0.022, ('grey', 100))
+            B.rod('Stay%d' % (s_ > 0), (0.03, s_ * 0.10, 0.96), (-0.45, s_ * 0.10, 0.60), 0.016, ('grey', 100))
+        B.rod('HoopTop', (0.03, -0.10, 0.98), (0.03, 0.10, 0.98), 0.022, ('grey', 100))
+    else:
+        B.box('Hoop', (0.0, -0.10, 0.62), (0.06, 0.10, 0.98), ('grey', 100))
+    mirrors(B, 0.80, 0.40, 0.66, ay=0.24, az=0.55)
+    c = CAR_1980
+    suspension(B, c['xf'], c['xr'], c['yf'], c['yr'], c['Rf'])
 
 
 # ------------------------------------------------------------------ 2016: low finger nose, 1.65 m wing
@@ -646,7 +710,7 @@ def build_safety_cars(years=('1998', '2010', '2016', '2025')):
     return out
 
 
-CARS = {'1998': (car_1998, CAR_1998), '2016': (car_2016, CAR_2016), '2025': (car_2025, CAR_2025)}
+CARS = {'1980': (car_1980, CAR_1980), '1998': (car_1998, CAR_1998), '2016': (car_2016, CAR_2016), '2025': (car_2025, CAR_2025)}
 HALF_2010 = 0.90          # the 2010 car's half width (1.80 m, 2010 rules 3.3)
 
 
@@ -654,7 +718,8 @@ def offsets():
     """side by side, SPACING apart wheel to wheel: 1998, the 2010 car at y = 0, 2016, 2025"""
     h98, h16, h25 = CAR_1998['half'], CAR_2016['half'], CAR_2025['half']
     y16 = HALF_2010 + SPACING + h16
-    return {'1998': -(HALF_2010 + SPACING + h98), '2016': y16, '2025': y16 + h16 + SPACING + h25}
+    y98 = -(HALF_2010 + SPACING + h98)
+    return {'1980': y98 - h98 - SPACING - CAR_1980['half'], '1998': y98, '2016': y16, '2025': y16 + h16 + SPACING + h25}
 
 
 def remove_car(year):
@@ -684,9 +749,9 @@ def build(years=('1998', '2016', '2025')):
         for lod in (0, 1, 2):
             fn(Builder(year, lod, collection('FL_%s_LOD%d' % (year, lod), carcol), root))
         P = Builder(year, 9, collection('FL_%s_Preview' % year, carcol), root)
-        for ax, y, w in ((spec['xf'], spec['yf'], spec['wf']), (spec['xr'], spec['yr'], spec['wr'])):
+        for ax, y, w, RR in ((spec['xf'], spec['yf'], spec['wf'], spec.get('Rf', spec['R'])), (spec['xr'], spec['yr'], spec['wr'], spec['R'])):
             for s, sn in ((1, 'L'), (-1, 'R')):
-                P.tyre('Tyre' + sn, ax, s * y, spec['R'], w, spec['rim'], grooves=4 if year == '1998' else 0,
+                P.tyre('Tyre' + sn, ax, s * y, RR, w, spec['rim'], grooves=4 if year == '1998' else 0,
                        cover=spec.get('cover', False))
         root.location = (0, offs[year], 0)
         lc = bpy.context.view_layer.layer_collection.children['FL_%s_Car' % year]

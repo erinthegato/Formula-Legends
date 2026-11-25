@@ -49,7 +49,7 @@ const Shot ATTRACT_SHOTS[] = {
     // quiet intro: the studio, empty circuit, the four eras
     {0, 0, SH_TEXT, "CODE 4 STUDIOS", "PRESENTS"}, {2, 0, SH_EMPTY}, {4, 0, SH_TEXT, "FOUR ERAS", "ONE GRID"}, {5, 0, SH_EMPTY},
     {7, 0, SH_CARD},
-    // the drop: 1998, lights out on the first big beat
+    // the drop: 1980, lights out on the first big beat
     {8, 0, SH_START}, {10, 0, SH_OVERTAKE}, {12, 0, SH_PIT}, {14, 0, SH_EMPTY}, {15, 0, SH_OVERTAKE}, {17, 0, SH_CRASH},
     {19, 0, SH_EMPTY}, {20, 0, SH_OVERTAKE}, {22, 0, SH_EMPTY},
     // chorus: 2010 under the lights, a cut every bar or two
@@ -490,7 +490,7 @@ void Game::drawIntro() {
         gfx::drawFill2D(0, 0, SCREEN_W, SCREEN_H, RGBA(bg + 20, 6, 4));
         gfx::drawFill2D(0, 118, SCREEN_W, 4, RGBA(255, 70, 40));
         bigText(R, SCREEN_W / 2, 52, ERA_SHORT[B.era], RGBA(255, 255, 255), 3.4f);
-        static const char* CAPS[ERA_COUNT] = {"THE V10 ERA", "THE V8 ERA", "THE HYBRID ERA", "THE GROUND EFFECT ERA"};
+        static const char* CAPS[ERA_COUNT] = {"THE WING CAR ERA", "THE V8 ERA", "THE HYBRID ERA", "THE GROUND EFFECT ERA"};
         bigText(R, SCREEN_W / 2, 136, CAPS[B.era], RGBA(255, 200, 150), 1.2f);
         for (int i = 0; i < TRACK_COUNT; i++) if (!strcmp(TRACKS[i].id, B.track)) bigText(R, SCREEN_W / 2, 170, TRACKS[i].name, RGBA(200, 200, 210), 0.9f);
         gfx::setBlend(false); gfx::setDepthTest(true);

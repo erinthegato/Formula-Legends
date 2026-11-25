@@ -48,7 +48,7 @@ struct Renderer {
     const Texture* teamTexture(const Texture* tex, u32 main, u32 second);
     // the driver in the car, made in Blender (tools/blender/cockpit_parts.py -> tools/gen_cockpit.py):
     // helmet, HANS, shoulders and arms in the team's colours; not drawn from his own seat
-    Model driver;
+    Model driver, driverEra[ERA_COUNT];      // driverEra: an era's own driver (1980: driver_90s.emm), else driver
     void drawDriver(const Car& c, const M4& place, int lod, bool near);
     int lvyLoadedStyle[ERA_COUNT] = {-1, -1, -1, -1};   // the one career livery style kept in lvyBlob
     // car models re-ordered into body / nose / rear wing (the nose and wing can come off)

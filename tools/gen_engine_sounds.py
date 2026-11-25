@@ -95,6 +95,7 @@ def norm(x, peak=0.62):
 
 ERAS = {}
 
+# (the 1998 V10 -- no longer used by any car since the era became 1980 -- kept for reference)
 # 1998 V10, 17,500 rpm: a hard, high scream. Five firings a crank turn, even spacing, bright exhaust
 idle, mx = 4000, 17500
 crank = ref_rpm(idle, mx) / 60
@@ -147,6 +148,20 @@ shimmer = 1 + 0.18 * np.sin(2 * np.pi * snap(9.6) * t)                # the inve
 x = 0.62 * norm(eng) + 0.42 * whine * shimmer + 0.08 * norm(sines([(6200, 1.0, 40, 0.8)]))
 x += noise(400, 3200, 0.05)
 ERAS['ge'] = (norm(x), idle, mx)
+
+# 1980 Cosworth DFV-style V8, 11,000 rpm: a cross-plane crank -- each bank fires unevenly, so the note is
+# a deep, hard-edged bark with a strong burble under it rather than a scream; open exhausts, lots of
+# induction roar from the trumpets
+idle, mx = 3200, 11000
+crank = ref_rpm(idle, mx) / 60
+p, cr = pulse_train(crank, 8, [1.0, 0.62, 0.88, 0.70, 0.95, 0.60, 0.84, 0.74], 0.12,
+                    [(1150, 0.0020, 1.0), (2100, 0.0012, 0.75), (650, 0.0030, 0.55), (3300, 0.0007, 0.3)])
+fire = cr * 4
+x = 0.70 * norm(p) + 0.42 * norm(sines([(fire, 1.0, 3, 5.0), (fire * 2, 0.5, 4, 5.0), (fire * 0.5, 0.55, 2, 2.4),
+                                       (fire * 0.25, 0.30, 0, 0), (fire * 1.5, 0.22, 0, 0), (fire * 3, 0.15, 0, 0)]))
+x += noise(800, 4200, 0.14)                     # induction roar
+x = norm(lowpass(x, 5200))
+ERAS['80s'] = (norm(np.tanh(x * 2.2)), idle, mx)     # driven a little harder: as loud as the others
 
 out = os.path.join(ROOT, 'DATA', 'audio')
 for era, (x, idle, mx) in ERAS.items():
