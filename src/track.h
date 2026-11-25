@@ -25,7 +25,7 @@ struct Chunk {
     int first[MAT_COUNT], count[MAT_COUNT];
 };
 
-struct PropInst { int model; V3 p; float yaw; float scale; };
+struct PropInst { int model; V3 p; float yaw; float scale; float s = 0; };   // s: metres round the lap (flag panels)
 // distance boards before the sharp corners (300 / 200 / 100 m to the turn-in); yaw = the way the face looks
 struct BrakeBoard { V3 p; float yaw; int metres; };
 // props grouped into 200 m squares so whole groups can be skipped when off-screen

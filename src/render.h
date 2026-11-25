@@ -28,6 +28,7 @@ struct Renderer {
     int rearLightMode(const Race& r, const Car& c) const;
     static bool rearLightLit(int mode, float t);
     bool eraPartsLoaded[ERA_COUNT] = {};
+    Model safetyCar[ERA_COUNT];        // each era's safety car (tools/gen_safety_cars.py; tyres on the model)
     void loadEraParts(int era);
     // crew / driver poses made in Blender (tools/blender/pit_crew.py -> tools/gen_crew.py): DATA/models/crew_<anim>_<frame>.emm
     enum { ANIM_IDLE = 0, ANIM_WHEELGUN, ANIM_PUSH, ANIM_CELEBRATE, ANIM_COUNT };
@@ -115,6 +116,10 @@ struct Renderer {
     // 3D text and coloured quads in some local space (used on the wheel display and dash)
     void text3D(const M4& place, const char* s, float height, u32 color, bool centre);
     void quad3D(const M4& place, float x0, float y0, float x1, float y1, u32 color);
+    void box3D(const M4& place, const V3& lo, const V3& hi, u32 color);
+    // the marshal light panels (yellow at incidents, the VSC and the safety car; blue flags) and
+    // the fans' flags waving over the grandstands and bleachers (render_fx.cpp)
+    void drawTrackLife(const Race& r, const Camera& cam);
     void drawBoards(const Race& r, const Camera& cam, float tanH, float tanV);
     void drawGhost(const Race& r, const Camera& cam, float tanH, float tanV);
     void drawTimeTrialHud(const Race& r);

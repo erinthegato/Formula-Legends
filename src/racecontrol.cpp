@@ -518,6 +518,8 @@ void Race::moveSafetyCar(float dt) {
     sc.pos = p + l * sc.d;
 }
 
+static void deploySC(Race& r, bool rain);
+void Race::testSafetyCar() { deploySC(*this, false); }   // (the PC test: fl_test screel)
 static void deploySC(Race& r, bool rain) {
     if (r.sc.state || r.session != SES_RACE || r.scCooldown > 0 || r.formation) return;
     const Car* lead = nullptr;

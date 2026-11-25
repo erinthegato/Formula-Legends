@@ -26,7 +26,8 @@ static const CockpitLayout COCKPIT[ERA_COUNT] = {
 // the DRS flap's hinge on each era's rear wing (tools/gen_f1.py flap_pivot) and the front tyres' width
 // against the rears
 static const V3 FLAP_PIVOT[ERA_COUNT] = {V3(-1.82f, 0, 0.73f), V3(-2.015f, 0, 0.87f), V3(-2.02f, 0, 0.82f), V3(-2.28f, 0, 0.86f)};
-static const float FRONT_W[ERA_COUNT] = {0.78f, 0.72f, 0.75f, 0.75f};
+extern const float FRONT_W[ERA_COUNT];
+const float FRONT_W[ERA_COUNT] = {0.78f, 0.72f, 0.75f, 0.75f};
 
 void formatTime(char* out, float t) {
     if (t <= 0) { strcpy(out, "-:--.---"); return; }
@@ -43,6 +44,14 @@ bool Renderer::loadCommon() {
                                         "race_control", "ad_bridge", "tv_tower", "hospitality",
                                         "gantry", "bleacher", "tent", "flagpanel", "crane", "tecpro"};
     for (int i = 0; i < PROP_COUNT; i++) { snprintf(p, sizeof p, "DATA/models/%s.emm", P[i]); prop[i].load(p); }
+    // the circuit buildings made in Blender share the grandstand's 512 px atlas (tools/gen_trackside.py):
+    // their files carry no texture of their own
+    for (int i : {PROP_BILLBOARD, PROP_CONTROL, PROP_BRIDGE, PROP_HOSPITALITY}) {
+        Model& m = prop[i];
+        if (!m.lodCount || m.lod[0].tex.pixels || !prop[PROP_GRANDSTAND].lodCount) continue;
+        m.lod[0].tex = prop[PROP_GRANDSTAND].lod[0].tex;
+        for (int l = 1; l < m.lodCount; l++) if (!m.lod[l].tex.pixels) { m.lod[l].tex = m.lod[0].tex; m.sharedTex |= (uint8_t)(1u << l); }
+    }
     for (int e = 0; e < ERA_COUNT; e++) {
         snprintf(p, sizeof p, "DATA/models/wheel_%s.emm", ERA_ID[e]); eraWheel[e].load(p);
         // the steering wheel and DRS flap load with the first car of their era (loadEraParts)
@@ -91,6 +100,8 @@ void Renderer::loadEraParts(int e) {
     if (steering[e].load(p)) gfx::moveToFastMemory(steering[e].lod[0].tex);
     snprintf(p, sizeof p, "DATA/models/flap_%s.emm", ERA_ID[e]);
     if (flap[e].load(p)) gfx::moveToFastMemory(flap[e].lod[0].tex);
+    snprintf(p, sizeof p, "DATA/models/safety_car_%s.emm", ERA_ID[e]);
+    if (safetyCar[e].load(p)) { gfx::moveToFastMemory(safetyCar[e].lod[0].tex); safetyCar[e].reshare(); }
 }
 
 void Renderer::loadCar(int idx) {
@@ -300,7 +311,7 @@ void Renderer::drawScene(const Race& r, const Camera& cam, bool hidePlayer) {
         else gfx::drawModel(md.lod[lod].verts, md.lod[lod].count, md.matrix(place));
       }
     }
-    if (!sceneLite) { drawBoards(r, cam, tanH, tanV); drawPit(r, cam); }
+    if (!sceneLite) { drawBoards(r, cam, tanH, tanV); drawPit(r, cam); drawTrackLife(r, cam); }
     // cars
     for (const Car& c : r.cars) {
         if (hidePlayer && c.player) continue;

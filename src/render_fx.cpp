@@ -2,6 +2,7 @@
 // smoke / spray / carbon shards, the safety car, night lighting, rain and lightning, TV cameras,
 // and the race-control part of the HUD (flags, messages, tyres / fuel / damage).
 #include "render.h"
+extern const float FRONT_W[ERA_COUNT];     // (render.cpp) the front tyres are narrower
 #include "clip.h"
 #include <cstdio>
 #include <cstring>
@@ -117,10 +118,12 @@ void Renderer::buildPit(const Race& r) {
         addBox(pitVerts, P(g, -hw0 - 0.8f, 5.3f), P(g, hw0 + 0.8f, 5.3f), P(g, hw0 + 0.8f, 6.4f), P(g, -hw0 - 0.8f, 6.4f), RGBA(40, 42, 50));
     }
     gfx::flushCache(pitVerts.data(), (int)pitVerts.size() * (int)sizeof(WorldVertex));
-    // the safety car is the Ashcombe Vanguard
+    // the safety car: each era's own (loadEraParts); the Ashcombe Vanguard road car only where that's missing
     scModel = -1;
     for (int i = 0; i < CAR_COUNT; i++) if (!strcmp(CARS[i].id, "ashcombevanguard")) scModel = i;
-    if (scModel >= 0) loadCar(scModel);
+    int scE = r.cars.empty() ? 0 : r.cars[0].def->era % ERA_COUNT;
+    loadEraParts(scE);
+    if (scModel >= 0 && !safetyCar[scE].lodCount) loadCar(scModel);
 }
 
 void Renderer::drawPit(const Race& r, const Camera& cam) {
@@ -149,15 +152,33 @@ void Renderer::drawPit(const Race& r, const Camera& cam) {
             quad3D(face, x - h, -h, x + h, h, col);
         }
     }
-    // crews and the fuel rig at cars stopped in their box
+    // crews at cars stopped in their box -- and waiting, ready, for a car coming down the pit lane
     for (const Car& c : r.cars) {
-        if (c.pit != PIT_STOP) continue;
-        V3 rel = c.pos - cam.eye;
+        bool stopped = c.pit == PIT_STOP;
+        float toBox = 1e9f;
+        if (!stopped && c.pit == PIT_IN && c.pitPhase != -1 && r.session == SES_RACE)
+            toBox = r.pitRel(r.boxS(c)) - r.pitRel(c.s);
+        bool ready = !stopped && toBox > -2 && toBox < 150;
+        // just released: the crew stay in the box until the car is clear
+        bool after = c.pit == PIT_OUT && c.pitPhase == 0 && r.session == SES_RACE &&
+                     r.pitRel(c.s) - r.pitRel(r.boxS(c)) < 30 && r.pitRel(c.s) - r.pitRel(r.boxS(c)) > -1;
+        if (!stopped && !ready && !after) continue;
+        M4 place;
+        V3 rel;
+        if (stopped) {
+            rel = c.pos - cam.eye;
+            place = M4::basis(c.fwd, c.left, V3(0, 0, 1), rel - V3(0, 0, c.lift));
+        } else {                                       // the box the car is heading for
+            float bs = r.boxS(c);
+            V3 p, t, l; float hw; r.track.frame(bs, p, t, l, hw);
+            rel = r.track.world(bs, r.boxD) - cam.eye;
+            place = M4::basis(t, l, V3(0, 0, 1), rel);
+        }
         if (dot(rel, rel) > 70.0f * 70.0f) continue;
-        M4 place = M4::basis(c.fwd, c.left, V3(0, 0, 1), rel - V3(0, 0, c.lift));
         float tt = r.time * 3.0f + c.number;
         u32 tm, ts; teamColours(c.def, tm, ts);        // the crew wear the team's colours
-        if (c.pitPhase <= -2) {
+        int era = c.def->era % ERA_COUNT;
+        if (stopped && c.pitPhase <= -2) {
             // in the garage: the crew round the car; when it goes out, two push at the back and one at each side
             bool pushing = c.pitPhase == -3 && c.pitTimer > 2.6f;
             float hl = c.def->lengthM * 0.5f;
@@ -173,40 +194,104 @@ void Renderer::drawPit(const Race& r, const Camera& cam) {
             }
             continue;
         }
-        {
-            // a Formula 1 crew: at each wheel the gun man (crouched in close while they work), the man
-            // taking the old wheel off and the one bringing the new one; the front and rear jack men and a
-            // man holding each side of the car
-            int ph = c.pitPhase;
-            bool wheels = ph == 1;
-            float in = wheels ? 1.05f : 1.8f;
-            const Model& body = carModel[c.def - CARS];
-            float xf = body.axleF != 0 ? body.axleF : 1.6f, xr = body.axleR != 0 ? body.axleR : -1.6f;
-            float hl = c.def->lengthM * 0.5f;
-            const float WX[8] = {xf, xf, xr, xr, hl + 0.7f, -hl - 0.6f, 0.1f, 0.1f};
-            const float WY[8] = {1, -1, 1, -1, 0, 0, 1.25f, -1.25f};
-            for (int k = 0; k < 8; k++) {
-                float y = (k < 4 ? WY[k] * in : WY[k]) + (wheels && k < 4 ? sinf(tt + k) * 0.05f : 0);
-                float yaw = k < 4 || k >= 6 ? (WY[k] > 0 ? -1.57f : 1.57f) : (WX[k] > 0 ? 3.14f : 0);
-                bool gun = wheels && k < 4;
-                float squat = gun && !poseCount[ANIM_WHEELGUN] ? 0.7f : 1.0f;
-                M4 p = place * M4::translate(V3(WX[k], y, 0)) * M4::rotZ(yaw) * M4::scale(1, 1, squat);
-                drawPerson(p, gun ? ANIM_WHEELGUN : ANIM_IDLE, tt * 0.33f + k * 0.3f, false, tm, ts);
-                if (k < 4) {
-                    // wheel off (behind) and wheel on (ahead) men, standing off a little while the gun works
-                    float sy = WY[k] * (in + 0.75f);
-                    M4 a = place * M4::translate(V3(WX[k] - 0.75f, sy, 0)) * M4::rotZ(WY[k] > 0 ? -2.2f : 2.2f);
-                    M4 b = place * M4::translate(V3(WX[k] + 0.75f, sy, 0)) * M4::rotZ(WY[k] > 0 ? -0.9f : 0.9f);
-                    drawPerson(a, ANIM_IDLE, tt * 0.33f + k * 0.5f + 1.0f, false, tm, ts);
-                    drawPerson(b, ANIM_IDLE, tt * 0.33f + k * 0.7f + 2.0f, false, tm, ts);
+        // A Formula 1 crew. At each wheel: the gun man (crouched in close), the man who takes the old
+        // wheel off and carries it away, and the man who brings the new one; the front and rear jack men
+        // with their jacks; a man steadying each side; and the release: a lollipop man in front of the
+        // car (1998) or the light gantry over its nose (2010 on: red while they work, green to go).
+        int ph = stopped ? c.pitPhase : (after ? 3 : -9);       // -9: waiting for the car; after it leaves: 3
+        bool wheels = ph == 1, done = (stopped || after) && ph >= 2 && !(ph == 2 && c.plan.repair);
+        static const float SWAP[ERA_COUNT] = {1.6f, 3.2f, 2.6f, 2.3f};   // as Race::pitStop
+        float f = wheels ? clampf(c.pitTimer / SWAP[era], 0, 1) : (done ? 1.0f : 0.0f);
+        bool gunReady = ph == -9 || ph == 0;           // crouched at the wheel before the car is up
+        float in = wheels || gunReady ? 1.05f : 1.8f;
+        const Model& body = carModel[c.def - CARS];
+        float xf = body.axleF != 0 ? body.axleF : 1.6f, xr = body.axleR != 0 ? body.axleR : -1.6f;
+        float wy = body.axleF != 0 ? body.wheelY : 0.86f;
+        float hl = c.def->lengthM * 0.5f;
+        const float WX[8] = {xf, xf, xr, xr, hl + 0.7f, -hl - 0.6f, 0.1f, 0.1f};
+        const float WY[8] = {1, -1, 1, -1, 0, 0, 1.25f, -1.25f};
+        const Model& wm = eraWheel[era].lodCount ? eraWheel[era] : wheel;
+        float rad = wm.lodCount ? wm.scale[2] : 0.33f;
+        for (int k = 0; k < 8; k++) {
+            float y = (k < 4 ? WY[k] * in : WY[k]) + (wheels && k < 4 ? sinf(tt + k) * 0.05f : 0);
+            float yaw = k < 4 || k >= 6 ? (WY[k] > 0 ? -1.57f : 1.57f) : (WX[k] > 0 ? 3.14f : 0);
+            bool gun = (wheels || gunReady) && k < 4;
+            float squat = gun && !poseCount[ANIM_WHEELGUN] ? 0.7f : 1.0f;
+            M4 p = place * M4::translate(V3(WX[k], y, 0)) * M4::rotZ(yaw) * M4::scale(1, 1, squat);
+            // the gun only works while the car is up; waiting, they hold the first pose
+            float at = gunReady ? 0.0f : tt * 0.33f + k * 0.3f;
+            drawPerson(p, gun ? ANIM_WHEELGUN : ANIM_IDLE, at, false, tm, ts);
+            if (k < 4) {
+                float sgn = WY[k] > 0 ? 1.0f : -1.0f, sy = sgn * (in + 0.75f);
+                bool front = k < 2;
+                // wheel off: in by the wheel, then away with the old one once the gun has done its work
+                float offAway = clampf((f - 0.45f) / 0.4f, 0, 1);
+                V3 offAt(WX[k] - 0.75f - offAway * 1.1f, sgn * (in + 0.75f + offAway * 0.6f), 0);
+                // wheel on: waiting with the new one, in with it as the old one comes off
+                float onIn = clampf((f - 0.3f) / 0.2f, 0, 1);
+                V3 onAt(WX[k] + 0.75f - onIn * 0.25f, sy, 0);
+                M4 a = place * M4::translate(offAt) * M4::rotZ(sgn > 0 ? -2.2f : 2.2f);
+                M4 b = place * M4::translate(onAt) * M4::rotZ(sgn > 0 ? -1.2f : 1.2f);
+                drawPerson(a, ANIM_IDLE, tt * 0.33f + k * 0.5f + 1.0f, false, tm, ts);
+                drawPerson(b, ANIM_IDLE, tt * 0.33f + k * 0.7f + 2.0f, false, tm, ts);
+                // the wheels they carry: the new one until it goes on, the old one after it comes off
+                if (wm.lodCount && stopped && c.plan.tyres && (ph == 0 || ph == 1 || ph == -9) && f < 0.5f) {
+                    M4 w = place * M4::translate(onAt + V3(-0.05f, -sgn * 0.42f, rad + 0.18f));
+                    if (front) w = w * M4::scale(1, FRONT_W[era], 1);
+                    gfx::bindTexture(&wm.lod[1 < wm.lodCount ? 1 : 0].tex);
+                    gfx::drawModel(wm.lod[1 < wm.lodCount ? 1 : 0].verts, wm.lod[1 < wm.lodCount ? 1 : 0].count, wm.matrix(w));
+                } else if (wm.lodCount && wheels && f >= 0.5f) {
+                    M4 w = place * M4::translate(offAt + V3(0.05f, -sgn * 0.42f, rad + 0.18f));
+                    if (front) w = w * M4::scale(1, FRONT_W[era], 1);
+                    gfx::bindTexture(&wm.lod[1 < wm.lodCount ? 1 : 0].tex);
+                    gfx::drawModel(wm.lod[1 < wm.lodCount ? 1 : 0].verts, wm.lod[1 < wm.lodCount ? 1 : 0].count, wm.matrix(w));
                 }
-            }
-            if (ph == 0 || ph == -2) {
-                M4 p = place * M4::translate(V3(-0.8f, 1.6f, 0)) * M4::rotZ(-1.57f);
-                drawPerson(p, ANIM_IDLE, tt * 0.33f + 2.0f, false, tm, ts);
+                (void)wy;
             }
         }
-        if (fuelRig.lodCount && r.ep().refuel) {           // refuelling only in the 1990s
+        if (ph == 0 || ph == -2) {
+            M4 p = place * M4::translate(V3(-0.8f, 1.6f, 0)) * M4::rotZ(-1.57f);
+            drawPerson(p, ANIM_IDLE, tt * 0.33f + 2.0f, false, tm, ts);
+        }
+        // the jacks: a low trolley under the nose and the tail, the handle up to the jack man's hands
+        {
+            u32 steel = RGBA(70, 72, 78), handle = RGBA(30, 30, 34);
+            float lift = stopped ? c.lift : 0;
+            if (after) lift = 0;
+            M4 ground = place * M4::translate(V3(0, 0, lift));       // (the crew stand on the ground, not the car)
+            for (int e = 0; e < 2; e++) {
+                float sx = e == 0 ? 1.0f : -1.0f;
+                float x0 = e == 0 ? hl - 0.15f : -hl + 0.05f;         // under the nose / the rear crash structure
+                box3D(ground, V3(x0 - 0.2f, -0.2f, 0), V3(x0 + 0.2f, 0.2f, 0.1f + lift), steel);
+                // the handle runs from the trolley up to his hands, 1.1 m out at waist height
+                M4 h = ground * M4::translate(V3(x0, 0, 0.1f + lift)) * M4::rotZ(e == 0 ? 0.0f : 3.14159f) * M4::rotY(-0.62f);
+                box3D(h, V3(0, -0.03f, -0.03f), V3(1.25f, 0.03f, 0.03f), handle);
+                (void)sx;
+            }
+        }
+        // the release
+        bool go = done && ph == 3;
+        if (era == 0) {
+            // 1998: the lollipop man in front of the nose; the board comes up when the car may go
+            float hx = hl + 1.4f;
+            M4 p = place * M4::translate(V3(hx, 0.35f, 0)) * M4::rotZ(3.14159f);
+            drawPerson(p, ANIM_IDLE, tt * 0.33f + 3.0f, false, tm, ts);
+            float up = go ? 0.75f : 0.0f;
+            M4 pole = place * M4::translate(V3(hx - 0.35f, 0.2f, 0));
+            box3D(pole, V3(-0.02f, -0.02f, 0.95f + up), V3(0.02f, 0.02f, 1.55f + up), RGBA(30, 30, 30));
+            box3D(pole, V3(-0.03f, -0.22f, 1.5f + up), V3(0.0f, 0.22f, 1.85f + up), go ? RGBA(240, 240, 235) : RGBA(210, 25, 20));
+        } else {
+            // 2010 on: a light gantry from the garage side over the nose
+            float gx = xf + 0.6f;
+            u32 frame = RGBA(55, 57, 62);
+            box3D(place, V3(gx - 0.06f, 2.3f, 0), V3(gx + 0.06f, 2.42f, 3.1f), frame);
+            box3D(place, V3(gx - 0.06f, -0.2f, 2.98f), V3(gx + 0.06f, 2.42f, 3.1f), frame);
+            box3D(place, V3(gx - 0.12f, -0.18f, 2.62f), V3(gx + 0.06f, 0.18f, 2.98f), RGBA(18, 18, 20));
+            M4 face = place * M4::translate(V3(gx - 0.13f, 0, 2.8f)) * M4::basis(V3(0, -1, 0), V3(0, 0, 1), V3(-1, 0, 0), V3(0, 0, 0));
+            u32 lamp = go ? RGBA(40, 240, 70) : RGBA(255, 30, 20);
+            quad3D(face, -0.12f, -0.1f, 0.12f, 0.12f, lamp);
+        }
+        if (fuelRig.lodCount && r.ep().refuel && stopped) {    // refuelling only in the 1990s
             gfx::bindTexture(&fuelRig.lod[0].tex);
             M4 p = place * M4::translate(V3(-0.8f, 4.0f, 0)) * M4::rotZ(1.57f);
             gfx::drawModel(fuelRig.lod[0].verts, fuelRig.lod[0].count, fuelRig.matrix(p));
@@ -214,10 +299,120 @@ void Renderer::drawPit(const Race& r, const Camera& cam) {
     }
 }
 
+// ---- life at the trackside: marshal light panels and fans waving flags
+void Renderer::drawTrackLife(const Race& r, const Camera& cam) {
+    // The light panels (tools/blender/trackside.py flagpanel: the lamp face is 0.64 x 0.44 m, 2.18-2.62 m
+    // up, facing the track). Flashing yellow round an incident (its slow zone, or one coming up within
+    // 150 m), all round the lap under the VSC or the safety car; blue when a car here is being caught by
+    // a faster one. Dark otherwise.
+    bool flash = fmodf(r.time * 2.0f, 1.0f) < 0.6f;
+    bool everywhere = r.sc.state || r.fcy > 0;
+    for (const PropInst& p : r.track.props) {
+        if (p.model != PROP_FLAGPANEL) continue;
+        V3 rel = p.p - cam.eye;
+        if (dot(rel, rel) > 260.0f * 260.0f || dot(rel, cam.fwd) < -2) continue;
+        u32 col = 0;
+        if (everywhere || r.zoneAt(p.s) || r.zoneAt(r.track.wrap(p.s + 150))) col = flash ? RGBA(255, 210, 20) : 0;
+        if (!col && !everywhere) {
+            for (const Car& c : r.cars) {
+                if (c.blue <= 0) continue;
+                float ahead = r.track.wrap(p.s - c.s);
+                if (ahead < 90 || ahead > r.track.length - 10) { col = flash ? RGBA(40, 120, 255) : 0; break; }
+            }
+        }
+        if (!col) continue;
+        M4 face = M4::translate(rel) * M4::rotZ(p.yaw) * M4::translate(V3(0.225f, 0, 2.4f)) *
+                  M4::basis(V3(0, 1, 0), V3(0, 0, 1), V3(1, 0, 0), V3(0, 0, 0));
+        quad3D(face, -0.31f, -0.21f, 0.31f, 0.21f, col);
+    }
+    // Fans' flags: a few in each stand within 160 m, in the colours of the teams racing, waving.
+    if (!perf.effects || r.cars.empty()) return;
+    const int MAXF = 160;
+    WorldVertex* v = (WorldVertex*)gfx::frameAlloc(MAXF * 12 * sizeof(WorldVertex));
+    if (!v) return;
+    int o = 0, nf = 0, nc = (int)r.cars.size();
+    for (const PropInst& p : r.track.props) {
+        bool stand = p.model == PROP_GRANDSTAND, bl = p.model == PROP_BLEACHER;
+        if (!stand && !bl) continue;
+        V3 rel = p.p - cam.eye;
+        if (dot(rel, rel) > 160.0f * 160.0f || dot(rel, cam.fwd) < -16) continue;
+        M4 m = M4::translate(rel) * M4::rotZ(p.yaw) * M4::scale(p.scale, p.scale, p.scale);
+        int count = stand ? 14 : 5;
+        u32 seed = (u32)(p.p.x * 13.0f) * 2654435761u + (u32)(p.p.y * 7.0f);
+        for (int k = 0; k < count && nf < MAXF; k++) {
+            seed = seed * 1664525u + 1013904223u;
+            int row = stand ? (int)(seed >> 8) % 8 : (int)(seed >> 8) % 5;
+            float yy = ((seed >> 16) & 1023) / 1023.0f * 2 - 1;
+            // where a fan sits: the front of his row, his head's height (as the Blender stands)
+            float x = stand ? 5.0f - row * 0.95f - 0.35f : -row * 0.9f - 0.45f;
+            float z = stand ? 1.1f + row * 0.72f + 0.55f : 0.45f + row * 0.55f + 0.5f;
+            float y = yy * (stand ? 14.5f : 4.4f);
+            float ph = (seed & 255) / 40.0f, t = r.time;
+            float sway = sinf(t * 3.1f + ph) * 0.18f;                // the arm waves it from side to side
+            float flap = sinf(t * 9.0f + ph * 2) * 0.12f;            // the cloth flutters
+            u32 col = r.cars[(k * 7 + row) % nc].def->colour | 0xFF000000u;
+            V3 a(x + 0.05f, y + sway, z + 0.35f), b(x + 0.05f, y + sway, z + 0.75f);       // along the pole
+            V3 c(x + 0.05f + flap, y + sway + 0.55f, z + 0.78f), d(x + 0.05f + flap, y + sway + 0.55f, z + 0.38f);
+            V3 q[4] = {a, d, c, b};
+            WorldVertex w[4];
+            for (int i = 0; i < 4; i++) {
+                V3 wp = m.point(q[i]);
+                w[i] = WorldVertex{0, 0, i >= 1 && i <= 2 ? col : (col & 0xFFE0E0E0u), wp.x, wp.y, wp.z};
+            }
+            // both sides of the cloth
+            v[o++] = w[0]; v[o++] = w[1]; v[o++] = w[2]; v[o++] = w[0]; v[o++] = w[2]; v[o++] = w[3];
+            v[o++] = w[0]; v[o++] = w[2]; v[o++] = w[1]; v[o++] = w[0]; v[o++] = w[3]; v[o++] = w[2];
+            nf++;
+        }
+    }
+    if (!o) return;
+    gfx::flushCache(v, o * (int)sizeof(WorldVertex));
+    gfx::bindTexture(nullptr);
+    gfx::drawWorld(v, o, PRIM_TRIANGLES, M4::identity());
+}
+
+// a solid box (place-space corners lo..hi), flat-coloured, lit from above, in one draw
+void Renderer::box3D(const M4& place, const V3& lo, const V3& hi, u32 col) {
+    WorldVertex* v = (WorldVertex*)gfx::frameAlloc(36 * sizeof(WorldVertex));
+    if (!v) return;
+    auto shade = [&](float k) {
+        int r_ = (int)((col & 0xFF) * k), g_ = (int)(((col >> 8) & 0xFF) * k), b_ = (int)(((col >> 16) & 0xFF) * k);
+        return RGBA(r_ > 255 ? 255 : r_, g_ > 255 ? 255 : g_, b_ > 255 ? 255 : b_);
+    };
+    V3 c[8];
+    for (int i = 0; i < 8; i++) c[i] = V3(i & 1 ? hi.x : lo.x, i & 2 ? hi.y : lo.y, i & 4 ? hi.z : lo.z);
+    // faces (counter-clockwise from outside) and their light: +Z, -Z, +X, -X, +Y, -Y
+    static const int F[6][4] = {{4, 5, 7, 6}, {0, 2, 3, 1}, {1, 3, 7, 5}, {0, 4, 6, 2}, {2, 6, 7, 3}, {0, 1, 5, 4}};
+    static const float L[6] = {1.15f, 0.45f, 0.9f, 0.75f, 0.85f, 0.7f};
+    int o = 0;
+    for (int f = 0; f < 6; f++) {
+        u32 k = shade(L[f]);
+        const int* q = F[f];
+        int idx[6] = {q[0], q[1], q[2], q[0], q[2], q[3]};
+        for (int i : idx) { v[o++] = WorldVertex{0, 0, k, c[i].x, c[i].y, c[i].z}; }
+    }
+    gfx::flushCache(v, 36 * sizeof(WorldVertex));
+    gfx::bindTexture(nullptr);
+    gfx::drawWorld(v, 36, PRIM_TRIANGLES, place);
+}
+
 // ------------------------------------------------------------------ debris, particles, safety car
 void Renderer::drawEffects(const Race& r, const Camera& cam, bool ownLights) {
-    // the safety car / pace car
-    if (r.sc.state && scModel >= 0 && carLoaded[scModel]) {
+    // the safety car: the era's own (made in Blender), else the old road car
+    int scEra = r.cars.empty() ? 0 : r.cars[0].def->era % ERA_COUNT;
+    const Model& scm = safetyCar[scEra];
+    float scRoof = 1.35f;
+    if (r.sc.state && scm.lodCount) {
+        V3 rel = r.sc.pos - cam.eye;
+        float d = len(rel);
+        int li = d < 30 ? 0 : (d < 80 ? 1 : 2);
+        if (li >= scm.lodCount) li = scm.lodCount - 1;
+        M4 place = M4::basis(r.sc.fwd, r.sc.left, r.sc.up, rel);
+        gfx::bindTexture(&scm.lod[li].tex);
+        if (d < 9) clip::drawModel(scm.lod[li].verts, scm.lod[li].count, scm.matrix(place));
+        else gfx::drawModel(scm.lod[li].verts, scm.lod[li].count, scm.matrix(place));
+        scRoof = scm.offset[2] + scm.scale[2] - 0.04f;       // its light bar is the top of the model
+    } else if (r.sc.state && scModel >= 0 && carLoaded[scModel]) {
         Car tmp;
         tmp.def = &CARS[scModel];
         tmp.pos = r.sc.pos; tmp.fwd = r.sc.fwd; tmp.left = r.sc.left; tmp.up = r.sc.up;
@@ -288,7 +483,7 @@ void Renderer::drawEffects(const Race& r, const Camera& cam, bool ownLights) {
     }
     if (r.sc.state) {
         bool flash = ((int)(r.time * 6)) & 1;
-        V3 roof = r.sc.pos + r.sc.up * 1.35f - cam.eye;
+        V3 roof = r.sc.pos + r.sc.up * scRoof - cam.eye;
         quad(roof + r.sc.left * 0.45f, 0.28f, flash ? RGBA(255, 170, 20, 240) : RGBA(255, 120, 0, 90));
         quad(roof - r.sc.left * 0.45f, 0.28f, flash ? RGBA(255, 120, 0, 90) : RGBA(255, 170, 20, 240));
     }

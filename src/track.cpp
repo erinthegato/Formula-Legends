@@ -734,7 +734,7 @@ void Track::addTrackside(std::vector<V3>& keepClear) {
         V3 out = q.n * sg;
         V3 a = q.p + out * (q.hw + (leftSide ? q.outL : q.outR) + 1.0f);
         a.z = ground(q, a);
-        props.push_back({PROP_FLAGPANEL, a, atan2f(-out.y, -out.x), 1.0f});
+        props.push_back({PROP_FLAGPANEL, a, atan2f(-out.y, -out.x), 1.0f, s});
         last = s; leftSide = !leftSide;
     }
 }

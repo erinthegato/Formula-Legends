@@ -631,11 +631,13 @@ def build_safety_cars(years=('1998', '2010', '2016', '2025')):
         root.empty_display_type = 'ARROWS'; root.empty_display_size = 0.5
         carcol.objects.link(root)
         for lod in (0, 1, 2):
-            road_car(Builder(key, lod, collection('FL_%s_LOD%d' % (key, lod), carcol), root), SC_SPECS[key])
-        P = Builder(key, 9, collection('FL_%s_Preview' % key, carcol), root)
-        for ax, y, w in ((spec['xf'], spec['yf'], spec['wf']), (spec['xr'], spec['yr'], spec['wr'])):
-            for sd, sn in ((1, 'L'), (-1, 'R')):
-                P.tyre('Tyre' + sn, ax, sd * y, spec['R'], w, spec['rim'], cover=SC_SPECS[key].get('cover', False))
+            B = Builder(key, lod, collection('FL_%s_LOD%d' % (key, lod), carcol), root)
+            road_car(B, SC_SPECS[key])
+            # the game draws the safety car whole: its tyres are part of the model (fewer sides further away)
+            for ax, y, w in ((spec['xf'], spec['yf'], spec['wf']), (spec['xr'], spec['yr'], spec['wr'])):
+                for sd, sn in ((1, 'L'), (-1, 'R')):
+                    B.tyre('Tyre' + sn, ax, sd * y, spec['R'], w, spec['rim'], cover=SC_SPECS[key].get('cover', False),
+                           seg=(14, 10, 6)[lod])
         root.location = (SC_ROW_X, offs[year], 0)
         lc = bpy.context.view_layer.layer_collection.children['FL_%s_Car' % key]
         for name in ('FL_%s_LOD1' % key, 'FL_%s_LOD2' % key):
@@ -722,7 +724,7 @@ GAME_DRAWS = ('RWFlap', 'RWTop')
 def export_json(year, path):
     """one car's three LODs, relative to its empty, in the same format as the 2010 car (without the
     parts the game draws itself: wheels, the rear wing's top flap)"""
-    mats = []; lods = []
+    mats = []; lods = []; pal = {}
     dg = bpy.context.evaluated_depsgraph_get()
     root = bpy.data.objects.get('FL_%s' % year)
     to_car = root.matrix_world.inverted() if root else None
@@ -741,7 +743,10 @@ def export_json(year, path):
                     continue
                 name = slots[min(f.material_index, len(slots) - 1)].split('.')[0]
                 key = name[3:] if name.startswith('FL_') else 'carbon'
-                if key not in mats: mats.append(key)
+                if key not in mats:
+                    mats.append(key)
+                    sm = ob.material_slots[min(f.material_index, len(slots) - 1)].material if ob.material_slots else None
+                    pal[key] = [round(c, 4) for c in sm.diffuse_color[:3]] if sm else [0.1, 0.1, 0.1]
                 for lp in f.loops:
                     P += [round(c, 4) for c in lp.vert.co]
                     N += [round(c, 3) for c in f.normal]
@@ -751,7 +756,7 @@ def export_json(year, path):
     os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
     with open(path, 'w') as f:
         json.dump(dict(format='FL-blender-1', car=year, axes='+X forward, +Y left, +Z up, metres',
-                       materials=mats, lods=lods), f, separators=(',', ':'))
+                       materials=mats, palette=pal, lods=lods), f, separators=(',', ':'))
     return {'path': path, 'triangles': [l['tris'] for l in lods]}
 
 

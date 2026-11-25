@@ -101,6 +101,18 @@ DRS opens by itself when you have it; the DRS box by the speedometer shows it (o
   marshal light panels, recovery cranes, TecPro barriers) and exports them to `tools/blender/props/`;
   `python3 tools/gen_trackside.py` turns them into `HD/models/*.emm` with one 64 px colour texture each
   (about 15-30 KB a model). `Track::addTrackside()` places them on every circuit.
+* The circuit buildings (grandstand, billboard, advertising bridge, race control, hospitality) are in
+  `tools/blender/trackside.py` too. They share one 512 px atlas of sponsor boards, the timing screen, the
+  crowd and glass, painted by `tools/gen_trackside.py` and stored once, in `grandstand.emm`.
+* The era safety cars: `build_safety_cars()` + `export_json('SC<year>', ...)` in `tools/blender/f1_eras.py`,
+  then `python3 tools/gen_safety_cars.py` -> `HD/models/safety_car_<era>.emm` (tyres on the model).
+* F1 rear light: a lens on each car's crash structure, lit by `Renderer::rearLightMode` (rain; energy
+  harvesting and the pit lane limiter on the hybrid cars).
+* Track life: the marshal light panels flash yellow at incidents, under the VSC and the safety car, and
+  blue for blue flags; fans wave flags in the teams' colours; a crowd loop plays near the stands
+  (`DATA/sfx/crowd_stands.raw`); pit crews wait in the box, carry the wheels, hold the jacks, and
+  release the car with a lollipop (1998) or the light gantry (2010 on), with a shout (`pit_crew_go.raw`).
+  Test modes: `fl_test screel <dir> <era>`, `fl_test pitreel <dir> <era>`.
 * `tools/blender/pit_crew.py` builds the rigged pit crew member (full-face helmet, wheel gun) and his
   four motions, keyed on the timeline (idle 1-10, wheel gun 11-20, push 21-30, celebrate 31-40);
   `export_json()` -> `tools/blender/pit_crew.json`, then `python3 tools/gen_crew.py` writes the 16 poses

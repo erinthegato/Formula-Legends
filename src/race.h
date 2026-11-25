@@ -255,6 +255,7 @@ struct Race {
     bool slowAt(float s) const;               // 80 km/h here (FCY or a slow zone)
     bool zoneAt(float s) const;               // a slow zone here (not the FCY)
     void callFcy(float seconds);
+    void testSafetyCar();
     void addSlowZone(float s, float seconds);
     PitQte qte;                   // the player's manual pit stop
     float scCooldown = 0;

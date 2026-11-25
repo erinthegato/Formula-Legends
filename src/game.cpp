@@ -301,6 +301,19 @@ void Game::raceAudio() {
     // rain on the car (quieter inside the cockpit)
     float rv = race.rain * (cam == CAM_COCKPIT ? 0.4f : 0.65f);
     sound::loop(0, rv > 0.02f && screen != SCR_PAUSE ? "weather_rain" : nullptr, rv);
+    // the crowd in the grandstands and bleachers: louder the nearer the stand (muffled in the cockpit)
+    {
+        static const Track* stTrack = nullptr; static std::vector<V3> stands;
+        if (stTrack != &race.track) {
+            stTrack = &race.track; stands.clear();
+            for (const PropInst& p : race.track.props) if (p.model == PROP_GRANDSTAND || p.model == PROP_BLEACHER) stands.push_back(p.p);
+        }
+        float dmin = 1e9f;
+        for (const V3& s : stands) { float d = len(s - me.pos); if (d < dmin) dmin = d; }
+        float cv = dmin < 260 ? 0.42f / (1 + dmin / 30.0f) * (1 - dmin / 260.0f) : 0;
+        if (cam == CAM_COCKPIT) cv *= 0.6f;
+        sound::loop(1, cv > 0.01f && screen != SCR_PAUSE ? "crowd_stands" : nullptr, cv);
+    }
 }
 
 // pit sounds, thunder and the engineer's radio
@@ -310,6 +323,34 @@ void Game::raceEvents() {
         sound::play(SFX_FILE[e], v, e >= SFX_THUNDER_CLOSE ? ((rand() % 100) - 50) / 100.0f : 0.3f);
     }
     race.sfxEvents.clear();
+    // other teams' stops near us: the air jacks, the wheel guns, the drop and the crew's shout as the
+    // car goes (our own stop's sounds come from the race, above; the shout is ours too)
+    {
+        static float lastT = 1e9f;
+        static int prevPit[64], prevPh[64]; static float prevTm[64];
+        int n = (int)race.cars.size() < 64 ? (int)race.cars.size() : 64;
+        if (race.time < lastT) for (int i = 0; i < 64; i++) { prevPit[i] = -1; prevPh[i] = -99; prevTm[i] = 0; }
+        lastT = race.time;
+        const Car& me = race.player();
+        static const float SWAP[ERA_COUNT] = {1.6f, 3.2f, 2.6f, 2.3f};   // (as Race::pitStop)
+        for (int i = 0; i < n; i++) {
+            const Car& c = race.cars[i];
+            V3 rel = c.pos - me.pos;
+            float d = len(rel);
+            float vol = 0.85f / (1 + d / 8.0f), pan = d > 0.5f ? dot(rel * (1.0f / d), me.left * -1.0f) * 0.8f : 0;
+            if (race.session == SES_RACE && d < 60 && prevPit[i] == PIT_STOP && c.pit == PIT_OUT && prevPh[i] >= 0)
+                sound::play("pit_crew_go", c.player ? 0.7f : vol, c.player ? 0 : pan);
+            if (!c.player && d < 45 && c.pit == PIT_STOP && prevPit[i] == PIT_STOP) {
+                if (c.pitPhase == 1 && prevPh[i] != 1) sound::play("pit_airjack_up", vol, pan);
+                if (c.pitPhase == 3 && prevPh[i] != 3) sound::play("pit_jack_drop", vol, pan);
+                if (c.pitPhase == 1 && prevPh[i] == 1) {
+                    float sw = SWAP[c.def->era % ERA_COUNT];
+                    for (float g : {0.25f, 0.45f}) if (prevTm[i] < g * sw && c.pitTimer >= g * sw) sound::play("pit_wheelgun", vol, pan);
+                }
+            }
+            prevPit[i] = c.pit; prevPh[i] = c.pitPhase; prevTm[i] = c.pitTimer;
+        }
+    }
     if (race.radioPending >= 0 && race.radioPending < RADIO_COUNT) {
         if (screen != SCR_REEL && !aiDrivesPlayer) sound::radio(RADIO_FILE[race.radioPending]);
         race.radioPending = -1;
