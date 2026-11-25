@@ -220,7 +220,7 @@ def build_lod(B):
         B.prism('RW_End' + sn, [(-1.83, 0.30), (-1.83, 0.86), (-1.92, 0.95), (-2.20, 0.95), (-2.20, 0.30)], 0.015, s * (RW_HALF - 0.008), BODY)
         if lod < 2:
             B.box('Mirror' + sn, (0.72, s * 0.36, 0.73), (0.04, 0.12, 0.05), BODY)
-            B.rod('MirrorStalk' + sn, (0.78, s * 0.26, 0.64), (0.73, s * 0.33, 0.72), 0.01, CARB)
+            B.rod('MirrorStalk' + sn, (0.78, s * 0.18, 0.45), (0.73, s * 0.33, 0.72), 0.012, CARB)   # from inside the tub
         if lod == 0:
             r = 0.012
             B.rod('FUpper1' + sn, (1.75, s * 0.15, 0.50), (1.6, s * 0.60, 0.45), r, CARB)

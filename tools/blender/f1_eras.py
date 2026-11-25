@@ -28,7 +28,13 @@ COLOURS = {   # one look per car in Blender (the game paints its own liveries)
     '2025': dict(livery=(0.40, 0.04, 0.08), second=(0.95, 0.95, 0.95)),
 }
 FIXED = dict(carbon=(0.025, 0.025, 0.03), grey=(0.45, 0.46, 0.48), rubber=(0.03, 0.03, 0.03),
-             glass=(0.10, 0.12, 0.16), red=(0.9, 0.05, 0.05))
+             glass=(0.10, 0.12, 0.16), red=(0.9, 0.05, 0.05), white=(0.95, 0.95, 0.92),
+             orange=(1.0, 0.50, 0.04), green=(0.10, 0.85, 0.20))
+# the safety cars: each era its own body colour and trim
+COLOURS['SC1998'] = dict(livery=(0.08, 0.30, 0.17), second=(0.72, 0.73, 0.75))    # deep green, silver trim
+COLOURS['SC2010'] = dict(livery=(0.80, 0.81, 0.83), second=(0.06, 0.06, 0.07))    # bright silver, black trim
+COLOURS['SC2016'] = dict(livery=(0.22, 0.23, 0.25), second=(0.85, 0.08, 0.06))    # graphite, red trim
+COLOURS['SC2025'] = dict(livery=(0.98, 0.76, 0.02), second=(0.03, 0.03, 0.035))   # vivid yellow, black
 
 
 def material(year, sw, shade=100):
@@ -236,12 +242,13 @@ def suspension(B, xf, xr, yf, yr, R, hwf=0.12, hwr=0.20):
             B.rod('RLower' + sn, (xr + dx * 1.3, s * hwr, R - 0.13), (xr, s * (yr - 0.17), R - 0.13), r, 'carbon')
 
 
-def mirrors(B, x, y, z):
+def mirrors(B, x, y, z, ay, az):
+    """mirrors on stalks; each stalk starts at (ay, az), a point inside the bodywork, so it is attached"""
     if B.lod > 1:
         return
     for s, sn in ((1, 'L'), (-1, 'R')):
         B.box('Mirror' + sn, (x - 0.02, s * y - 0.06, z - 0.025), (x + 0.02, s * y + 0.06, z + 0.025), 'livery')
-        B.rod('MirrorStalk' + sn, (x + 0.05, s * (y - 0.10), z - 0.08), (x, s * (y - 0.03), z), 0.01, 'carbon')
+        B.rod('MirrorStalk' + sn, (x + 0.03, s * ay, az), (x, s * (y - 0.02), z - 0.01), 0.012, 'carbon')
 
 
 # ------------------------------------------------------------------ 1998: narrow, grooved tyres
@@ -290,7 +297,7 @@ def car_1998(B):
     B.prism('Diffuser', [(-1.50, 0.05), (-1.95, 0.05), (-1.95, 0.20), (-1.75, 0.17)], 0.30, 0, ('carbon', 60))
     B.loft('Deck', [(0.02, 0.52, 0.10, 0.44), (-0.45, 0.50, 0.10, 0.40), (-1.00, 0.42, 0.10, 0.30),
                     (-1.40, 0.28, 0.10, 0.22), (-1.90, 0.10, 0.12, 0.20)], 'livery', n=n, e=0.35)
-    mirrors(B, 0.50, 0.36, 0.66)
+    mirrors(B, 0.50, 0.36, 0.66, ay=0.18, az=0.45)
     c = CAR_1998
     suspension(B, c['xf'], c['xr'], c['yf'], c['yr'], c['R'])
 
@@ -345,7 +352,7 @@ def car_2016(B):
     B.prism('Diffuser', [(-1.55, 0.05), (-2.05, 0.05), (-2.05, 0.26), (-1.85, 0.22)], 0.74, 0, ('carbon', 60))
     B.loft('Deck', [(0.04, 0.56, 0.10, 0.46), (-0.40, 0.54, 0.10, 0.42), (-1.00, 0.45, 0.10, 0.31),
                     (-1.45, 0.28, 0.10, 0.21), (-1.90, 0.10, 0.12, 0.20)], 'livery', n=n, e=0.35)
-    mirrors(B, 0.66, 0.42, 0.66)
+    mirrors(B, 0.66, 0.42, 0.66, ay=0.18, az=0.45)
     c = CAR_2016
     suspension(B, c['xf'], c['xr'], c['yf'], c['yr'], c['R'])
 
@@ -402,7 +409,7 @@ def car_2025(B):
     B.prism('Diffuser', [(-1.75, 0.06), (-2.22, 0.06), (-2.22, 0.36), (-2.02, 0.30)], 1.0, 0, ('carbon', 60))
     B.loft('Deck', [(0.06, 0.66, 0.10, 0.46), (-0.30, 0.66, 0.10, 0.44), (-0.90, 0.56, 0.10, 0.32),
                     (-1.50, 0.34, 0.10, 0.22), (-2.10, 0.10, 0.12, 0.20)], 'livery', n=n, e=0.35)
-    mirrors(B, 0.62, 0.55, 0.68)
+    mirrors(B, 0.62, 0.55, 0.68, ay=0.48, az=0.56)
     halo(B)
     c = CAR_2025
     suspension(B, c['xf'], c['xr'], c['yf'], c['yr'], c['R'], hwf=0.14, hwr=0.22)
@@ -427,9 +434,19 @@ def wheel_winglet(B, s, sn, gap=0.035, half_angle=38.0, t=0.01):
         F += [(b, b + 1, n + 1, n), (b + 2, n + 2, n + 3, b + 3), (b, n, n + 2, b + 2), (b + 1, b + 3, n + 3, n + 1)]
     F += [(0, 2, 3, 1), ((k - 1) * 4, (k - 1) * 4 + 1, (k - 1) * 4 + 3, (k - 1) * 4 + 2)]
     B.mesh('WheelWinglet' + sn, V, F, 'carbon')
-    # the strut: from the winglet's inner edge, over the top of the tyre, down to the nose's side
-    top = (ax, y0, R + R + gap)
-    B.rod('WingletStrut' + sn, top, (ax + 0.04, s * 0.19, 0.50), 0.012, 'carbon')
+    # the support: a flat plate under the winglet's inner edge, a little shorter than the winglet,
+    # running down to the side of the nose
+    r = R + gap
+    xs = 0.85 * r * math.sin(math.radians(half_angle))          # 85 % of the winglet's length
+    top = [(ax + x, y0, R + math.sqrt(r * r - x * x) + 0.005) for x in (xs, xs / 2, 0.0, -xs / 2, -xs)]   # into the winglet
+    bot = [(ax - 0.80 * xs, s * 0.19, 0.48), (ax + 0.80 * xs, s * 0.19, 0.48)]
+    front = [Vector(p) for p in top + bot]
+    nrm = (front[0] - front[4]).cross(front[6] - front[4]).normalized() * 0.006
+    V = [tuple(p + nrm) for p in front] + [tuple(p - nrm) for p in front]
+    m = len(front)
+    F = [tuple(range(m)), tuple(range(2 * m - 1, m - 1, -1))]
+    F += [(i, (i + 1) % m, m + (i + 1) % m, m + i) for i in range(m)]
+    B.mesh('WingletSupport' + sn, V, F, 'carbon')
 
 
 def halo(B, cx=0.20, r=0.26, z_back=0.78, z_front=0.86, rim=0.66, post_x=0.81, z_mount=0.695):
@@ -453,6 +470,168 @@ def halo(B, cx=0.20, r=0.26, z_back=0.78, z_front=0.86, rim=0.66, post_x=0.81, z
     # (the opening's front is at x 0.80)
     front = hoop[k // 2]
     B.tube('HaloPillar', [front, ((front[0] + post_x) / 2, 0.0, front[2] - 0.05), (post_x, 0.0, rim)], 0.022, 'carbon', sides=sides)
+
+
+# ------------------------------------------------------------------ the safety cars
+# Original front-engined road cars in each era's style (not copies of any real model), low-poly like the
+# F1 cars: a body loft with its wheel arches cut out, a glass cabin with a painted roof, lights, and the
+# roof light bar (amber lamps, green at the ends). Units and axes as the F1 cars.
+SC_SPECS = {
+    # 1998: a rounded two-door coupe with a separate boot (4.57 x 1.72 x 1.37 m), small wheels, a tall bar
+    'SC1998': dict(wb=2.69, of=0.86, ov=1.02, W=1.72, H=1.37, belt=0.86, hood=0.79, deck=0.87, cowl=0.50,
+                   roof_f=0.12, roof_r=-0.62, rw_base=-0.92, gw=0.82, e=0.40, R=0.31, rim=0.19, twf=0.215, twr=0.215,
+                   lb_w=0.60, lb_h=0.16, bar='box', spoiler='lip', grille=0.55, roof='livery'),
+    # 2010: a long-hood GT coupe (4.64 x 1.94 x 1.26 m), the cabin pushed right back, short fastback, wing vents
+    'SC2010': dict(wb=2.68, of=0.80, ov=1.16, W=1.94, H=1.26, belt=0.82, hood=0.74, deck=0.84, cowl=-0.20,
+                   roof_f=-0.58, roof_r=-0.98, rw_base=-1.42, gw=0.70, e=0.38, R=0.34, rim=0.24, twf=0.265, twr=0.295,
+                   lb_w=0.42, lb_h=0.07, bar='slim', spoiler=None, grille=0.62, wing_vents=True, roof='livery'),
+    # 2016: a fastback GT coupe (4.55 x 1.94 x 1.29 m): sloping roof to the tail, ducktail spoiler
+    'SC2016': dict(wb=2.63, of=0.80, ov=1.12, W=1.94, H=1.29, belt=0.80, hood=0.72, deck=0.80, cowl=0.20,
+                   roof_f=-0.18, roof_r=-0.45, rw_base=-1.70, gw=0.72, e=0.32, R=0.345, rim=0.25, twf=0.265, twr=0.295,
+                   lb_w=0.44, lb_h=0.05, bar='slim', spoiler='duck', grille=0.66, roof='livery'),
+    # 2025: a wide front-engined GT coupe (4.50 x 1.98 x 1.27 m): flared arches, canards, splitter, big wing, black roof
+    'SC2025': dict(wb=2.70, of=0.80, ov=1.00, W=1.98, H=1.27, belt=0.79, hood=0.68, deck=0.82, cowl=0.15,
+                   roof_f=-0.25, roof_r=-0.62, rw_base=-1.20, gw=0.66, e=0.30, R=0.35, rim=0.265, twf=0.285, twr=0.315,
+                   lb_w=0.40, lb_h=0.035, bar='slim', spoiler='wing', splitter=True, vents=True, canards=True,
+                   flare=0.10, grille=0.72, roof='second', cover=True),
+}
+
+
+def cylinder_y(B, name, ax, y0, y1, z, r, seg, mat):
+    """a closed cylinder along Y (a wheel-arch cutter)"""
+    V = []
+    for y in (y0, y1):
+        for k in range(seg):
+            a = 2 * math.pi * k / seg
+            V.append((ax + r * math.cos(a), y, z + r * math.sin(a)))
+    F = [(k, (k + 1) % seg, seg + (k + 1) % seg, seg + k) for k in range(seg)]
+    F += [tuple(range(seg))[::-1], tuple(range(seg, 2 * seg))]
+    return B.mesh(name, V, F, mat)
+
+
+def road_car(B, s):
+    lod = B.lod; n = {0: 8, 1: 6, 2: 4}[lod]
+    hw = s['W'] / 2 - 0.01
+    xf, xr = s['wb'] / 2, -s['wb'] / 2
+    xn, xt = xf + s['of'], xr - s['ov']
+    belt, hood, deck, H = s['belt'], s['hood'], s['deck'], s['H']
+    pinch = 1.0 - s.get('flare', 0.0)          # wide-body: the waist between the arches is narrower
+    rw = s['rw_base']
+    secs = [(xn, hw * 0.80, 0.30, hood - 0.12), (xn - 0.18, hw * 0.96, 0.20, hood - 0.03),
+            (xf, hw, 0.17, hood), (s['cowl'], hw * pinch, 0.17, belt), (rw, hw * pinch, 0.17, belt if rw > xr else deck + 0.06),
+            (xr, hw, 0.17, deck + 0.02 if rw > xr else deck + 0.08), (xt + 0.16, hw * 0.97, 0.20, deck), (xt, hw * 0.86, 0.30, deck - 0.06)]
+    if s.get('flare'):                           # the flares: full width over the axles only
+        secs += [(xf - 0.45, hw * pinch, 0.17, hood + 0.01), (xr + 0.45, hw * pinch, 0.17, belt)]
+    secs = sorted(secs, key=lambda q: -q[0])
+    body = B.loft('Body', secs, 'livery', n=n, e=s['e'])
+    if lod < 2:                                  # wheel arches
+        for ax in (xf, xr):
+            for side in (1, -1):
+                cut = cylinder_y(B, 'Arch', ax, side * (hw - 0.34), side * (hw + 0.10), s['R'], s['R'] + 0.035,
+                                 14 if lod == 0 else 8, ('carbon', 30))
+                apply_cut(body, cut)
+    # the cabin: glass, with a painted roof
+    gw = hw * s['gw']
+    B.loft('Cabin', [(s['cowl'], gw * 1.05, belt - 0.03, belt + 0.01), (s['roof_f'], gw, belt - 0.03, H - 0.04),
+                     (s['roof_r'], gw, belt - 0.03, H - 0.04), (s['rw_base'], gw * 1.02, belt - 0.03, belt + 0.01)],
+           ('glass', 70), n=n, e=0.5)
+    B.box('Roof', (s['roof_r'], -gw * 0.92, H - 0.05), (s['roof_f'], gw * 0.92, H), s.get('roof', 'livery'))
+    # the light bar on the roof: amber lamps, green at the ends
+    lx = (s['roof_f'] + s['roof_r']) / 2 + 0.05
+    lw, lh = s['lb_w'], s['lb_h']
+    if s.get('bar') == 'box':                   # 1990s: a tall bar on feet, big lamps
+        B.box('LightBar', (lx - 0.14, -lw, H + 0.04), (lx + 0.14, lw, H + lh * 0.45), 'second')
+        for side in (1, -1):
+            B.box('BarFoot', (lx - 0.10, side * lw * 0.7 - 0.04, H - 0.005), (lx + 0.10, side * lw * 0.7 + 0.04, H + 0.045), ('carbon', 60))
+    else:
+        B.box('LightBar', (lx - 0.11, -lw, H), (lx + 0.11, lw, H + lh * 0.45), 'second' if s.get('roof') != 'second' else ('carbon', 60))
+    if lod < 2:
+        for side in (1, -1):
+            B.box('LampAmber', (lx - 0.09, min(side * 0.04, side * (lw - 0.16)), H + lh * 0.40),
+                  (lx + 0.09, max(side * 0.04, side * (lw - 0.16)), H + lh), 'orange')
+            B.box('LampGreen', (lx - 0.09, min(side * (lw - 0.14), side * lw), H + lh * 0.40),
+                  (lx + 0.09, max(side * (lw - 0.14), side * lw), H + lh), 'green')
+    else:
+        B.box('Lamps', (lx - 0.09, -lw, H + lh * 0.4), (lx + 0.09, lw, H + lh), 'orange')
+    if lod < 2:
+        # grille, headlights, tail lights, mirrors
+        g = s.get('grille', 0.45)
+        B.box('Grille', (xn - 0.03, -hw * g, 0.30), (xn + 0.005, hw * g, hood - 0.16), ('carbon', 40))
+        for side, sn in ((1, 'L'), (-1, 'R')):
+            ys = sorted((side * hw * 0.50, side * hw * 0.82))
+            B.box('Headlight' + sn, (xn - 0.16, ys[0], hood - 0.17), (xn - 0.02, ys[1], hood - 0.09), 'white')
+            B.box('TailLight' + sn, (xt - 0.005, ys[0], deck - 0.14), (xt + 0.04, ys[1], deck - 0.07), 'red')
+            B.box('Mirror' + sn, (s['cowl'] - 0.12, side * (hw * pinch + 0.10) - 0.06, belt + 0.04),
+                  (s['cowl'] - 0.02, side * (hw * pinch + 0.10) + 0.06, belt + 0.11), 'second')
+            B.rod('MirrorArm' + sn, (s['cowl'] - 0.07, side * hw * pinch * 0.55, belt - 0.12),
+                  (s['cowl'] - 0.07, side * (hw * pinch + 0.06), belt + 0.07), 0.018, 'second')
+            if s.get('wing_vents'):              # 2010: the vents in the front wings
+                for k in range(3):
+                    B.box('WingVent' + sn, (xf - 0.62 + k * 0.10, side * (hw + 0.002) - 0.004, belt - 0.30),
+                          (xf - 0.56 + k * 0.10, side * (hw + 0.002) + 0.004, belt - 0.12), ('carbon', 40))
+            if s.get('canards'):                 # 2025: dive planes on the front corners
+                B.prism('Canard' + sn, [(xn - 0.05, 0.36), (xn - 0.30, 0.40), (xn - 0.30, 0.38), (xn - 0.08, 0.34)],
+                        0.14, side * (hw * 0.86), 'second')
+        B.box('Plate', (xt - 0.004, -0.16, 0.36), (xt + 0.01, 0.16, 0.47), 'white')
+    # era details
+    if s['spoiler'] == 'duck':                   # 2016: the roof ends in a ducktail
+        B.prism('Spoiler', [(xt + 0.32, deck + 0.02), (xt + 0.02, deck + 0.10), (xt - 0.01, deck + 0.07), (xt + 0.02, deck + 0.01)],
+                hw * 1.7, 0, 'second')
+    elif s['spoiler'] == 'lip':
+        B.prism('Spoiler', [(xt + 0.30, deck + 0.005), (xt + 0.05, deck + 0.05), (xt + 0.03, deck + 0.005)], hw * 1.6, 0, 'livery')
+    elif s['spoiler'] == 'wing':
+        B.prism('RearWing', [(xt + 0.40, deck + 0.24), (xt + 0.25, deck + 0.29), (xt + 0.08, deck + 0.30), (xt + 0.03, deck + 0.26)],
+                hw * 1.75, 0, 'second')
+        for side in (1, -1):
+            B.prism('WingEnd', [(xt + 0.42, deck + 0.18), (xt + 0.42, deck + 0.33), (xt + 0.0, deck + 0.33), (xt + 0.0, deck + 0.18)],
+                    0.012, side * hw * 0.88, 'second')
+        for side in (1, -1):
+            B.prism('WingPylon', [(xt + 0.30, deck), (xt + 0.24, deck + 0.25), (xt + 0.14, deck + 0.25), (xt + 0.16, deck)],
+                    0.012, side * hw * 0.55, ('carbon', 100))
+    if s.get('splitter') and lod < 2:
+        B.box('Splitter', (xn - 0.20, -hw * 0.92, 0.10), (xn + 0.06, hw * 0.92, 0.125), 'second')
+        B.prism('Diffuser', [(xt + 0.40, 0.17), (xt - 0.04, 0.17), (xt - 0.04, 0.30)], hw * 1.3, 0, 'second')
+    if s.get('vents') and lod < 2:
+        for side in (1, -1):
+            ys = sorted((side * 0.18, side * 0.42))
+            B.box('HoodVent', (xf - 0.30, ys[0], hood - 0.005), (xf + 0.05, ys[1], hood + 0.012), 'second')
+
+
+def sc_spec(key):
+    s = SC_SPECS[key]
+    return dict(xf=s['wb'] / 2, xr=-s['wb'] / 2, R=s['R'], yf=s['W'] / 2 - 0.02 - s['twf'] / 2,
+                yr=s['W'] / 2 - 0.02 - s['twr'] / 2, wf=s['twf'], wr=s['twr'], rim=s['rim'], half=s['W'] / 2)
+
+
+SC_ROW_X = -7.0        # the safety cars park behind their era's F1 car
+
+
+def build_safety_cars(years=('1998', '2010', '2016', '2025')):
+    scene = bpy.context.scene
+    offs = offsets(); offs['2010'] = 0.0
+    out = {}
+    for year in years:
+        key = 'SC' + year
+        remove_car(key)
+        for me in [m for m in bpy.data.meshes if m.users == 0]:
+            bpy.data.meshes.remove(me)
+        spec = sc_spec(key)
+        carcol = collection('FL_%s_Car' % key, scene.collection)
+        root = bpy.data.objects.new('FL_%s' % key, None)
+        root.empty_display_type = 'ARROWS'; root.empty_display_size = 0.5
+        carcol.objects.link(root)
+        for lod in (0, 1, 2):
+            road_car(Builder(key, lod, collection('FL_%s_LOD%d' % (key, lod), carcol), root), SC_SPECS[key])
+        P = Builder(key, 9, collection('FL_%s_Preview' % key, carcol), root)
+        for ax, y, w in ((spec['xf'], spec['yf'], spec['wf']), (spec['xr'], spec['yr'], spec['wr'])):
+            for sd, sn in ((1, 'L'), (-1, 'R')):
+                P.tyre('Tyre' + sn, ax, sd * y, spec['R'], w, spec['rim'], cover=SC_SPECS[key].get('cover', False))
+        root.location = (SC_ROW_X, offs[year], 0)
+        lc = bpy.context.view_layer.layer_collection.children['FL_%s_Car' % key]
+        for name in ('FL_%s_LOD1' % key, 'FL_%s_LOD2' % key):
+            lc.children[name].hide_viewport = True
+        out[key] = stats(key)
+    return out
 
 
 CARS = {'1998': (car_1998, CAR_1998), '2016': (car_2016, CAR_2016), '2025': (car_2025, CAR_2025)}
