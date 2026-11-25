@@ -48,41 +48,17 @@ engine (physics, circuits, trackside scenery, pit crews and their animations). N
 * **Modes**: quick race, time trial (ghost), championship (an era's 10-round season), career (your own
   two-car team in an era: sponsors, a team-mate and a reserve, upgrades, livery), race weekends
   (practice, qualifying, race), replays and photo mode, trophies.
-* **The intro**, cut to *Kickstart My Heart* (the copy in `DATA/music/intro.emu`, the first 64 s):
-  "CODE 4 STUDIOS" flashing on the motorcycle revs, then from the band's first beat a highlight reel
-  of the four eras in the game itself (2025 at Suzuka, 1980 at Monaco, 2010 in a storm at Spa, 2016
-  at the Red Bull Ring): empty-track crane shots, DRS trains, overtakes, pit stops, crashes, a grid
-  start, era title cards (the next circuit loads behind them) and FORMULA LEGENDS at the end. Any
-  button skips it. The script is `src/intro.cpp` (shots in bars of four beats, 178 BPM).
-* **The attract movie**: leave the title screen alone (Options: "Attract screen after", 10 s by
-  default) and a second movie plays to the whole of *Lose My Mind* (Don Toliver feat. Doja Cat,
-  `DATA/music/attract.emu`, 110 BPM), cut on the bar lines and one era per section of the song:
-  1980 at Imola from the drop, 2010 at night in Singapore for the chorus, 2016 at Silverstone (DRS)
-  and in the rain at Interlagos, 2025 on the Las Vegas Strip for the Doja Cat verse and Zandvoort,
-  then the title over the outro. It loops with the song until a button is pressed. Same script
-  file, `ATTRACT_SHOTS`.
-
-## Install (PS Vita)
-Get `FormulaLegends.vpk` from the GitHub Actions run (artifact `FormulaLegends-Vita`), copy it to
-`ux0:data` and install it with VitaShell (title ID `FLEG00001`). Needs `libshacccg.suprx`, like EMR 3D.
-Saves go to `ux0:data/FormulaLegends/`.
-
-## Controls
-| Button | Action |
-|---|---|
-| X or R / right stick up | accelerate |
-| Square or L / right stick down | brake |
-| Left stick / D-pad | steer (tilt steering in Settings) |
-| Triangle | camera: chase / far chase / cockpit |
-| Circle (hold) | look behind |
-| Select | box this lap |
-| D-pad up | engine map |
-| Start | pause |
-| L / R on the circuit and team screens | change era |
-
-DRS opens by itself when you have it; the DRS box by the speedometer shows it (outlined: you have it for the next zone, green: open).
-
-## Building
+* **The intro**, cut to *Take On The World* (All Good Folks, Uppbeat; `DATA/music/intro.emu`, the
+  first 70 s, 124.4 BPM): "CODE 4 STUDIOS" strobing on the opening beats, then from the first big hit a
+  highlight reel of the four eras in the game itself (2025 at Suzuka, 1980 at Monaco, 2010 in a storm at
+  Spa, 2016 at the Red Bull Ring): empty-track crane shots, DRS trains, overtakes, pit stops, crashes, a
+  grid start, era title cards (the next circuit loads behind them) and FORMULA LEGENDS at the end. Any
+  button skips it. The script is `src/intro.cpp` (shots in bars of four beats).
+* **The attract movie**: leave headquarters or the main menu alone (Options: "Attract screen after",
+  10 s by default) and a second movie plays a whole song from `DATA/music/attract.emu`, cut on the bar
+  lines with one era per section, looping until a button is pressed (script: `ATTRACT_SHOTS` in
+  `src/intro.cpp`, beat grid in `attract.txt`). The song is being replaced by an original
+  (ElevenLabs) track; with no `attract.emu` the game simply skips the attract movie.
 * PS Vita: `cmake -S vita -B build-vita && cmake --build build-vita` with VitaSDK + vitaGL
   (GitHub Actions builds the VPK on every push).
 * PC test build: `make -f Makefile.pc`, then from this folder e.g.
@@ -138,9 +114,9 @@ DRS opens by itself when you have it; the DRS box by the speedometer shows it (o
   envelope of the samples.
 * Intro music: `ffmpeg -i song.mp3 -t 64.5 -af afade=t=out:st=61.8:d=2.6 -ac 2 -ar 22050 -f s16le - |
   tools/music/adpcm_enc DATA/music/intro.emu 2`; `DATA/music/intro.txt` holds the first beat and the
-  beat length. Attract music: the same without `-t`/fade into `DATA/music/attract.emu`;
-  `attract.txt`: first downbeat 0.340 s, beat 0.545454 s (fitted to the onsets, steady through the
-  song). `./fl_test attract shots` checks it starts after 10 s idle, loops, and a button stops it.
+  beat length. Attract music: the same without `-t`/fade into `DATA/music/attract.emu`, and
+  `attract.txt` with its first downbeat, beat length and length. `./fl_test attract shots` checks it
+  starts after 10 s idle, loops, and a button stops it.
 
 Data credits: bacinger/f1-circuits (MIT), EU-DEM (Copernicus), SRTM (NASA) via OpenTopoData,
 OpenStreetMap contributors (ODbL, EMR's circuits). Engine, crew, props and engine sounds from

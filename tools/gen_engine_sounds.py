@@ -167,7 +167,7 @@ out = os.path.join(ROOT, 'DATA', 'audio')
 for era, (x, idle, mx) in ERAS.items():
     s = np.clip(np.round(x * 32767), -32768, 32767).astype('<i2')
     if era in ('v8', 'ge'):
-        continue        # recordings now: tools/engine/v8_from_recording.py, ge_from_recording.py (f1_ge0..9, a team each)
+        continue        # these two come from ElevenLabs takes now (tools/audio/make_engine_loops.py)
     s.tofile(os.path.join(out, f'f1_{era}.raw'))
     print(f'f1_{era}.raw  idle {idle}  limit {mx}  ref {ref_rpm(idle, mx):.0f} rpm  rms {np.sqrt((x ** 2).mean()):.3f}')
     if len(sys.argv) > 1:

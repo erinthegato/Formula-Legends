@@ -33,9 +33,9 @@ const Shot INTRO_SHOTS[] = {
     {27, 3, SH_FINAL},
 };
 
-// ---- the attract movie: Lose My Mind (Don Toliver feat. Doja Cat, DATA/music/attract.emu, the whole
+// ---- the attract movie (DATA/music/attract.emu, the whole
 // song, 110 BPM). Its sections: quiet intro bars 0-7, the beat drops at 8, a break in bar 23, chorus
-// 24-39, second verse 40-47, chorus 48-63, the Doja Cat verse 64-79, bridge 80-87, outro from 88.
+// 24-39, second verse 40-47, chorus 48-63, the third verse 64-79, bridge 80-87, outro from 88.
 // One era per section; the era cards land one bar before each section so the cut hits the downbeat.
 const Block ATTRACT_BLOCKS[] = {
     {ERA_90S, "imola", WX_DRY, 14.0f},
@@ -63,7 +63,7 @@ const Shot ATTRACT_SHOTS[] = {
     {47, 3, SH_CARD},
     {48, 3, SH_START}, {50, 3, SH_STORM}, {52, 3, SH_OVERTAKE}, {54, 3, SH_CRASH}, {56, 3, SH_STORM}, {58, 3, SH_OVERTAKE},
     {60, 3, SH_PIT}, {62, 3, SH_STORM},
-    // Doja Cat's verse: 2025 on the Strip at night
+    // the third verse: 2025 on the Strip at night
     {63, 4, SH_CARD},
     {64, 4, SH_EMPTY}, {66, 4, SH_DRS}, {68, 4, SH_OVERTAKE}, {70, 4, SH_PIT}, {72, 4, SH_DRS}, {74, 4, SH_CRASH},
     {76, 4, SH_OVERTAKE}, {78, 4, SH_EMPTY},

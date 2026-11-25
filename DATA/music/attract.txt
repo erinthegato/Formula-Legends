@@ -1,3 +1,0 @@
-beat0 0.340
-period 0.545454
-length 209.10
