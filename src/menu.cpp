@@ -624,15 +624,14 @@ void Game::drawPodium() {
         R.text3D(face * M4::translate(V3(SX[k], 0.4f + SH[k] * 0.62f, 0)), n, 0.42f, RGBA(20, 20, 20), true);
         snprintf(b, sizeof b, "#%d %s", cls[k]->number, cls[k]->def->team);
         R.text3D(face * M4::translate(V3(SX[k], 0.4f + SH[k] * 0.22f, 0)), b, 0.13f, RGBA(20, 20, 20), true);
-        // Formula 1: the driver on his step (in his team's suit and helmet), and on the top step the
-        // winning team's representative beside him. Trophies wait on the step beside them, then
+        // Formula 1: the driver on his step, in his team's suit and helmet. Trophies wait on the step beside them, then
         // go up over their heads as the celebration starts (with the March of the Toreadors playing).
         float topZ = 0.4f + SH[k];
         bool party = t > 2.5f;
         u32 tm, ts; R.teamColours(cls[k]->def, tm, ts);
-        int people = k == 0 ? 2 : 1;
+        int people = 1;
         for (int d = 0; d < people; d++) {
-            float x = SX[k] + (k == 0 ? (d == 0 ? -0.35f : 0.75f) : 0);
+            float x = SX[k];
             float hop = (party && t < 9 && !R.poseCount[Renderer::ANIM_CELEBRATE]) ? fmaxf(0, sinf(t * 7 + d * 2 + k)) * 0.12f : 0;
             V3 at(x, 0.8f, topZ + hop);
             M4 place = M4::translate(at - eye) * M4::rotZ(-1.5708f + (d ? 0.25f : 0));
