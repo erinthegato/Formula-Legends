@@ -416,8 +416,12 @@ int main(int argc, char** argv) {
         g.startRace();
         for (int i = 0; i < 30 * 400 && g.screen == SCR_RACE; i++) { Pad q{}; g.frame(1.0f / 30, q); }
         press(g, &Pad::cross);
-        for (int i = 0; i < 120; i++) { Pad q{}; g.frame(1.0f / 30, q); }
-        shot(g, std::string(argv[2]) + "/podium.ppm");
+        for (int i = 0; i < 60; i++) { Pad q{}; g.frame(1.0f / 30, q); }
+        shot(g, std::string(argv[2]) + "/podium_wait.ppm");          // 2 s: trophies on their stands
+        for (int i = 0; i < 60; i++) { Pad q{}; g.frame(1.0f / 30, q); }
+        shot(g, std::string(argv[2]) + "/podium.ppm");               // 4 s: champagne
+        for (int i = 0; i < 4; i++) { Pad q{}; g.frame(1.0f / 30, q); }
+        shot(g, std::string(argv[2]) + "/podium_b.ppm");
         return 0;
     }
     if (mode == "handling") {

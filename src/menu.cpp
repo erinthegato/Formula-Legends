@@ -624,15 +624,35 @@ void Game::drawPodium() {
         R.text3D(face * M4::translate(V3(SX[k], 0.4f + SH[k] * 0.62f, 0)), n, 0.42f, RGBA(20, 20, 20), true);
         snprintf(b, sizeof b, "#%d %s", cls[k]->number, cls[k]->def->team);
         R.text3D(face * M4::translate(V3(SX[k], 0.4f + SH[k] * 0.22f, 0)), b, 0.13f, RGBA(20, 20, 20), true);
-        // the three drivers of the crew, celebrating
+        // Formula 1: the driver on his step (in his team's suit and helmet), and on the top step the
+        // winning team's representative beside him. Trophies wait on the step beside them, then
+        // go up over their heads as the celebration starts (with the March of the Toreadors playing).
         float topZ = 0.4f + SH[k];
-        for (int d = 0; d < 3; d++) {
-            float hop = (t > 2.5f && t < 9 && !R.poseCount[Renderer::ANIM_CELEBRATE]) ? fmaxf(0, sinf(t * 7 + d * 2 + k)) * 0.12f : 0;
-            V3 at(SX[k] + (d - 1) * 0.78f, 0.8f, topZ + hop);
-            M4 place = M4::translate(at - eye) * M4::rotZ(-1.5708f + (d - 1) * 0.2f);
-            bool party = t > 2.5f;
-            u32 tm, ts; R.teamColours(cls[k]->def, tm, ts);   // the drivers' helmets and suits in their team's colours
-            R.drawPerson(place, party ? Renderer::ANIM_CELEBRATE : Renderer::ANIM_IDLE, t + d * 0.37f + k * 0.21f, true, tm, ts);
+        bool party = t > 2.5f;
+        u32 tm, ts; R.teamColours(cls[k]->def, tm, ts);
+        int people = k == 0 ? 2 : 1;
+        for (int d = 0; d < people; d++) {
+            float x = SX[k] + (k == 0 ? (d == 0 ? -0.35f : 0.75f) : 0);
+            float hop = (party && t < 9 && !R.poseCount[Renderer::ANIM_CELEBRATE]) ? fmaxf(0, sinf(t * 7 + d * 2 + k)) * 0.12f : 0;
+            V3 at(x, 0.8f, topZ + hop);
+            M4 place = M4::translate(at - eye) * M4::rotZ(-1.5708f + (d ? 0.25f : 0));
+            bool rep = d == 1;          // the team's representative: celebrates a beat later, more calmly
+            bool cheer = party && (!rep || t > 3.4f);
+            R.drawPerson(place, cheer ? Renderer::ANIM_CELEBRATE : Renderer::ANIM_IDLE, t * (rep ? 0.7f : 1.0f) + k * 0.21f, true, tm, ts);
+            // the trophy: on its stand, then held up (riding the jump of the celebration)
+            float tw = (k == 0 && !rep) ? 0.11f : 0.08f, th = (k == 0 && !rep) ? 0.34f : 0.26f;
+            V3 cup;
+            if (!cheer) cup = V3(x + 0.42f, 0.45f, topZ);                  // on the step, beside him
+            else {
+                float ph = fmodf(t * (rep ? 0.7f : 1.0f) * 5.0f + k * 1.05f, 6.0f);   // (the celebration's poses: 5 a second, there and back)
+                float up = ph < 3 ? ph / 3 : (6 - ph) / 3;
+                cup = V3(x, 0.78f, topZ + 1.95f + up * 0.32f);
+            }
+            M4 cm = M4::translate(cup - eye);
+            u32 gold = rep ? RGBA(200, 205, 215) : RGBA(235, 190, 60);
+            R.box3D(cm, V3(-tw * 0.7f, -tw * 0.7f, 0), V3(tw * 0.7f, tw * 0.7f, 0.05f), RGBA(40, 40, 44));      // base
+            R.box3D(cm, V3(-0.025f, -0.025f, 0.05f), V3(0.025f, 0.025f, th * 0.45f), gold);                  // stem
+            R.box3D(cm, V3(-tw, -tw, th * 0.45f), V3(tw, tw, th), gold);                                     // cup
         }
         float sx, sy;
         if (project(pv, V3(SX[k], 0.8f, topZ + 1.75f), sx, sy)) { podiumScr[k][0] = sx; podiumScr[k][1] = sy; }
@@ -655,16 +675,16 @@ void Game::drawPodium() {
     gfx::setDepthTest(false); gfx::setBlend(true);
     gfx::bindTexture(nullptr);
     gfx::drawSprites2D(sp, n);
-    if (!cls.empty()) {     // the winning crew's three drivers
-        char d0[24], d1[24], d2[24];
-        Race::driverName(*cls[0], 0, d0, sizeof d0); Race::driverName(*cls[0], 1, d1, sizeof d1); Race::driverName(*cls[0], 2, d2, sizeof d2);
-        snprintf(b, sizeof b, "Winners: %s / %s / %s", d0, d1, d2);
+    if (!cls.empty()) {     // the winner and his team
+        char d0[24];
+        Race::driverName(*cls[0], 0, d0, sizeof d0);
+        snprintf(b, sizeof b, "Winner: %s  -  %s", d0, cls[0]->def->team);
         float w = R.font.width(b, 0.75f) + 16;
         gfx::drawFill2D(SCREEN_W / 2 - w / 2, SCREEN_H - 62, w, 17, RGBA(0, 0, 0, 150));
         R.font.drawCentre(SCREEN_W / 2, SCREEN_H - 61, b, WHITE, 0.75f);
     }
     int mine = (int)(std::find(cls.begin(), cls.end(), &race.player()) - cls.begin()) + 1;
-    snprintf(b, sizeof b, "You finished P%d in class", mine);
+    snprintf(b, sizeof b, "You finished P%d", mine);
     gfx::drawFill2D(SCREEN_W / 2 - 100, SCREEN_H - 40, 200, 18, RGBA(0, 0, 0, 150));
     R.font.drawCentre(SCREEN_W / 2, SCREEN_H - 39, b, GOLD, 0.85f);
     R.font.drawCentre(SCREEN_W / 2, SCREEN_H - 16, "X  continue", DIM, 0.8f);
