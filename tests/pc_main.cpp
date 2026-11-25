@@ -507,6 +507,12 @@ int main(int argc, char** argv) {
         me.dmg[DM_ENGINE] = 0.95f;
         for (int f = 0; f < 20; f++) { Pad q{}; g.step(1.0f / 30, q); }
         g.R.camInit = false; shot(g, out + "/fx_fire.ppm", 0);
+        // a big crash: the car catches fire
+        me.dmg[DM_ENGINE] = 0.0f;
+        for (int f = 0; f < 60; f++) { Pad q{}; g.step(1.0f / 30, q); }     // (the engine fire's smoke clears)
+        me.dmg[DM_LEFT] = 0.6f; r.crashFire(me, 0.6f);
+        for (int f = 0; f < 12; f++) { Pad q{}; g.step(1.0f / 30, q); }
+        g.R.camInit = false; shot(g, out + "/fx_crash.ppm", 0);
         int n[5] = {}; for (auto& q : r.parts) n[q.kind]++;
         printf("smoke %d spray %d shard %d spark %d flame %d\n", n[0], n[1], n[2], n[3], n[4]);
         return 0;

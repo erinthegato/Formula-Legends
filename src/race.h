@@ -269,6 +269,8 @@ struct Race {
     std::vector<int> sfxEvents;   // pit / thunder sounds to play this frame
     std::vector<Debris> debris;
     std::vector<Particle> parts;
+    std::vector<float> fireT;     // seconds each car (by its index in cars) keeps burning after a big crash (not saved)
+    void crashFire(Car& c, float amount);
     // pit lane (distances along the lap, wrapping)
     float pitIn = 0, pitOut = 0, pitWallFrom = 0, pitWallTo = 0;
     float laneD = 0, boxD = 0;

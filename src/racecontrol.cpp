@@ -957,6 +957,7 @@ void Race::addDamage(Car& c, int part, float amount) {
         }
     // and sparks where metal meets the barrier or the other car
     if (amount > 0.01f) sparks(c.pos + c.fwd * ((rnd() - 0.5f) * 2.5f) + V3(0, 0, 0.25f), c.fwd * (c.v * 0.6f), 4 + (int)fminf(amount * 60, 14), 6.0f);
+    if (amount > 0.30f) crashFire(c, amount);
     if (part == DM_NOSE && c.dmg[part] > 0.75f && !c.noseOff) detach(c, DM_NOSE);
     if (part == DM_WING && c.dmg[part] > 0.7f && !c.wingOff) detach(c, DM_WING);
     if (c.player && amount > 0.06f && before < 0.95f) {
@@ -999,6 +1000,32 @@ void Race::sparks(const V3& at, const V3& vel, int n, float spread) {
     }
 }
 
+// A very heavy hit sets the car alight: a burst of flame, sparks and black smoke now, then flames
+// keep coming from it for a few seconds (longer the harder the hit; shorter on a soaked track)
+void Race::crashFire(Car& c, float amount) {
+    size_t i = (size_t)(&c - cars.data());
+    if (i >= cars.size()) return;
+    if (fireT.size() < cars.size()) fireT.resize(cars.size(), 0.0f);
+    float t = 4.0f + fminf(amount, 1.0f) * 4.0f + rnd() * 1.5f;
+    if (wet > 0.5f) t *= 0.5f;
+    fireT[i] = fmaxf(fireT[i], t);
+    V3 d = c.pos - player().pos;
+    if (d.x * d.x + d.y * d.y > 120 * 120) return;          // the burst only where the camera is
+    sparks(c.pos + V3(0, 0, 0.3f), c.fwd * (c.v * 0.5f), 18, 7.0f);
+    for (int k = 0; k < 8 && parts.size() < 300; k++) {
+        Particle p; p.p = c.pos + c.fwd * ((rnd() - 0.5f) * 3.0f) + c.left * ((rnd() - 0.5f) * 1.2f) + V3(0, 0, 0.35f);
+        p.v = c.fwd * (c.v * 0.9f) + V3((rnd() - 0.5f) * 2.0f, (rnd() - 0.5f) * 2.0f, 1.5f + rnd() * 2.0f);
+        p.life = 0.45f + rnd() * 0.3f; p.size = 0.22f + rnd() * 0.14f; p.kind = 4; p.color = RGBA(255, 200, 80, 230);
+        parts.push_back(p);
+    }
+    for (int k = 0; k < 2 && parts.size() < 300; k++) {
+        Particle p; p.p = c.pos + V3((rnd() - 0.5f) * 1.5f, (rnd() - 0.5f) * 1.5f, 0.9f);
+        p.v = c.fwd * (c.v * 0.6f) + V3(rnd() - 0.5f, rnd() - 0.5f, 1.5f + rnd());
+        p.life = 1.6f; p.size = 0.5f; p.kind = 0; p.color = RGBA(28, 26, 24, 130);
+        parts.push_back(p);
+    }
+}
+
 void Race::particles(float dt) {
     for (auto& d : debris) {
         d.life -= dt;
@@ -1021,12 +1048,34 @@ void Race::particles(float dt) {
         else { p.v = p.v * (1 - 1.5f * dt); p.v.z += 0.6f * dt; p.size += dt * (p.kind == 0 ? 1.6f : 2.2f); }
     }
     parts.erase(std::remove_if(parts.begin(), parts.end(), [](const Particle& p) { return p.life <= 0; }), parts.end());
+    // crash fires burn down (a stopped wreck smoulders on a little longer)
+    if (fireT.size() < cars.size()) fireT.resize(cars.size(), 0.0f);
+    for (size_t i = 0; i < cars.size(); i++)
+        if (fireT[i] > 0) fireT[i] = fmaxf(0, fireT[i] - dt * (cars[i].v < 3 && cars[i].damage() > 0.6f ? 0.6f : 1.0f) * (wet > 0.5f ? 1.6f : 1.0f));
     // new smoke and spray only near the player (that's where the camera is)
     const V3 cam = player().pos;
     for (auto& c : cars) {
         if (parts.size() >= 240) break;      // (sparks may take the pool up to 300)
         V3 dv = c.pos - cam;
         if (dv.x * dv.x + dv.y * dv.y > 150 * 150) continue;
+        // a car on fire after a big crash: flames licking up from the body, black smoke over them,
+        // dying down as the fire burns out
+        float fire = fireT[(size_t)(&c - cars.data())];
+        if (fire > 0) {
+            float k = fminf(1.0f, fire / 3.0f);
+            for (int n = 0; n < 2 && rnd() < 0.45f + 0.5f * k; n++) {
+                Particle p; p.p = c.pos + c.fwd * ((rnd() - 0.6f) * 2.6f) + c.left * ((rnd() - 0.5f) * 1.0f) + V3(0, 0, 0.3f + rnd() * 0.3f);
+                p.v = c.fwd * (c.v * 0.9f) + V3((rnd() - 0.5f) * 0.8f, (rnd() - 0.5f) * 0.8f, 1.2f + rnd() * 1.4f);
+                p.life = 0.4f + rnd() * 0.35f; p.size = (0.2f + rnd() * 0.18f) * (0.6f + 0.4f * k); p.kind = 4; p.color = RGBA(255, 200, 80, 230);
+                parts.push_back(p);
+            }
+            if (rnd() < 0.15f * k + 0.05f) {
+                Particle p; p.p = c.pos + c.fwd * ((rnd() - 0.6f) * 2.0f) + V3(0, 0, 1.1f);
+                p.v = c.fwd * (c.v * 0.8f) + V3(rnd() - 0.5f, rnd() - 0.5f, 1.4f + rnd());
+                p.life = 1.4f; p.size = 0.45f; p.kind = 0; p.color = RGBA(30, 28, 26, 120);
+                parts.push_back(p);
+            }
+        }
         float smoke = fminf(fmaxf(c.dmg[DM_ENGINE] - 0.3f, 0), 0.3f) + (c.slip > 0.5f && c.v > 8 && wet < 0.3f ? 0.5f : 0);
         if (smoke > 0 && rnd() < smoke * 0.9f) {
             Particle p; p.p = c.pos - c.fwd * 2.0f + V3(0, 0, 0.5f);
