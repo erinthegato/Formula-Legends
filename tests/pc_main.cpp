@@ -311,6 +311,16 @@ int main(int argc, char** argv) {
         for (int k = 0; k < 12; k++) { char fn[64]; snprintf(fn, sizeof fn, "/crew_%02d.ppm", k); shot(g, out + fn); Pad q{}; g.frame(1.0f / 30, q); g.frame(1.0f / 30, q); }
         return 0;
     }
+    if (mode == "music") {      // music x: which menu songs play with a 1998 car and with a 2025 car (era songs: playlist.txt 3rd column)
+        for (int era : {0, 3}) {
+            g.set.car = eraFirstCar(era);
+            for (int i = 0; i < 5; i++) { Pad q{}; g.frame(1.0f / 30, q); }
+            int salsa = 0, n = 40;
+            for (int i = 0; i < n; i++) { sound::musicSkip(1); sound::update(); if (strstr(sound::nowPlaying(), "Salsa")) salsa++; }
+            printf("era %d: Salsa played %d of %d songs (now: %s)\n", era, salsa, n, sound::nowPlaying());
+        }
+        return 0;
+    }
     if (mode == "menus") {
         std::string out = argv[2];
         auto settle = [&](int n = 80) { for (int i = 0; i < n; i++) { Pad q{}; g.frame(1.0f / 30, q); } };
@@ -470,6 +480,30 @@ int main(int argc, char** argv) {
             if (t0 >= 0) { float tt = r.time - t0; if (tt < 0.8f) { st = amount; th = brake > 0 ? 0 : 0.6f; bk = brake; } else { th = 0.5f; if (getenv("FL_COUNTER") && tt < 1.6f) st = -(float)atof(getenv("FL_COUNTER")) * (amount > 0 ? 1 : -1); } if (tt > 4) break;
                 if (i % 12 == 0) printf("t %.1f  steer %.1f  v %5.1f  nose %6.1f deg  slide %6.1f deg  across %5.1f m  slip %.2f\n", tt, st, c.v, c.yaw * 57.3f, c.drift * 57.3f, c.d, c.slip); }
             r.update(1.0f / 60, st, th, bk, 0, false);
+        }
+        return 0;
+    }
+    if (mode == "driver") {
+        // driver <car> <outdir>: a few seconds into a race, close views of the player's car (driver in
+        // the cockpit) from the side, behind and above, front three-quarter
+        g.set.car = atoi(argv[2]); std::string out = argv[3];
+        for (int i = 0; i < TRACK_COUNT; i++) if (!strcmp(TRACKS[i].id, "monza")) g.set.track = i;
+        g.set.laps = 1; g.set.opponents = 3; g.set.weather = WX_DRY; g.aiDrivesPlayer = true;
+        g.startRace();
+        for (int f = 0; f < 30 * 9; f++) { Pad q{}; g.step(1.0f / 30, q); }
+        const Car& c = g.race.player();
+        V3 views[4] = {V3(-0.6f, 2.2f, 1.3f), V3(-3.2f, 0.0f, 1.9f), V3(2.4f, 1.6f, 1.1f), V3(0.4f, -1.3f, 2.4f)};
+        for (int k = 0; k < 4; k++) {
+            Camera cam;
+            V3 v = views[k];
+            cam.eye = c.pos + c.fwd * v.x + c.left * v.y + c.up * v.z;
+            V3 look = c.pos + c.up * 0.6f - cam.eye;
+            cam.fwd = look * (1.0f / len(look)); cam.up = V3(0, 0, 1); cam.fov = 50;
+            gfx::beginFrame(RGBA(120, 160, 210));
+            g.R.drawScene(g.race, cam, false);
+            gfx::endFrame();
+            char b[64]; snprintf(b, sizeof b, "/driver_%d.ppm", k);
+            pc::saveShot((out + b).c_str());
         }
         return 0;
     }

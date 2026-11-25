@@ -861,6 +861,7 @@ void Game::screenHelp(Panel& P) {
         {"Engine", "Endurance Motor Racing 3D"},
         {"Intro music", "Take On The World - All Good Folks (Uppbeat)"},
         {"Attract music", "Lose My Mind - Don Toliver feat. Doja Cat"},
+        {"2025 era music", "Salsa - Hey Pluto! (Uppbeat)"},
         {"Cars, wheels, cockpits", "Modelled in Blender"},
         {"Pit crew, safety cars, props", "Modelled in Blender"},
         {"Circuit outlines", "bacinger/f1-circuits (MIT)"},

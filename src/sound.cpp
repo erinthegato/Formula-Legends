@@ -38,6 +38,8 @@ float hpX = 0, hpY = 0, lpY = 0;     // speaker tone filters
 struct Tap { volatile float gain = 0, pan = 0, delay = 0.01f, dull = 0; float g = 0, d = 0.01f, p = 0, lp = 0; };
 Tap taps[4];
 std::vector<std::string> mFiles, mNames;
+std::vector<int> mEra;                  // per track: the era it belongs to (-1: every era)
+int mCurEra = -1;                       // the era picked in the menus (-1: not known yet)
 std::vector<int> mOrder; int mPos = -1, mLast = -1;
 FILE* mFile = nullptr; uint32_t mFrames = 0, mDone = 0;
 int mCh = 2;                             // 1 = mono file (playlist), 2 = stereo (podium / intro)
@@ -85,7 +87,17 @@ void loadPlaylist() {
         size_t e = all.find('\n', a); if (e == std::string::npos) e = all.size();
         std::string line = all.substr(a, e - a);
         size_t t = line.find('\t');
-        if (t != std::string::npos) { mFiles.push_back(line.substr(0, t)); mNames.push_back(line.substr(t + 1)); }
+        // file <tab> name [<tab> era: 90s, v8, hybrid or ge]: a song with an era plays only in that era
+        if (t != std::string::npos) {
+            std::string rest = line.substr(t + 1), era;
+            size_t t2 = rest.find('\t');
+            if (t2 != std::string::npos) { era = rest.substr(t2 + 1); rest = rest.substr(0, t2); }
+            while (!era.empty() && (era.back() == '\r' || era.back() == ' ')) era.pop_back();
+            while (!rest.empty() && rest.back() == '\r') rest.pop_back();
+            static const char* ERA_TAG[4] = {"90s", "v8", "hybrid", "ge"};
+            int e = -1; for (int k = 0; k < 4; k++) if (era == ERA_TAG[k]) e = k;
+            mFiles.push_back(line.substr(0, t)); mNames.push_back(rest); mEra.push_back(e);
+        }
         a = e + 1;
     }
     srand((unsigned)(sys::timeSec() * 1000003.0));
@@ -106,10 +118,13 @@ void openNext() {
         return;
     }
     if (mOrder.empty() || mPos + 1 >= (int)mOrder.size()) {
-        mOrder.resize(n);
-        for (int i = 0; i < n; i++) mOrder[i] = i;
-        for (int i = n - 1; i > 0; i--) { int j = rand() % (i + 1); int t = mOrder[i]; mOrder[i] = mOrder[j]; mOrder[j] = t; }
-        if (n > 1 && mOrder[0] == mLast) { int t = mOrder[0]; mOrder[0] = mOrder[1]; mOrder[1] = t; }
+        // the songs for every era, plus those of the era picked in the menus
+        mOrder.clear();
+        for (int i = 0; i < n; i++) if (mEra[i] < 0 || mEra[i] == mCurEra) mOrder.push_back(i);
+        if (mOrder.empty()) for (int i = 0; i < n; i++) mOrder.push_back(i);
+        int m = (int)mOrder.size();
+        for (int i = m - 1; i > 0; i--) { int j = rand() % (i + 1); int t = mOrder[i]; mOrder[i] = mOrder[j]; mOrder[j] = t; }
+        if (m > 1 && mOrder[0] == mLast) { int t = mOrder[0]; mOrder[0] = mOrder[1]; mOrder[1] = t; }
         mPos = 0;
     } else mPos++;
     int k = mOrder[mPos];
@@ -392,6 +407,11 @@ void musicFile(const char* file, bool once) {
 float musicPos() {
     int avail = (ringW - ringR + RING) % RING;
     return ((float)mDone - avail) / 22050.0f;
+}
+void musicEra(int era) {
+    if (era == mCurEra) return;
+    mCurEra = era;
+    mOrder.clear(); mPos = -1;          // a new shuffle with this era's songs from the next song on
 }
 void musicSkip(int dir) {
     if (!mOn || mFiles.empty() || !mForce.empty()) return;

@@ -10,3 +10,4 @@ l09_victory_lap.emu	Lyria 3 - Victory Lap
 l10_overcut.emu	Lyria 3 - Overcut
 l11_sunrise_stint.emu	Lyria 3 - Sunrise Stint
 l12_chequered_disco.emu	Lyria 3 - Chequered Disco
+l13_salsa.emu	Hey Pluto! - Salsa	ge

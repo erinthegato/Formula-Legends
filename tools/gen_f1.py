@@ -700,7 +700,7 @@ def main():
     for era in ERAS:
         print('wheel', era, write_emm(os.path.join(OUT, f'wheel_{era}.emm'), [(build_wheel(era, 18, True), t.img, 128), (build_wheel(era, 10, False), t.img, 64), (build_wheel(era, 7, False), t.img, 32)], share_tex=True))
         print('flap', era, write_emm(os.path.join(OUT, f'flap_{era}.emm'), [(build_flap(era), t.img, 64)]))
-        print('steering', era, write_emm(os.path.join(OUT, f'steering_{era}.emm'), [(build_steering(era), t.img, 256)]))
+        # (steering_<era>.emm: made in Blender now, tools/blender/cockpit_parts.py -> tools/gen_cockpit.py)
     # the career cars' livery sets
     for c in read_cars():
         if c['id'].startswith('career'):

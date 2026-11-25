@@ -70,6 +70,7 @@ bool Renderer::loadCommon() {
         for (int f = 0; f < poseCount[a]; f++)
             if (!pose[a][f].lod[0].tex.w && pose[0][0].lodCount) pose[a][f].lod[0].tex = pose[0][0].lod[0].tex;
     fuelRig.load("DATA/models/fuel_rig.emm");
+    driver.load("DATA/models/driver.emm");
     // a soft round blob (16x16, alpha falls off from the centre) for smoke, spray and lights
     for (int i = 0; i < 256; i++) puffPal[i] = RGBA(255, 255, 255, i);
     for (int y = 0; y < 16; y++) for (int x = 0; x < 16; x++) {
@@ -194,21 +195,41 @@ void Renderer::freeCars() {
 }
 
 // ------------------------------------------------------------------ camera
+// The sense of speed: speedFeel follows the speed (0 standing, 1 at 330 km/h) a little behind, so
+// the view widens as the car gathers speed and closes in again under braking. The shake grows with
+// the square of the speed (a high-speed buzz), and kicks up on kerbs and bumps (the body's pitch and
+// roll rates) and off the track. sx, sy: -1..1 noise (a few sine waves at odd rates) times the strength.
+void Renderer::speedShake(const Race& r, const Car& c, float dt, float& sx, float& sy) {
+    float sp = clampf(c.v * 3.6f / 330.0f, 0, 1);
+    speedFeel += (sp - speedFeel) * (1 - expf(-dt * 2.2f));
+    float bump = clampf((fabsf(c.body.pitchV) + fabsf(c.body.rollV)) * 0.9f, 0, 1.2f);
+    float amp = 0.45f * sp * sp + bump * clampf(c.v / 30.0f, 0, 1) + (c.offTrack ? 0.7f * clampf(c.v / 40.0f, 0, 1) : 0);
+    if (c.spinning) amp += 0.4f;
+    shakeAmp += (amp - shakeAmp) * (1 - expf(-dt * (amp > shakeAmp ? 14.0f : 5.0f)));
+    float t = r.time;
+    sx = (sinf(t * 31.0f) + 0.6f * sinf(t * 47.3f + 1.3f) + 0.4f * sinf(t * 73.9f + 2.1f)) * 0.5f * shakeAmp;
+    sy = (sinf(t * 27.1f + 0.7f) + 0.6f * sinf(t * 53.7f + 2.9f) + 0.4f * sinf(t * 81.3f + 0.4f)) * 0.5f * shakeAmp;
+}
+
 Camera Renderer::camera(const Race& r, int mode, float dt, bool lookBack) {
     const Car& c = r.cars[r.playerIdx];
     Camera cam;
     cam.up = V3(0, 0, 1);
+    float sx = 0, sy = 0;
+    speedShake(r, c, dt, sx, sy);
     if (mode == CAM_COCKPIT) {
         const CockpitLayout& L = COCKPIT[c.def->era % ERA_COUNT];
         M4 place = M4::basis(c.fwd, c.left, c.up, c.pos);
-        cam.eye = place.point(L.eye + V3(carModel[c.def - CARS].cabX, 0, 0));
-        cam.fwd = lookBack ? c.fwd * -1.0f : norm(c.fwd + c.up * -0.10f);
+        cam.eye = place.point(L.eye + V3(carModel[c.def - CARS].cabX, 0, 0)) + c.up * (sy * 0.006f);
+        // the head shakes with the car: a small turn of the view (the wheel and dash shake with it)
+        cam.fwd = lookBack ? c.fwd * -1.0f : norm(c.fwd + c.up * (-0.10f + sy * 0.010f) + c.left * (sx * 0.007f));
         cam.up = c.up;
-        cam.fov = 66;
+        cam.fov = 64 + speedFeel * 9;
         camInit = false;
         return cam;
     }
-    float back = mode == CAM_FAR ? 11.5f : 7.6f, height = mode == CAM_FAR ? 3.6f : 2.3f;
+    // at speed the camera drops back a little and the view widens (the world rushes past at the edges)
+    float back = (mode == CAM_FAR ? 11.5f : 7.6f) + speedFeel * 1.3f, height = (mode == CAM_FAR ? 3.6f : 2.3f) + speedFeel * 0.2f;
     V3 flat = norm(V3(c.fwd.x, c.fwd.y, 0));
     if (lookBack) flat = flat * -1.0f;
     V3 want = c.pos - flat * back + V3(0, 0, height);
@@ -220,9 +241,10 @@ Camera Renderer::camera(const Race& r, int mode, float dt, bool lookBack) {
     float gz = c.pos.z + 0.8f;
     if (camPos.z < gz) camPos.z = gz;
     V3 target = c.pos + flat * 6.0f + V3(0, 0, 0.9f);
-    cam.eye = camPos;
-    cam.fwd = norm(target - camPos);
-    cam.fov = 58 + clampf(c.v * 3.6f / 330.0f, 0, 1) * 8;
+    V3 side = norm(cross(V3(0, 0, 1), flat));
+    cam.eye = camPos + side * (sx * 0.035f) + V3(0, 0, sy * 0.030f);
+    cam.fwd = norm(target - camPos + V3(0, 0, sy * 0.05f));
+    cam.fov = 56 + speedFeel * 13;
     return cam;
 }
 
@@ -443,6 +465,7 @@ void Renderer::drawCar(const Car& c, const V3& eye, const V3& fwd, float tanH, f
     if (!c.wingOff) part(ps.wingFirst, ps.wingCount);
     if (!inside) part(ps.glassFirst, ps.glassCount);
     if (!c.wingOff && lod < 2 && !inside) drawFlap(c, place, d < 9);
+    if (lod < 2 && !inside && !sceneLite) drawDriver(c, place, lod, d < 9);
     if (inside) { drawWheels(*c.def, place, 0, c.steer, c.wheelSpin, true, &c, &eye); return; }    // open wheels: the fronts are in view
     if (d < (sceneLite ? 40 : 160)) drawWheels(*c.def, place, sceneLite ? 2 : (d < 12 ? 0 : (d < 28 ? 1 : 2)), c.steer, c.wheelSpin, false, &c, &eye);
     // the race number on the airbox sides (near cars only)
@@ -1198,6 +1221,43 @@ void Renderer::drawCarShowroom(int idx, float angle, float x0, float y0, float w
     drawWheels(CARS[idx], place, 0, 0, 0);
 }
 
+// a texture's pixels with palette entries 1-4 swapped for a team's colours (1, 3 main; 2, 4 second)
+const Texture* Renderer::teamTexture(const Texture* tex, u32 main, u32 second) {
+    if (!(main || second) || !tex->palette) return tex;
+    main |= 0xFF000000u; second |= 0xFF000000u;
+    CrewPal* cp = nullptr;
+    for (int i = 0; i < crewPalCount && !cp; i++)
+        if (crewPal[i].pixels == tex->pixels && crewPal[i].main == main && crewPal[i].second == second) cp = &crewPal[i];
+    if (!cp && crewPalCount < 40) {
+        cp = &crewPal[crewPalCount++];
+        cp->pixels = tex->pixels; cp->main = main; cp->second = second;
+        memcpy(cp->pal, tex->palette, sizeof cp->pal);
+        cp->pal[1] = main; cp->pal[2] = second; cp->pal[3] = main; cp->pal[4] = second;
+        gfx::flushCache(cp->pal, sizeof cp->pal);
+    }
+    if (!cp) return tex;
+    cp->tex = *tex; cp->tex.palette = cp->pal;     // bound by address, so each team keeps its own Texture
+    return &cp->tex;
+}
+
+// the driver in his seat: at the era's eye point, leaning a little into the corners
+void Renderer::drawDriver(const Car& c, const M4& place, int lod, bool near) {
+    if (!driver.lodCount) return;
+    int e = c.def->era % ERA_COUNT;
+    if (lod >= driver.lodCount) lod = driver.lodCount - 1;
+    // the helmet's centre sits a little behind and below the eye
+    // (the helmet sits above the camera's eye point: the eye is set low to see over the nose)
+    V3 at = COCKPIT[e].eye + V3(-0.045f, 0, 0.105f);
+    float lean = clampf(-c.steer * 0.12f, -0.12f, 0.12f) * (c.v > 10 ? 1.0f : c.v / 10.0f);
+    // (leans about the base of the neck)
+    M4 w = place * M4::translate(at + V3(0, 0, -0.25f)) * M4::rotX(lean) * M4::translate(V3(0, 0, 0.25f));
+    u32 mn, sc; teamColours(c.def, mn, sc);
+    if (c.def->career) { mn = mn ? mn : RGBA(30, 30, 34); }
+    gfx::bindTexture(teamTexture(&driver.lod[lod].tex, mn, sc));
+    if (near) clip::drawModel(driver.lod[lod].verts, driver.lod[lod].count, driver.matrix(w));
+    else gfx::drawModel(driver.lod[lod].verts, driver.lod[lod].count, driver.matrix(w));
+}
+
 void Renderer::teamColours(const CarDef* d, u32& main, u32& second) const {
     main = second = 0;
     if (!d) return;
@@ -1258,23 +1318,7 @@ void Renderer::drawPerson(const M4& place, int anim, float t, bool clipped, u32 
     M4 at = place;
     if (m != &pitCrew && anim >= 0 && anim < ANIM_COUNT && FACE[anim] != 0) at = place * M4::rotZ(FACE[anim]);
     // team colours: the same pixels with the team's own palette (tools/gen_crew.py: entries 1-4)
-    const Texture* tex = &m->lod[0].tex;
-    if ((main || second) && tex->palette) {
-        main |= 0xFF000000u; second |= 0xFF000000u;
-        CrewPal* cp = nullptr;
-        for (int i = 0; i < crewPalCount && !cp; i++) if (crewPal[i].main == main && crewPal[i].second == second) cp = &crewPal[i];
-        if (!cp && crewPalCount < 24) {
-            cp = &crewPal[crewPalCount++];
-            cp->main = main; cp->second = second;
-            memcpy(cp->pal, tex->palette, sizeof cp->pal);
-            cp->pal[1] = main; cp->pal[2] = second; cp->pal[3] = main; cp->pal[4] = second;
-            gfx::flushCache(cp->pal, sizeof cp->pal);
-        }
-        if (cp) {      // bound by address, so each team keeps its own Texture (same pixels, its palette)
-            cp->tex = *tex; cp->tex.palette = cp->pal;
-            tex = &cp->tex;
-        }
-    }
+    const Texture* tex = teamTexture(&m->lod[0].tex, main, second);
     gfx::bindTexture(tex);
     if (clipped) clip::drawModel(verts, m->lod[0].count, m->matrix(at));
     else gfx::drawModel(verts, m->lod[0].count, m->matrix(at));

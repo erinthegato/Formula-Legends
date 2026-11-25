@@ -30,6 +30,7 @@ void stopEffects();
 int freeEffects();             // unload every cached effect (they load again when next played); returns KB freed
 void musicDirect(bool on);     // true: plain stereo (menus); false: through the PA speakers (trackside)
 void musicSkip(int dir);       // +1 next song, -1 the one before
+void musicEra(int era);        // the era picked in the menus: its own songs join the shuffle (playlist.txt 3rd column)
 void musicPodium(bool on);
 void musicFile(const char* file, bool once = false);   // play DATA/music/<file> instead of the playlist; nullptr = playlist
 float musicPos();              // seconds of the current piece actually heard     // the podium music, straight (not through the PA); off = back to the playlist

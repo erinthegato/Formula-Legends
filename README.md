@@ -140,3 +140,4 @@ Data credits: bacinger/f1-circuits (MIT), EU-DEM (Copernicus), SRTM (NASA) via O
 OpenStreetMap contributors (ODbL, EMR's circuits). Engine, crew, props and engine sounds from
 Endurance Motor Racing / EMR 3D. Font: DejaVu Sans. Team names are fictional.
 Music: 'Take On The World' by All Good Folks on #Uppbeat https://uppbeat.io/c/all-good-folks  License code: TOLCYIUTLLD5VYGM
+Music: 'Salsa' by Hey Pluto! on #Uppbeat https://uppbeat.io/c/hey-pluto  License code: CCZCUH212QC10SVI (2025 era menu music)

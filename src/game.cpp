@@ -143,6 +143,7 @@ void Game::frame(float dt, const Pad& pad) {
     sound::musicDirect(!trackside && screen != SCR_REEL);
     if (trackside) trackSpeakers();
     else sound::paddockSpeakers();
+    sound::musicEra(set.car >= 0 && set.car < CAR_COUNT ? CARS[set.car].era % ERA_COUNT : -1);   // the era's own songs join the menu music
     // L / R skip songs in the menus
     bool menu = (!raceLoaded || screen == SCR_RESULTS || screen == SCR_PODIUM) && screen != SCR_INTRO;
     if (menu && screen != SCR_PODIUM && rebinding < 0) { if (pressed(pad, &Pad::r)) sound::musicSkip(1); if (pressed(pad, &Pad::l)) sound::musicSkip(-1); }

@@ -42,8 +42,14 @@ struct Renderer {
     void drawPerson(const M4& place, int anim, float t, bool clipped = false, u32 main = 0, u32 second = 0);
     void teamColours(const CarDef* d, u32& main, u32& second) const;
     // the crew texture with each team's palette (8 KB on the GPU each; the pixels are shared)
-    struct CrewPal { u32 main, second; Texture tex; u32 pal[256] __attribute__((aligned(16))); };
-    CrewPal crewPal[24]; int crewPalCount = 0;
+    // (keyed by the pixels too: the crew and the driver have different textures)
+    struct CrewPal { const void* pixels; u32 main, second; Texture tex; u32 pal[256] __attribute__((aligned(16))); };
+    CrewPal crewPal[40]; int crewPalCount = 0;
+    const Texture* teamTexture(const Texture* tex, u32 main, u32 second);
+    // the driver in the car, made in Blender (tools/blender/cockpit_parts.py -> tools/gen_cockpit.py):
+    // helmet, HANS, shoulders and arms in the team's colours; not drawn from his own seat
+    Model driver;
+    void drawDriver(const Car& c, const M4& place, int lod, bool near);
     int lvyLoadedStyle[ERA_COUNT] = {-1, -1, -1, -1};   // the one career livery style kept in lvyBlob
     // car models re-ordered into body / nose / rear wing (the nose and wing can come off)
     struct PartSplit { int body = 0, noseFirst = 0, noseCount = 0, wingFirst = 0, wingCount = 0, glassFirst = 0, glassCount = 0; V3 noseC, wingC; };
@@ -60,6 +66,8 @@ struct Renderer {
     // smoothed chase camera
     V3 camPos, camFwd;
     bool camInit = false;
+    float speedFeel = 0, shakeAmp = 0;   // the camera's sense of speed: smoothed speed share, shake strength
+    void speedShake(const Race& r, const Car& c, float dt, float& sx, float& sy);
     V3 camRight, camUp;             // camera axes for this frame
     std::vector<int> visChunks;     // chunks on screen this frame
     int raceMark = 0;               // video memory used before any car was loaded
