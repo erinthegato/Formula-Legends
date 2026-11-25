@@ -11,3 +11,7 @@ l10_overcut.emu	Lyria 3 - Overcut
 l11_sunrise_stint.emu	Lyria 3 - Sunrise Stint
 l12_chequered_disco.emu	Lyria 3 - Chequered Disco
 l13_salsa.emu	Hey Pluto! - Salsa	ge
+l14_home_in_a_minor.emu	Formula Legends - Home in A Minor	90s
+l15_midnight_walker.emu	Formula Legends - Midnight Walker	90s
+l16_midnight_resolve.emu	Formula Legends - Midnight Resolve	90s
+l17_fast_flying_lap.emu	Formula Legends - Fast Flying Lap	90s

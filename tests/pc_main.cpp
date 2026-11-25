@@ -315,9 +315,13 @@ int main(int argc, char** argv) {
         for (int era : {0, 3}) {
             g.set.car = eraFirstCar(era);
             for (int i = 0; i < 5; i++) { Pad q{}; g.frame(1.0f / 30, q); }
-            int salsa = 0, n = 40;
-            for (int i = 0; i < n; i++) { sound::musicSkip(1); sound::update(); if (strstr(sound::nowPlaying(), "Salsa")) salsa++; }
-            printf("era %d: Salsa played %d of %d songs (now: %s)\n", era, salsa, n, sound::nowPlaying());
+            int salsa = 0, orig = 0, n = 40;
+            for (int i = 0; i < n; i++) {
+                sound::musicSkip(1); sound::update();
+                if (strstr(sound::nowPlaying(), "Salsa")) salsa++;
+                if (strstr(sound::nowPlaying(), "Formula Legends - ")) orig++;      // the 1998 originals
+            }
+            printf("era %d: Salsa played %d, 1998 songs %d, of %d songs (now: %s)\n", era, salsa, orig, n, sound::nowPlaying());
         }
         return 0;
     }

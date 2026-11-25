@@ -141,3 +141,4 @@ OpenStreetMap contributors (ODbL, EMR's circuits). Engine, crew, props and engin
 Endurance Motor Racing / EMR 3D. Font: DejaVu Sans. Team names are fictional.
 Music: 'Take On The World' by All Good Folks on #Uppbeat https://uppbeat.io/c/all-good-folks  License code: TOLCYIUTLLD5VYGM
 Music: 'Salsa' by Hey Pluto! on #Uppbeat https://uppbeat.io/c/hey-pluto  License code: CCZCUH212QC10SVI (2025 era menu music)
+1998 era menu music: 'Home in A Minor', 'Midnight Walker', 'Midnight Resolve' and 'Fast Flying Lap', made for Formula Legends
