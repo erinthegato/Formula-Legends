@@ -8,8 +8,10 @@
 // The recordings are steady high-rev loops (22050 Hz mono). Like the Unity game, each is treated
 // as being at 72 % of the way from idle to the rev limit, and played faster or slower to follow the revs.
 namespace {
-struct Clip { const char* name = nullptr; int16_t* data = nullptr; int len = 0; };
-const int MAX_CLIPS = 12;
+// data: the file as loaded (16-bit samples, or an 'ADP1' file: then adp points at its IMA ADPCM codes,
+// kept packed and decoded as it plays -- a quarter of the memory). step: source samples per output sample.
+struct Clip { const char* name = nullptr; int16_t* data = nullptr; int len = 0; const uint8_t* adp = nullptr; float step = 0.5f; };
+const int MAX_CLIPS = 16;   // engine loops (the 2025 grid has one per team)
 Clip clips[MAX_CLIPS];
 int clipCount = 0;
 
@@ -53,7 +55,8 @@ volatile bool mDirect = false;          // straight to the speakers / headphones
 // ---------------- one-shot sounds (pit crew, thunder, radio) and the rain loop, DATA/sfx/*.raw
 const int MAX_SFX = 80;
 Clip sfx[MAX_SFX]; int sfxCount = 0;
-struct Shot { volatile int clip = -1; volatile float vol = 0, pan = 0; volatile bool loop = false; float pos = 0, g = 0; };
+struct Shot { volatile int clip = -1; volatile float vol = 0, pan = 0; volatile bool loop = false; float pos = 0, g = 0;
+              int decAt = -1, decClip = -1, dec[2] = {0, 0}, cur = 0; };   // ADPCM: decoded up to sample decAt (audio thread)
 Shot shots[7];                          // 0..3 effects, 4 radio, 5 rain loop, 6 crowd loop
 // freeing the effects while the audio thread mixes: it skips them while sfxHold is set, and
 // mixBusy says it is in the middle of reading them
@@ -147,7 +150,13 @@ int sfxFor(const char* name) {
     int size = 0;
     void* p = sys::loadFile(path, &size);
     if (!p) return -1;
-    sfx[sfxCount].name = name; sfx[sfxCount].data = (int16_t*)p; sfx[sfxCount].len = size / 2;
+    Clip& c = sfx[sfxCount];
+    c.name = name; c.data = (int16_t*)p; c.len = size / 2; c.adp = nullptr; c.step = 0.5f;
+    if (size >= 12 && !memcmp(p, "ADP1", 4)) {
+        uint32_t rate, n; memcpy(&rate, (char*)p + 4, 4); memcpy(&n, (char*)p + 8, 4);
+        if ((int)((n + 1) / 2) > size - 12 || rate < 4000 || rate > 44100) { sys::freeFile(p); return -1; }
+        c.adp = (const uint8_t*)p + 12; c.len = (int)n; c.step = rate / 44100.0f;
+    }
     return sfxCount++;
 }
 
@@ -189,7 +198,7 @@ void mix(int16_t* out, int frames) {
             if (v.pos >= c.len) v.pos -= c.len;
         }
     }
-    // one-shots and loops (22050 Hz sources)
+    // one-shots and loops (DATA/sfx: ADP1 files, packed in memory -- radio 11025 Hz, the rest 22050 Hz)
     mixBusy = 1;
     for (int si = 0; si < 7 && !sfxHold; si++) {
         Shot& sh = shots[si];
@@ -206,9 +215,16 @@ void mix(int16_t* out, int frames) {
                 if (sh.loop) { sh.pos -= c.len; a = (int)sh.pos; }
                 else { sh.clip = -1; break; }
             }
-            float x = c.data[a] * (1.0f / 32768.0f) * sh.g * shotVol;
+            int smp;
+            if (c.adp) {
+                // packed: decode forward to sample a (from the start again after a loop or a new clip)
+                if (sh.decClip != ci || a < sh.decAt) { sh.decClip = ci; sh.decAt = -1; sh.dec[0] = sh.dec[1] = 0; sh.cur = 0; }
+                while (sh.decAt < a) { sh.decAt++; sh.cur = decodeNibble(sh.dec, (c.adp[sh.decAt >> 1] >> ((sh.decAt & 1) * 4)) & 15); }
+                smp = sh.cur;
+            } else smp = c.data[a];
+            float x = smp * (1.0f / 32768.0f) * sh.g * shotVol;
             buf[i * 2] += x * gl; buf[i * 2 + 1] += x * gr;
-            sh.pos += 0.5f;
+            sh.pos += c.step;
         }
     }
     // menu / session music: 22050 Hz ring -> 44100 Hz, made mono and speaker-toned, then played back
@@ -427,7 +443,8 @@ int freeEffects() {
     while (mixBusy && sys::timeSec() - t0 < 0.25) {}        // let a mix in progress finish (one buffer, ~10 ms)
     int kb = 0;
     for (auto& s : shots) { s.vol = 0; s.g = 0; s.clip = -1; }
-    for (int i = 0; i < sfxCount; i++) { kb += sfx[i].len * 2 / 1024; sys::freeFile(sfx[i].data); sfx[i] = Clip(); }
+    for (int i = 0; i < sfxCount; i++) { kb += (sfx[i].adp ? sfx[i].len / 2 : sfx[i].len * 2) / 1024; sys::freeFile(sfx[i].data); sfx[i] = Clip(); }
+    for (auto& s : shots) { s.decClip = -1; s.decAt = -1; }
     sfxCount = 0;
     sfxHold = false;
     return kb;
