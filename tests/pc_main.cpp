@@ -312,16 +312,17 @@ int main(int argc, char** argv) {
         return 0;
     }
     if (mode == "music") {      // music x: which menu songs play with a 1998 car and with a 2025 car (era songs: playlist.txt 3rd column)
-        for (int era : {0, 3}) {
+        for (int era : {0, 2, 3}) {
             g.set.car = eraFirstCar(era);
             for (int i = 0; i < 5; i++) { Pad q{}; g.frame(1.0f / 30, q); }
-            int salsa = 0, orig = 0, n = 40;
+            int salsa = 0, orig = 0, h16 = 0, n = 40;
             for (int i = 0; i < n; i++) {
                 sound::musicSkip(1); sound::update();
                 if (strstr(sound::nowPlaying(), "Salsa") || strstr(sound::nowPlaying(), "DISTRXCT")) salsa++;   // (2025 songs)
                 if (strstr(sound::nowPlaying(), "Formula Legends - ")) orig++;      // the 1998 originals
+                if (strstr(sound::nowPlaying(), "Exekat - Big Rush") || strstr(sound::nowPlaying(), "Velveteen")) h16++;   // (2016 songs)
             }
-            printf("era %d: 2025 songs (Salsa, DISTRXCT) %d, 1998 songs %d, of %d songs (now: %s)\n", era, salsa, orig, n, sound::nowPlaying());
+            printf("era %d: 2025 songs (Salsa, DISTRXCT) %d, 2016 songs (Big Rush, Velveteen) %d, 1998 songs %d, of %d songs (now: %s)\n", era, salsa, h16, orig, n, sound::nowPlaying());
         }
         return 0;
     }

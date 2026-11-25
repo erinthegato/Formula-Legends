@@ -862,6 +862,7 @@ void Game::screenHelp(Panel& P) {
         {"Intro music", "Take On The World - All Good Folks (Uppbeat)"},
         {"Attract music", "Lose My Mind - Don Toliver feat. Doja Cat"},
         {"1998 era music", "Formula Legends originals"},
+        {"2016 era music", "Uppbeat, Epidemic Sound"},
         {"2025 era music", "Uppbeat (uppbeat.io)"},
         {"Cars, wheels, cockpits", "Modelled in Blender"},
         {"Pit crew, safety cars, props", "Modelled in Blender"},
@@ -871,7 +872,7 @@ void Game::screenHelp(Panel& P) {
     P.fill(30, 42, 420, 200, RGBA(0, 0, 0, 120));
     int n = sizeof(L) / sizeof(L[0]);
     for (int i = 0; i < n; i++) {
-        float y = 48 + i * 17.5f;
+        float y = 47 + i * 16.2f;              // (12 rows fit the panel)
         bool top = i < 2;
         P.textR(214, y, L[i].role, top ? ACC : DIM, 0.74f);
         P.text(226, y, L[i].who, top ? GOLD : WHITE, top ? 0.86f : 0.76f);

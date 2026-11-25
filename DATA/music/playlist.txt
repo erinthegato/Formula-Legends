@@ -15,3 +15,10 @@ g09_wanna_be_alone.emu	DISTRXCT - Wanna Be Alone	ge
 g10_keep_calling.emu	DISTRXCT - Keep Calling	ge
 g11_stand_up.emu	Kaleidoscope - Stand Up	ge
 g12_the_nights.emu	Pecan Pie - The Nights	ge
+h01_do_you_wanna_follow.emu	Velveteen - Do You Wanna Follow	hybrid
+h02_action_replay.emu	Matrika - Action Replay	hybrid
+h03_keep_loving_you.emu	Chill Winston - Keep Loving You	hybrid
+h04_aerial.emu	IMG - Aerial	hybrid
+h05_big_rush.emu	Exekat - Big Rush	hybrid
+h06_infinity.emu	Exekat - Infinity	hybrid
+h07_fuel.emu	Hey Pluto! - Fuel	hybrid
