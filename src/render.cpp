@@ -37,7 +37,8 @@ bool Renderer::loadCommon() {
     char p[96];
     for (int i = 0; i < 4; i++) { snprintf(p, sizeof p, "DATA/tex/%s.tex", T[i]); tex[i].load(p); }
     static const char* P[PROP_COUNT] = {"grandstand", "tree_pine", "tree_round", "tyre_stack", "billboard", "marshal_post",
-                                        "race_control", "ad_bridge", "tv_tower", "hospitality"};
+                                        "race_control", "ad_bridge", "tv_tower", "hospitality",
+                                        "gantry", "bleacher", "tent", "flagpanel", "crane", "tecpro"};
     for (int i = 0; i < PROP_COUNT; i++) { snprintf(p, sizeof p, "DATA/models/%s.emm", P[i]); prop[i].load(p); }
     for (int e = 0; e < ERA_COUNT; e++) {
         snprintf(p, sizeof p, "DATA/models/wheel_%s.emm", ERA_ID[e]); eraWheel[e].load(p);
@@ -248,7 +249,8 @@ void Renderer::drawScene(const Race& r, const Camera& cam, bool hidePlayer) {
         if (!md.lodCount) continue;
         V3 rel = p.p - cam.eye;
         bool tree = p.model == PROP_TREE_PINE || p.model == PROP_TREE_ROUND;
-        bool big = p.model == PROP_GRANDSTAND || p.model == PROP_CONTROL || p.model == PROP_BRIDGE || p.model == PROP_HOSPITALITY;
+        bool big = p.model == PROP_GRANDSTAND || p.model == PROP_CONTROL || p.model == PROP_BRIDGE || p.model == PROP_HOSPITALITY ||
+                   p.model == PROP_GANTRY || p.model == PROP_BLEACHER || p.model == PROP_CRANE;
         float maxD = (tree ? (perf.scenery ? 420 : 170) : (big ? 900 : (perf.scenery ? 300 : 150))) * perf.distance;
         float rad = md.scale[0] > md.scale[1] ? md.scale[0] : md.scale[1];
         rad = (rad > md.scale[2] ? rad : md.scale[2]) * p.scale * 1.2f;

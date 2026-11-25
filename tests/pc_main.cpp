@@ -567,15 +567,24 @@ int main(int argc, char** argv) {
         g.aiDrivesPlayer = true;
         g.startRace();
         if (g.screen != SCR_RACE) { fprintf(stderr, "race did not start\n"); return 1; }
-        static const char* NM[PROP_COUNT] = {"", "", "", "", "", "", "control", "bridge", "tvtower", "hospitality"};
-        int k = 0;
+        static const char* NM[PROP_COUNT] = {"", "", "", "", "", "", "control", "bridge", "tvtower", "hospitality",
+                                             "gantry", "bleacher", "tent", "flagpanel", "crane", "tecpro"};
+        int k = 0, count[PROP_COUNT] = {};
+        for (const PropInst& p : g.race.track.props) count[p.model]++;
+        for (int m = PROP_GANTRY; m < PROP_COUNT; m++) fprintf(stderr, "%-10s x%d\n", NM[m], count[m]);
+        int shown[PROP_COUNT] = {};
         for (const PropInst& p : g.race.track.props) {
             if (p.model < PROP_CONTROL) continue;
+            if (p.model >= PROP_GANTRY && shown[p.model]++ >= 2) continue;    // the Blender trackside objects: two pictures each
             // stand on the track near it, looking at it
             int bi = 0; float bd = 1e18f;
             for (int i = 0; i < g.race.track.n; i++) { V3 d = g.race.track.pts[i].p - p.p; float dd = dot(d, d); if (dd < bd) { bd = dd; bi = i; } }
             const TrackPoint& q = g.race.track.pts[(bi + g.race.track.n - (p.model == PROP_BRIDGE ? 12 : 6)) % g.race.track.n];
             Camera cam; cam.eye = q.p + V3(0, 0, getenv("EMR_CAMZ") ? (float)atof(getenv("EMR_CAMZ")) : 3.0f); cam.up = V3(0, 0, 1); cam.fov = 60;
+            if (getenv("EMR_NEAR")) {   // EMR_NEAR=<m>: stand that far from the object, between it and the track
+                V3 d = q.p - p.p; d.z = 0; d = norm(d);
+                cam.eye = p.p + d * (float)atof(getenv("EMR_NEAR")) + V3(0, 0, 2.5f);
+            }
             cam.fwd = norm(p.p + V3(0, 0, p.model == PROP_BRIDGE ? 4.0f : 5.0f) - cam.eye);
             gfx::beginFrame(RGBA(150, 180, 220));
             g.R.camRight = norm(cross(cam.fwd, cam.up)); g.R.camUp = cross(g.R.camRight, cam.fwd);

@@ -33,7 +33,9 @@ struct PropCell { V3 centre; float radius; int first, count; };
 
 enum { PROP_GRANDSTAND, PROP_TREE_PINE, PROP_TREE_ROUND, PROP_TYRES, PROP_BILLBOARD, PROP_MARSHAL,
        // Unity AI buildings made for the Vita (HD/models); the PSP has no model for them and skips them
-       PROP_CONTROL, PROP_BRIDGE, PROP_TVTOWER, PROP_HOSPITALITY, PROP_COUNT };
+       PROP_CONTROL, PROP_BRIDGE, PROP_TVTOWER, PROP_HOSPITALITY,
+       // trackside objects made in Blender (tools/blender/trackside.py), one 64 px texture each
+       PROP_GANTRY, PROP_BLEACHER, PROP_TENT, PROP_FLAGPANEL, PROP_CRANE, PROP_TECPRO, PROP_COUNT };
 
 // pit area (distances from the line) kept flat at road level on the left of the straight
 // the pit lane: entry PIT_IN_BEFORE m before the line, PIT_LANE_LEN long; garages from PIT_BOX0 m after
@@ -47,6 +49,7 @@ struct Track {
     const TrackDef* def = nullptr;
     int n = 0;
     float step = 5, length = 0;
+    float gantryScale = 1;   // the start gantry model (20 m between pillars) scaled to the road
     float elevMin = 0, elevMax = 0;
     std::vector<TrackPoint> pts;
     // terrain from the elevation model
@@ -93,6 +96,7 @@ private:
     void buildMesh();
     void addBuildings(Chunk& ch, int c0, int c1, std::vector<WorldVertex>* bins);
     void buildProps();
+    void addTrackside(std::vector<V3>& keepClear);
     void groupProps();
     void placeSpeakers();
     void addQuad(Chunk& c, int mat, const V3& a, const V3& b, const V3& cc, const V3& d,

@@ -105,8 +105,8 @@ void Renderer::buildPit(const Race& r) {
     // pit building above the garages
     for (float a = PIT_BOX0 - 20; a < PIT_BOX0 + 16 * (TEAMS_PER_ERA + 1); a += 20)
         addBox(pitVerts, P(a, garage + 1, 4.6f), P(a + 20, garage + 1, 4.6f), P(a + 20, garage + 1, 11), P(a, garage + 1, 11), RGBA(70, 90, 120));
-    // start-light gantry over the track just past the line
-    {
+    // start-light gantry over the track just past the line (boxes where the Blender gantry is missing)
+    if (!prop[PROP_GANTRY].lodCount) {
         float g = PIT_IN_BEFORE + 8;      // metres after the pit entry = 8 m past the line
         float hw0 = t.pts[t.index(8)].hw;
         for (int sd = -1; sd <= 1; sd += 2) {
@@ -138,12 +138,15 @@ void Renderer::drawPit(const Race& r, const Camera& cam) {
         for (const Car& o : r.cars) if (o.startDelay > 0) waiting = true;
         V3 gp, gt, gl; float ghw;
         r.track.frame(8.0f, gp, gt, gl, ghw);
-        M4 face = M4::translate(gp - gt * 0.06f + V3(0, 0, 5.85f) - cam.eye) * M4::basis(gl * -1.0f, V3(0, 0, 1), gt * -1.0f, V3(0, 0, 0));
+        // the Blender gantry is scaled to the track (Track::gantryScale): its lamp panel is 4.6-5.32 m up at full size
+        float sc = prop[PROP_GANTRY].lodCount ? r.track.gantryScale : 1.0f;
+        V3 at = prop[PROP_GANTRY].lodCount ? gp - gt * (0.28f * sc) + V3(0, 0, 4.96f * sc) : gp - gt * 0.06f + V3(0, 0, 5.85f);
+        M4 face = M4::translate(at - cam.eye) * M4::basis(gl * -1.0f, V3(0, 0, 1), gt * -1.0f, V3(0, 0, 0));
         int lit = r.countdown > 0 ? (int)(5 - (r.countdown - 0.5f) / 0.7f) : 0;
         for (int k = 0; k < 5; k++) {
             u32 col = r.countdown > 0 ? (k < lit && !waiting ? RGBA(255, 30, 20) : RGBA(50, 16, 16)) : (r.time < 3.5f ? RGBA(40, 240, 70) : RGBA(16, 50, 20));
-            float x = (k - 2) * 1.0f;
-            quad3D(face, x - 0.36f, -0.36f, x + 0.36f, 0.36f, col);
+            float x = (k - 2) * 1.0f * sc, h = 0.36f * sc;
+            quad3D(face, x - h, -h, x + h, h, col);
         }
     }
     // crews and the fuel rig at cars stopped in their box
@@ -437,7 +440,7 @@ bool Renderer::sightBlocked(const Track& t, const V3& a, const V3& b) const {
         for (int pi = cell.first; pi < cell.first + cell.count; pi++) {
             const PropInst& p = t.props[pi];
             const Model& md = prop[p.model];
-            if (!md.lodCount || p.model == PROP_BRIDGE) continue;   // the TV camera sees under a footbridge
+            if (!md.lodCount || p.model == PROP_BRIDGE || p.model == PROP_GANTRY) continue;   // the TV camera sees under a footbridge or the gantry
             float rad = fmaxf(md.scale[0], md.scale[1]) * p.scale * 0.8f;
             float top = p.p.z + md.scale[2] * 2 * p.scale;
             // closest approach of the line to the prop's upright axis (in the ground plane)

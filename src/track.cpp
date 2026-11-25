@@ -632,6 +632,113 @@ void Track::groupProps() {
     }
 }
 
+// ---- the trackside objects made in Blender (tools/blender/trackside.py): +X of each model faces the track
+void Track::addTrackside(std::vector<V3>& keepClear) {
+    // nothing may stand on another part of the lap (circuits fold back on themselves)
+    auto clearOfTrack = [&](const V3& at, float margin) {
+        for (int j = 0; j < n; j += 2) {
+            float dx = pts[j].p.x - at.x, dy = pts[j].p.y - at.y;
+            float need = pts[j].hw + fmaxf(pts[j].outL, pts[j].outR) + margin;
+            if (dx * dx + dy * dy < need * need) return false;
+        }
+        return true;
+    };
+    auto ground = [&](const TrackPoint& q, const V3& at) { return q.p.z + clampf((terrainZ(at.x, at.y) - q.p.z) * 0.35f, -1.5f, 2.5f); };
+    auto awayFrom = [&](const std::vector<float>& used, float s, float gap) {
+        for (float u : used) { float d = fabsf(s - u); d = fminf(d, length - d); if (d < gap) return false; }
+        return true;
+    };
+    auto inPits = [&](float s) { return s < 260 || s > length - 420; };
+    // the start gantry 8 m past the line, its pillars just off the road (the start lights are drawn on its panel)
+    {
+        V3 p, t, l; float hw; frame(8.0f, p, t, l, hw);
+        gantryScale = (pts[index(8)].hw + 0.8f) / 10.0f;
+        props.push_back({PROP_GANTRY, p, atan2f(l.y, l.x), gantryScale});
+    }
+    // corners, tightest first: local peaks of curvature
+    std::vector<int> peaks;
+    for (int i = 0; i < n; i++) {
+        float c = fabsf(pts[i].curv);
+        if (c > 1.0f / 400 && c >= fabsf(pts[(i + n - 1) % n].curv) && c >= fabsf(pts[(i + 1) % n].curv)) peaks.push_back(i);
+    }
+    std::sort(peaks.begin(), peaks.end(), [&](int a, int b) { return fabsf(pts[a].curv) > fabsf(pts[b].curv); });
+    // fans: two bleachers and a tent behind the run-off of up to five slow corners
+    std::vector<float> fans;
+    for (int i : peaks) {
+        if ((int)fans.size() >= 5 || fabsf(pts[i].curv) < 1.0f / 160) break;
+        float s = i * step;
+        if (inPits(s) || !awayFrom(fans, s, 380)) continue;
+        const TrackPoint& q = pts[i];
+        float sg = q.curv > 0 ? -1.0f : 1.0f;                // outside of the bend
+        float w = q.curv > 0 ? q.outR : q.outL;
+        V3 out = q.n * sg;
+        float yaw = atan2f(-out.y, -out.x);                  // facing the corner
+        V3 at[3] = {q.p + out * (q.hw + w + 14) - q.t * 5.6f, q.p + out * (q.hw + w + 14) + q.t * 5.6f,
+                    q.p + out * (q.hw + w + 22) + q.t * 15.0f};
+        bool ok = true;
+        for (const V3& a : at) if (!clearOfTrack(a, 8)) ok = false;
+        if (!ok) continue;
+        for (int k = 0; k < 3; k++) {
+            V3 a = at[k]; a.z = ground(q, a);
+            props.push_back({k < 2 ? PROP_BLEACHER : PROP_TENT, a, yaw, 1.0f});
+            keepClear.push_back(a);
+        }
+        fans.push_back(s);
+    }
+    // TecPro barriers lining the outside of medium-speed corners (tight ones already have tyre walls)
+    int barriers = 0;
+    std::vector<float> lined;
+    for (int i : peaks) {
+        float c = fabsf(pts[i].curv);
+        if (c >= 1.0f / 160) continue;
+        if (barriers >= 8) break;
+        float s0 = i * step;
+        if (inPits(s0) || !awayFrom(lined, s0, 150)) continue;
+        for (float ds = -30; ds <= 30; ds += 6) {
+            const TrackPoint& q = pts[index(s0 + ds)];
+            float sg = pts[i].curv > 0 ? -1.0f : 1.0f;
+            float w = pts[i].curv > 0 ? q.outR : q.outL;
+            V3 out = q.n * sg;
+            V3 a = q.p + out * (q.hw + w + 0.5f);
+            a.z = ground(q, a);
+            props.push_back({PROP_TECPRO, a, atan2f(-out.y, -out.x), 1.0f});
+        }
+        lined.push_back(s0);
+        barriers++;
+    }
+    // recovery cranes behind the run-off of three corners
+    std::vector<float> cranes;
+    for (int i : peaks) {
+        if ((int)cranes.size() >= 3) break;
+        float s = i * step;
+        if (inPits(s) || !awayFrom(cranes, s, length * 0.2f) || !awayFrom(fans, s, 60)) continue;
+        const TrackPoint& q = pts[i];
+        float sg = q.curv > 0 ? -1.0f : 1.0f;
+        float w = q.curv > 0 ? q.outR : q.outL;
+        V3 out = q.n * sg;
+        V3 a = q.p + out * (q.hw + w + 6) + q.t * 18.0f;
+        if (!clearOfTrack(a, 4)) continue;
+        a.z = ground(q, a);
+        props.push_back({PROP_CRANE, a, atan2f(-out.y, -out.x), 1.0f});
+        keepClear.push_back(a);
+        cranes.push_back(s);
+    }
+    // marshal light panels every ~300 m, sides taking turns, not inside tight corners
+    float last = -1000;
+    bool leftSide = true;
+    for (int i = 0; i < n; i++) {
+        float s = i * step;
+        const TrackPoint& q = pts[i];
+        if (s - last < 300 || inPits(s) || fabsf(q.curv) > 1.0f / 300) continue;
+        float sg = leftSide ? 1.0f : -1.0f;
+        V3 out = q.n * sg;
+        V3 a = q.p + out * (q.hw + (leftSide ? q.outL : q.outR) + 1.0f);
+        a.z = ground(q, a);
+        props.push_back({PROP_FLAGPANEL, a, atan2f(-out.y, -out.x), 1.0f});
+        last = s; leftSide = !leftSide;
+    }
+}
+
 void Track::buildProps() {
     props.clear();
     rngState = 12345;
@@ -724,6 +831,7 @@ void Track::buildProps() {
             keepClear.push_back(at);
             used.push_back(s);
         }
+        addTrackside(keepClear);
     }
     // trees in the land around the circuit (not in the desert; few in the city)
     if (!desert) {

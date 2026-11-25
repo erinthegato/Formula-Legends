@@ -97,6 +97,10 @@ DRS opens by itself when you have it; the DRS box by the speedometer shows it (o
 * `tools/blender/f1_eras.py` builds the 1998, 2016 and 2025 cars in the same style, sized to each
   season's technical regulations; `export_json(year, path)` exports one to `tools/blender/f1_<year>_car.json`,
   which `gen_f1.py` paints every team's livery onto (all four eras are Blender cars now).
+* `tools/blender/trackside.py` builds the trackside objects (start gantry, corner bleachers, tents,
+  marshal light panels, recovery cranes, TecPro barriers) and exports them to `tools/blender/props/`;
+  `python3 tools/gen_trackside.py` turns them into `HD/models/*.emm` with one 64 px colour texture each
+  (about 15-30 KB a model). `Track::addTrackside()` places them on every circuit.
 * The F1 engine loops (`DATA/audio/f1_*.raw`) were generated with ElevenLabs sound effects;
   `tools/audio/make_engine_loops.py <folder of takes>` picks the steadiest take per era and cuts the loop.
 * Circuits: `python3 tools/build_tracks.py` -> `DATA/tracks/*.emt`. Outlines in
