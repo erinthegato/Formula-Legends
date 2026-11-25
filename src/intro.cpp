@@ -413,6 +413,19 @@ Camera Game::introCamera(float st) {
     default:
         c.eye = V3(0, 0, 10); c.fwd = V3(1, 0, 0);
     }
+    // another car passing right by the lens gets cut open by the near plane: lift the camera over it,
+    // still looking at the same spot
+    if (S.type != SH_EMPTY) {
+        V3 aim = c.eye + c.fwd * 20.0f;
+        for (int i = 0; i < n; i++) {
+            const Car& o = r.cars[i];
+            // (the shot's own cars may be framed close - the DRS shot sits 4.6 m behind - so a smaller margin)
+            float near = (&o == &a || &o == &b) ? 4.0f : 5.0f;
+            float dist = len(c.eye - o.pos);
+            if (dist < near) c.eye.z += (near - dist) * 0.9f;
+        }
+        c.fwd = norm(aim - c.eye);
+    }
     return c;
 }
 

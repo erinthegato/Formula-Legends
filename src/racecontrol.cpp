@@ -35,10 +35,11 @@ float Race::nightLevel() const {
 
 float Race::sunLevel() const {
     float h = clockHour();
-    // sunrise 6:00-7:30, sunset 19:30-21:00
-    if (h >= 7.5f && h <= 19.5f) return 0;
-    if (h > 6.0f && h < 7.5f) return 1 - (h - 6.0f) / 1.5f;
-    if (h > 19.5f && h < 21.0f) return (h - 19.5f) / 1.5f;
+    // sunrise 5:45-7:00, sunset 18:15-19:15 (the night races are near the equator or in autumn:
+    // Singapore at 20:00 is fully dark; it used to read as dusk)
+    if (h >= 7.0f && h <= 18.25f) return 0;
+    if (h > 5.75f && h < 7.0f) return 1 - (h - 5.75f) / 1.25f;
+    if (h > 18.25f && h < 19.25f) return (h - 18.25f) / 1.0f;
     return 1;
 }
 

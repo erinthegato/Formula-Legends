@@ -12,10 +12,11 @@ static const float GEAR[8] = {0, 0.36f, 0.49f, 0.60f, 0.70f, 0.79f, 0.89f, 1.0f}
 const ClassPhys& Race::phys(int era) {
     // tuned so the AI on Hard laps close to each era's real pole times (see tests: Monza, Spa, Suzuka)
     //                                  top   mu     dfV   brake  cdA    cap   fuel  ers   drs    refuel vsc
-    static ClassPhys E[ERA_COUNT] = {{350, 1.32f, 52, 1.95f, 1.08f, 3.0f, 95,  0,   false, true,  false},   // 1998 V10
-                                     {335, 1.41f, 48, 2.10f, 1.15f, 3.1f, 160, 0,   false, false, false},   // 2010 V8
-                                     {345, 1.42f, 50, 2.10f, 1.18f, 3.2f, 100, 120, true,  false, true},    // 2016 hybrid
-                                     {345, 1.52f, 47, 2.20f, 1.12f, 3.4f, 100, 120, true,  false, true}};   // 2025 ground effect
+    // (mu +1 % with the momentum physics, which costs a few tenths over crests and kerbs)
+    static ClassPhys E[ERA_COUNT] = {{350, 1.333f, 52, 1.95f, 1.08f, 3.0f, 95,  0,   false, true,  false},   // 1998 V10
+                                     {335, 1.424f, 48, 2.10f, 1.15f, 3.1f, 160, 0,   false, false, false},   // 2010 V8
+                                     {345, 1.434f, 50, 2.10f, 1.18f, 3.2f, 100, 120, true,  false, true},    // 2016 hybrid
+                                     {345, 1.535f, 47, 2.20f, 1.12f, 3.4f, 100, 120, true,  false, true}};   // 2025 ground effect
     // AI on Hard, dry, best of 3 laps (Monza / Spa / Monaco / Suzuka) against the real pole times:
     //   1998 1:23.9 1:49.5 1:15.7 1:36.4 (real 1:25.3 1:48.7 1:19.8 1:36.3)
     //   2010 1:23.0 1:45.8 1:13.0 1:31.9 (real 1:21.9 1:45.8 1:13.8 1:30.8)
@@ -717,7 +718,10 @@ void Race::update(float dt, float steer, float throttle, float brake, int shift,
     if (countdown > 0) {
         countdown -= dt;
         for (auto& c : cars) { c.v = 0; c.rpm = c.def->idleRpm + (c.def->maxRpm - c.def->idleRpm) * 0.35f * (c.player ? throttle : 0.5f + 0.2f * sinf(countdown * 9 + c.number)); pose(c); }
-        if (countdown <= 0) message("LIGHTS OUT - GO!", RGBA(60, 255, 90), RADIO_GO);
+        if (countdown <= 0) {
+            message("LIGHTS OUT - GO!", RGBA(60, 255, 90), RADIO_GO);
+            if (session == SES_RACE) greenTime = time;    // standing starts: the race clock starts at lights out
+        }
         return;
     }
     time += dt;
