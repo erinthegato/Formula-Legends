@@ -1,4 +1,5 @@
 #include "race.h"
+#include "settings.h"
 #include <algorithm>
 #include <cstdio>
 #include <cstring>
@@ -77,6 +78,7 @@ bool Race::start(const RaceSettings& s0, Session ses, const std::vector<int>* gr
     ghost.clear(); ghostRec.clear(); ghostLap = 0; lapInvalid = false; newRecord = false; ttDeltaOn = false;
     if (!track.load(&TRACKS[s.track])) return false;
     era = CARS[s.car].era;
+    real = cfg.real;
     plan();
     setupPit();
     setupDrs();
@@ -350,6 +352,10 @@ void Race::physics(Car& c, float dt) {
     float wingD = (c.su.wing - 3) * 0.06f, wingDrag = 1 + (c.su.wing - 3) * 0.045f;
     float P = c.def->powerKW * 1000 * (1 - 0.45f * c.dmg[DM_ENGINE]) * MAP_POWER[map];
     if (c.fuel <= 0) P *= 0.08f;                         // out of fuel: crawling on the last drops
+    // mechanical problems: a dead turbo, an overheating engine, a throttle that cuts out
+    P *= c.rel.powerK;
+    if (c.rel.engT > 115) P *= fmaxf(0.7f, 1 - (c.rel.engT - 115) * 0.015f);
+    if (c.rel.cut > 0) c.throttle = fminf(c.throttle, 0.05f);
     // hybrid (2014 on): braking charges the battery, deploying spends it: +120 kW (MGU-K) for up to
     // ~16 s a lap. It deploys by itself on parts of the track, set by the engine map:
     //   Safety-car map: never (charge only, and a trickle more while lifting)
@@ -393,6 +399,7 @@ void Race::physics(Car& c, float dt) {
     float suspK = DRY[c.su.susp] + (WETK[c.su.susp] - DRY[c.su.susp]) * wet;
     float gripMul = (off ? (gravel ? 0.42f : 0.55f) : (onKerb ? KERB[c.su.susp] : 1.0f)) * c.def->grip * tyreGrip(c) * (1 - 0.25f * c.dmg[DM_SUSP]) * suspK;
     if (!off) gripMul *= rubberGrip(c);
+    if (c.rel.flat >= 0) gripMul *= 0.55f;               // running on a flat tyre
     // the tyres' share of the load (CarBody): light over a crest, none in the air, a little more in a dip
     // (tyres grip less than in proportion to load, so ~load^0.7)
     float loadK = c.body.init ? powf(clampf(c.body.load, 0, 1.4f), 0.7f) : 1.0f;
@@ -411,7 +418,7 @@ void Race::physics(Car& c, float dt) {
     float force = c.throttle * P * powerFrac / fmaxf(c.v, 6.0f);
     float traction = 1.25f * mass * G * aeroK * gripMul * loadK;
     if (force > traction) force = traction;
-    float dragK = (1 + 0.12f * (c.dmg[DM_NOSE] + c.dmg[DM_LEFT] + c.dmg[DM_RIGHT]) - (c.wingOff ? 0.06f : 0)) * wingDrag * (c.drs ? 0.84f : 1.0f);
+    float dragK = (1 + 0.12f * (c.dmg[DM_NOSE] + c.dmg[DM_LEFT] + c.dmg[DM_RIGHT]) - (c.wingOff ? 0.06f : 0)) * wingDrag * (c.drs ? 0.84f : 1.0f) * (1 - 0.32f * c.rel.tow);
     float drag = 0.5f * 1.2f * p.cdA * c.def->aero * dragK * c.v * c.v + 0.015f * mass * G;
     float grade = track.gradeAt(c.s);
     float slope = mass * G * grade / sqrtf(1 + grade * grade);
@@ -420,6 +427,12 @@ void Race::physics(Car& c, float dt) {
     float bias = c.su.bias();
     float brakeK = fminf(1.0f, (c.su.brakeF + c.su.brakeR) / 115.0f) * (1 - 1.4f * fabsf(bias - 0.63f));
     float brakeDec = c.brake * p.brakeG * G * fminf(aeroK, 2.6f) * (off ? 0.6f : 1.0f) * fminf(1.0f, tyreGrip(c) + 0.15f) * brakeK * fminf(loadK, 1.1f);
+    {   // brake temperature (Realism): cold discs bite less, past their range they fade; a brake fault halves them
+        float bt = c.rel.brakeT, fadeAt = era == ERA_90S ? 750.0f : 950.0f;   // 1980: steel discs fade early
+        float k2 = bt < 150 ? 0.85f + bt * 0.001f : (bt > fadeAt ? fmaxf(0.55f, 1 - (bt - fadeAt) * 0.0016f) : 1.0f);
+        if (c.rel.brakeWeak) k2 *= 0.5f;
+        brakeDec *= k2;
+    }
     acc -= c.v > 0.1f ? brakeDec : 0;
     if (off) acc -= (gravel ? 4.0f + 0.05f * c.v : 1.2f + 0.012f * c.v) * (c.v > 1 ? 1 : 0);
     c.v += acc * dt;
@@ -429,6 +442,7 @@ void Race::physics(Car& c, float dt) {
     // ---- steering / yaw (c.yawRate holds the wanted rate, set by player input or AI)
     if (c.human) c.yawCmd += (c.yawRate - c.yawCmd) * fminf(1.0f, dt * FEEL[era % ERA_COUNT].turnIn);
     else c.yawCmd = c.yawRate;
+    if (c.rel.steerT > 0) c.yawCmd *= 0.25f;            // broken steering rod: the wheel barely turns the car
     float want = c.yawCmd + (c.dmg[DM_SUSP] * 0.04f * c.v / 30.0f) * (c.dmg[DM_LEFT] > c.dmg[DM_RIGHT] ? 1 : -1) * (c.player ? 1 : 0);
     float maxRate = c.v > 1 ? latMax / c.v : 3.0f;
     c.slip = 0;
@@ -504,6 +518,8 @@ void Race::physics(Car& c, float dt) {
     c.d += dd;
     c.wheelSpin += c.v * dt / 0.34f;
 
+    if (!real.on(real.tyres)) { for (float& t : c.tyreT) t = 90; }
+    else
     // ---- tyre temperatures: speed, cornering, braking (fronts) and wheelspin (rears) heat them; a wet
     // track cools slicks. They settle over ~25 s. Grip is best between 80 and 105 deg C (tyreGrip).
     {
@@ -528,10 +544,16 @@ void Race::physics(Car& c, float dt) {
         float life = tyreKm[c.tyre] * 1000;
         bool slick = c.tyre <= TY_HARD;
         float abuse = 1 + c.slip * 1.5f + (slick ? 0 : fmaxf(0, 0.5f - wet) * (c.tyre == TY_WET ? 4 : 2)) + c.dmg[DM_SUSP];
-        c.wear = fminf(1, c.wear + ds / life * consumeScale * abuse);
+        if (real.on(real.tyres)) c.wear = fminf(1, c.wear + ds / life * consumeScale * abuse * (c.rel.flat >= 0 ? 3.0f : 1.0f));
         // the tank is sized to the race (Race::start); a little more on the Attack map
-        c.fuel = fmaxf(0, c.fuel - ds / (tankKm * 1000) * consumeScale * (0.6f + 0.4f * c.throttle) * MAP_FUEL[map] / 0.95f);
+        if (real.on(real.fuel)) c.fuel = fmaxf(0, c.fuel - ds / (tankKm * 1000) * consumeScale * (0.6f + 0.4f * c.throttle) * MAP_FUEL[map] / 0.95f);
         c.stint += dt * consumeScale;          // driving time: same clock as fuel and tyres (a tank ~65 min)
+    }
+
+    // ---- ground contact (Realism): hammering the kerbs and the gravel knocks the floor and suspension
+    if (real.on(real.ground) && session == SES_RACE && realFor(c) && c.v > 35) {
+        float hitK = (onKerb ? (c.su.susp == 2 ? 0.0022f : 0.0012f) : 0) + (gravel ? 0.006f : 0);
+        if (hitK > 0 && frand() < dt * 6) addDamage(c, DM_SUSP, hitK * (c.v / 60.0f) * (era == ERA_90S ? 1.6f : 1.0f));
     }
 
     // ---- barriers, pit wall
@@ -560,8 +582,10 @@ void Race::physics(Car& c, float dt) {
     bodyUpdate(c, dt, G * aeroK, accLong, c.yawRate * c.v);
 
     // ---- gears
+    int gTop = c.rel.gearMax > 0 ? c.rel.gearMax : topGear(c);
+    if (c.gear > gTop) c.gear = gTop;                     // gearbox fault: the top gears are gone
     if (!c.player || !set.manualGears) {
-        if (rpmFrac > 0.965f && c.gear < topGear(c)) c.gear++;
+        if (rpmFrac > 0.965f && c.gear < gTop) c.gear++;
         else if (c.gear > 1 && c.rpm < c.def->maxRpm * 0.6f && !c.slowLim) {
             float lower = c.def->maxRpm * c.v / (vt * 1.03f * GEAR[c.gear - 1] * RATIO[c.su.gearing]);
             if (lower < c.def->maxRpm * 0.93f) c.gear--;
@@ -720,6 +744,8 @@ void Race::rank() {
             if (A.bestLap > 0) return A.bestLap < B.bestLap;
             return A.total > B.total;
         }
+        if (A.rel.retired != B.rel.retired) return B.rel.retired;   // retired cars at the back (DNF)
+        if (A.rel.retired) return A.total > B.total;
         if (A.finished != B.finished) return A.finished;
         if (A.finished) {
             if (A.lap != B.lap) return A.lap > B.lap;
@@ -752,9 +778,12 @@ void Race::endSession() {
 void Race::update(float dt, float steer, float throttle, float brake, int shift, bool aiPlayer) {
     sfxEvents.clear();
     autoPlayer = aiPlayer;
+    bool clutch = drsPress || shift > 0;          // the launch clutch (standing starts)
+    if (launch.state == LS_REV || launch.state == LS_WAIT) { if (drsPress) drsPress = false; if (launch.state == LS_WAIT) shift = 0; }
     if (countdown > 0) {
-        countdown -= dt;
+        countdown -= launchCountdown(dt, throttle, clutch);
         for (auto& c : cars) { c.v = 0; c.rpm = c.def->idleRpm + (c.def->maxRpm - c.def->idleRpm) * 0.35f * (c.player ? throttle : 0.5f + 0.2f * sinf(countdown * 9 + c.number)); pose(c); }
+        if (launch.state == LS_REV) player().rpm = player().def->idleRpm + (player().def->maxRpm - player().def->idleRpm) * launch.rev;
         if (countdown <= 0) {
             message("LIGHTS OUT - GO!", RGBA(60, 255, 90), RADIO_GO);
             if (session == SES_RACE) greenTime = time;    // standing starts: the race clock starts at lights out
@@ -770,8 +799,10 @@ void Race::update(float dt, float steer, float throttle, float brake, int shift,
     if (session == SES_RACE && set.raceMin > 0 && !formation && time - greenTime >= set.raceMin * 60.0f && !chequered) { chequered = true; message("Chequered flag: the leader's next lap is the last", RGBA(255, 255, 255), RADIO_LASTLAP); }
     blueFlags(dt);
     updateDrs(dt);
+    slipstream(dt);
     for (auto& c : cars) {
         if (c.hold) { c.v = 0; continue; }
+        if (c.rel.retired) { retiredDrive(c, dt); continue; }
         if (c.startDelay > 0) { c.startDelay -= dt; if (c.startDelay <= 0 && c.player) message("In the car - go!", RGBA(60, 255, 90)); }
         bool human = c.player && !aiPlayer && !c.finished && c.pit == PIT_NONE && !c.plan.aiDrives;
         // the player's car is taken into the pit lane automatically once the entry is reached
@@ -779,6 +810,7 @@ void Race::update(float dt, float steer, float throttle, float brake, int shift,
         c.human = human && c.startDelay <= 0;
         if (human && c.startDelay <= 0) {
             c.throttle = throttle; c.brake = brake;
+            if (c.player && launch.state != LS_OFF) launchBefore(c, dt, clutch);
             // the lock falls away with speed (less twitchy at high speed), and the car takes ~0.1 s to
             // answer the wheel, so a flick of the stick doesn't jerk the nose round
             float lock = steerLock(c.v);
@@ -792,7 +824,7 @@ void Race::update(float dt, float steer, float throttle, float brake, int shift,
                 float cap = playerLatMax / c.v * (steerHelp == 1 ? 1.18f : 1.0f);
                 c.yawRate = clampf(c.yawRate, -cap, cap);
             }
-            if (shift > 0 && c.gear < topGear(c)) c.gear++;
+            if (shift > 0 && c.gear < (c.rel.gearMax > 0 ? c.rel.gearMax : topGear(c))) c.gear++;
             if (shift < 0 && c.gear > 1) c.gear--;
         } else {
             if (c.player && c.startDelay > 0) { c.throttle = 0; c.brake = 1; }
@@ -803,6 +835,7 @@ void Race::update(float dt, float steer, float throttle, float brake, int shift,
         if (c.pit == PIT_STOP) { pitStop(c, dt); continue; }
         int lapsBefore = (int)floorf(c.total / track.length);
         physics(c, dt);
+        if (c.player && launch.state == LS_RUN) launchAfter(c, dt);
         if (c.player) playerThrPrev = c.throttle;
         // the FCY / slow zone limiter: once down to 80 km/h in the zone, the car holds it
         if (c.player) {
@@ -820,6 +853,7 @@ void Race::update(float dt, float steer, float throttle, float brake, int shift,
             }
         }
         penaltyCheck(c, dt);
+        reliability(c, dt);
         int lapsAfter = (int)floorf(c.total / track.length);
         if (set.timeTrial && c.player && !c.outLap && c.total > 0) {
             float lt = time - c.lapStart;
@@ -906,7 +940,10 @@ void Race::update(float dt, float steer, float throttle, float brake, int shift,
     for (auto& c : cars) pose(c);
     rank();
     Car& me = player();
-    if (session == SES_RACE) { if (me.finished && time - me.finishTime > 8 && me.pit == PIT_NONE) over = true; }
+    if (session == SES_RACE) {
+        if (me.finished && time - me.finishTime > 8 && me.pit == PIT_NONE) over = true;
+        if (me.rel.retired && time - me.rel.retireT > 7) over = true;    // out of the race: on to the results
+    }
     else if (me.finished) {
         bool all = true;
         for (auto& c : cars) if (!c.finished && c.pit == PIT_NONE) all = false;

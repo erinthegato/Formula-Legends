@@ -25,7 +25,7 @@ set(CMAKE_C_FLAGS   "${CMAKE_C_FLAGS} -O2 -Wall -ffast-math -fno-strict-aliasing
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O2 -Wall -ffast-math -fno-strict-aliasing -mcpu=cortex-a9 -mfpu=neon -fno-exceptions -fno-rtti")
 
 add_executable(${PROJECT_NAME}
-  ${ROOT}/src/data.cpp ${ROOT}/src/track.cpp ${ROOT}/src/race.cpp ${ROOT}/src/racecontrol.cpp
+  ${ROOT}/src/data.cpp ${ROOT}/src/track.cpp ${ROOT}/src/race.cpp ${ROOT}/src/racecontrol.cpp ${ROOT}/src/launch.cpp ${ROOT}/src/reliability.cpp
   ${ROOT}/src/champ.cpp ${ROOT}/src/career.cpp ${ROOT}/src/settings.cpp ${ROOT}/src/menu.cpp
   ${ROOT}/src/sound.cpp ${ROOT}/src/render.cpp ${ROOT}/src/render_fx.cpp ${ROOT}/src/clip.cpp
   ${ROOT}/src/game.cpp ${ROOT}/src/intro.cpp ${ROOT}/src/trophies.cpp ${ROOT}/src/setups.cpp ${ROOT}/src/platform_vita.cpp)

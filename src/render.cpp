@@ -1243,6 +1243,7 @@ void Renderer::drawHUD(const Race& r, int mode) {
     }
     drawRaceInfo(r);
     drawQte(r);
+    drawLaunch(r);
     gfx::setBlend(true); gfx::setDepthTest(false);
     if (c.offTrack && r.countdown <= 0 && !c.finished) font.drawCentre(SCREEN_W / 2, SCREEN_H - 30, "OFF TRACK", RGBA(255, 160, 60), 1.0f);
     gfx::setBlend(false);

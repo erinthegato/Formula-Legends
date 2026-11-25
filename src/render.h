@@ -112,6 +112,7 @@ struct Renderer {
     Camera cinematicCamera(const Race& r, const Car& c, float t);
     void drawRaceInfo(const Race& r);
     void drawQte(const Race& r);
+    void drawLaunch(const Race& r);   // the standing-start rev bar (launch.cpp)
     void drawCockpitHud(const Race& r);
     void drawSpeedBox(const Car& c);
     void drawRelative(const Race& r);      // PS Vita HUD: gaps ahead / behind, stint, fuel laps

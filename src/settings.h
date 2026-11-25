@@ -1,6 +1,7 @@
 // Player settings (settings menu): sound, performance / vsync, button bindings. Saved to settings.cfg.
 #pragma once
 #include "platform.h"
+#include "realism.h"
 
 // L and R are not bindable: they brake (L) and accelerate (R) while driving, and skip music tracks in the menus
 enum Button { BTN_NONE = -1, BTN_CROSS = 0, BTN_CIRCLE, BTN_SQUARE, BTN_TRIANGLE, BTN_SELECT, BTN_UP, BTN_DOWN, BTN_COUNT };
@@ -33,6 +34,7 @@ struct Config {
     int help() const;   // PS Vita: holding the rear touch pad looks behind (off: fingers resting on it would)
     int pitCam = 0;          // pit stops and the garage: 0 cinematic camera, 1 your own camera        // seconds idle on the main menu before the highlights start (5..30)
     // BTN_NONE = the action has no button
+    Realism real;            // car realism and mechanical problems (settings > Car realism)
     int bind[ACT_COUNT] = {BTN_CROSS, BTN_SQUARE, BTN_NONE, BTN_NONE, BTN_TRIANGLE, BTN_CIRCLE, BTN_SELECT, BTN_UP, BTN_DOWN};
 
     void load();

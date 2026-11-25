@@ -11,13 +11,13 @@
 struct Panel;
 
 // title menu: item ids (0 quick race .. 5 credits, 6 time trial) in the order they are shown
-enum { CR_HELP = 100, CR_TILT, CR_TILTDIR, CR_REAR, CR_RESET, CR_BACK };   // Controls page rows (0..ACT_COUNT-1: buttons)
+enum { CR_HELP = 100, CR_TILT, CR_TILTDIR, CR_REAR, CR_REALISM, CR_RESET, CR_BACK };   // Controls page rows (0..ACT_COUNT-1: buttons)
 static const int TITLE_ORDER[8] = {0, 6, 1, 2, 3, 7, 4, 5};   // 7: trophies
 // pause menu: item ids in the order shown (7 replay, 8 photo mode)
 static const int PAUSE_ORDER[9] = {0, 1, 2, 7, 8, 3, 4, 5, 6};
 enum Screen { SCR_TITLE, SCR_TRACK, SCR_CAR, SCR_SETTINGS, SCR_HELP, SCR_RACE, SCR_PAUSE, SCR_RESULTS,
               SCR_TEAM, SCR_PODIUM, SCR_CHAMP, SCR_LOAD, SCR_REEL, SCR_OPTIONS, SCR_CONTROLS, SCR_GARAGE, SCR_INTRO,
-              SCR_CAREER, SCR_CAREER_NEW, SCR_LIVERY, SCR_TROPHIES, SCR_REPLAY, SCR_PHOTO };
+              SCR_CAREER, SCR_CAREER_NEW, SCR_LIVERY, SCR_TROPHIES, SCR_REPLAY, SCR_PHOTO, SCR_REALISM };
 
 struct Game {
     Screen screen = SCR_TITLE;
@@ -127,7 +127,10 @@ struct Game {
     Camera introCamera(float st);
     float introBarTime(int bar) const;
 
-    int controlRows(int* ids) const;     // the rows the Controls page shows (CR_* ids), in order
+    int controlRows(int* ids) const;
+    bool mechPage = false;               // Car realism: the mechanical problems page
+    void screenRealism(Panel& P);
+    void updateRealism(int dx, int dy, bool ok, bool back);     // the rows the Controls page shows (CR_* ids), in order
 private:
     void update(float dt, const Pad& pad);
     void updateRace(float dt, const Pad& p);

@@ -446,6 +446,37 @@ int main(int argc, char** argv) {
         shot(g, std::string(argv[2]) + "/podium_b.ppm");
         return 0;
     }
+    if (mode == "launch") {
+        // launch [era]: three standing starts for the player: good (revs held in the band, clutch
+        // 0.2 s after lights out), bad (button flat out, late clutch), jump (clutch before the lights)
+        int era = argc > 2 ? atoi(argv[2]) : 0;
+        const char* NAME[3] = {"good", "bad", "jump"};
+        for (int sc = 0; sc < 3; sc++) {
+            RaceSettings rs; rs.track = 2; rs.car = eraFirstCar(era); rs.opponents = 5; rs.weather = WX_DRY; rs.startType = START_STANDING;
+            g.race.start(rs, SES_RACE);
+            Race& r = g.race;
+            float mid = (r.launch.lo + r.launch.hi) * 0.5f, outT = -1, v3 = -1, d3 = 0, s0 = r.player().total;
+            bool jumpDone = false;
+            for (int i = 0; i < 60 * 20 && v3 < 0; i++) {
+                float th = sc == 0 ? (mid - 0.05f) / 0.95f : 1.0f;
+                bool press = false;
+                if (r.countdown <= 0 && outT < 0) outT = r.time;
+                if (outT >= 0 && (sc != 0 || r.launch.state != Race::LS_WAIT)) th = 1.0f;   // (good: holds the revs until the clutch)
+                if (sc == 0 && outT >= 0 && r.time - outT >= 0.2f) press = true;
+                if (sc == 1 && outT >= 0 && r.time - outT >= 0.6f) press = true;
+                if (sc == 2 && r.countdown > 0 && r.countdown < 2.0f && !jumpDone) { press = true; jumpDone = true; }
+                if (press && r.launch.state != Race::LS_OFF) r.drsPress = true;
+                r.update(1.0f / 60, 0, th, 0, 0, false);
+                r.sfxEvents.clear();
+                if (outT >= 0 && r.time - outT >= 3.0f) { v3 = r.player().v; d3 = r.player().total - s0; }
+            }
+            const char* last = r.msgs.empty() ? "" : r.msgs.back().text;
+            printf("era %d %-4s: quality %.2f reaction %.2f revs %.2f (band %.2f-%.2f) penalty %.0f s  3 s after green: %.1f km/h, %.1f m  [%s]\n",
+                   era, NAME[sc], r.launch.quality, r.launch.reaction, r.launch.revAtDrop, r.launch.lo, r.launch.hi, r.player().penalty, v3 * 3.6f, d3, last);
+            for (auto& m : r.msgs) printf("      msg: %s\n", m.text);
+        }
+        return 0;
+    }
     if (mode == "drsers") {
         // drsers <era 2|3> <map 0-2>: Monza practice. The AI drives; on the straights the pad takes
         // over (steer 0, flat out) so DRS must wait for the button. Prints the ERS time per state
@@ -885,6 +916,34 @@ int main(int argc, char** argv) {
         press(g, &Pad::circle); press(g, &Pad::circle);            // photo -> replay -> pause
         fprintf(stderr, "back on screen %d; player restored: %s\n", (int)g.screen, g.race.playerIdx == g.repLivePlayer && g.repLive.empty() ? "yes" : "no");
         (void)before;
+        return 0;
+    }
+    if (mode == "reliab") {
+        // reliab <era> <laps> [runs]: whole races with the AI in every car; how often things break and who retires
+        int era = atoi(argv[2]), laps = atoi(argv[3]), runs = argc > 4 ? atoi(argv[4]) : 1;
+        int ret[MF_COUNT + 1] = {}, fail[MF_COUNT] = {}, cars = 0, flats = 0; float sumDmg = 0;
+        for (int r = 0; r < runs; r++) {
+            g.set.track = 0; g.set.car = eraFirstCar(era); g.set.laps = laps; g.set.opponents = 19; g.set.weather = WX_DRY;
+            g.set.weekend = false; g.set.startType = START_STANDING;
+            g.aiDrivesPlayer = true; g.startRace();
+            if (g.screen != SCR_RACE) { fprintf(stderr, "race did not start\n"); return 1; }
+            float simT = 0; std::string lastMsg;
+            while (g.screen == SCR_RACE && !g.race.over && simT < 3 * 3600) {
+                Pad p{}; g.screen = SCR_RACE; g.step(1.0f / 30, p); simT += 1.0f / 30;
+                if (!g.race.msgs.empty() && lastMsg != g.race.msgs[0].text) { lastMsg = g.race.msgs[0].text; if (strstr(lastMsg.c_str(), "out:") || strstr(lastMsg.c_str(), "slowing") || strstr(lastMsg.c_str(), "RETIRED")) fprintf(stdout, "  [%5.0f s lap %d] %s\n", g.race.time - g.race.greenTime, g.race.player().lap, lastMsg.c_str()); }
+            }
+            for (auto& c : g.race.cars) {
+                cars++; sumDmg += c.damage();
+                if (c.rel.retired) ret[c.rel.cause < 0 ? MF_COUNT : c.rel.cause]++;
+                for (int k = 0; k < MF_COUNT; k++) if (c.rel.fails & (1u << k)) fail[k]++;
+                if (c.rel.flat >= 0) flats++;
+            }
+            fprintf(stdout, "run %d: %.0f s, consumeScale %.2f, leader laps %d\n", r, g.race.time - g.race.greenTime, g.race.consumeScale, g.race.cars[0].lap);
+            g.race.end();
+        }
+        int nret = 0; for (int k = 0; k <= MF_COUNT; k++) nret += ret[k];
+        printf("era %d: %d cars, %d retired (%.0f %%), mean damage %.2f, flats at the end %d\n", era, cars, nret, 100.0f * nret / cars, sumDmg / cars, flats);
+        for (int k = 0; k < MF_COUNT; k++) printf("  %-28s failed %2d  retired %2d\n", MECH_NAME[k], fail[k], ret[k]);
         return 0;
     }
     if (mode == "race") {

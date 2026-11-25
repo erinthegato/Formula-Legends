@@ -135,7 +135,7 @@ void Game::frame(float dt, const Pad& pad) {
     double tu1 = sys::timeSec();
     // music: menus, results, podium (its own tune), the highlights reel and practice / qualifying
     // (through the trackside speakers); off in the race
-    bool pausedOpt = (screen == SCR_OPTIONS || screen == SCR_CONTROLS) && optionsFrom == SCR_PAUSE;
+    bool pausedOpt = (screen == SCR_OPTIONS || screen == SCR_CONTROLS || screen == SCR_REALISM) && optionsFrom == SCR_PAUSE;
     bool racing = raceLoaded && race.session == SES_RACE && (screen == SCR_RACE || screen == SCR_PAUSE || screen == SCR_TEAM || pausedOpt);
     if (screen == SCR_GARAGE) racing = false;
     if (screen != SCR_PODIUM && screen != SCR_INTRO) sound::musicEnable(!racing && screen != SCR_PAUSE && !pausedOpt);
@@ -353,7 +353,12 @@ void Game::raceEvents() {
         }
     }
     if (race.radioPending >= 0 && race.radioPending < RADIO_COUNT) {
-        if (screen != SCR_REEL && !aiDrivesPlayer) sound::radio(RADIO_FILE[race.radioPending]);
+        if (screen != SCR_REEL && !aiDrivesPlayer) {
+            // the same engineer in every era; the radio itself sounds of its time
+            static const char* ERA_RADIO[4] = {"80", "10", "16", "25"};
+            char name[40]; snprintf(name, sizeof name, "%s_%s", ERA_RADIO[race.era & 3], RADIO_FILE[race.radioPending]);
+            sound::radio(name);
+        }
         race.radioPending = -1;
     }
 }
@@ -502,7 +507,7 @@ void Game::updateRace(float dt, const Pad& p) {
     raceAudio();
     if (race.playerAtBox()) {
         if (aiDrivesPlayer) race.releasePlayer();
-        else { screen = SCR_TEAM; sel = 6; race.timeAccel = 1; sound::silence(); sound::radio("box"); }
+        else { screen = SCR_TEAM; sel = 6; race.timeAccel = 1; sound::silence(); sound::radio(race.era == 0 ? "80_box" : race.era == 1 ? "10_box" : race.era == 2 ? "16_box" : "25_box"); }
     }
     if (race.inGarage()) { screen = SCR_GARAGE; setupSel = 8; race.timeAccel = 1; sound::silence(); }
     if (race.over) finishRace();
@@ -784,6 +789,7 @@ void Game::update(float dt, const Pad& p) {
     }
     case SCR_OPTIONS:
     case SCR_CONTROLS:
+    case SCR_REALISM:
         updateOptions(p, dx, dy, ok, back);
         break;
     case SCR_RESULTS:
@@ -1014,7 +1020,7 @@ void Game::draw() {
     if (screen == SCR_INTRO) { drawIntro(); return; }
     if (screen == SCR_PODIUM) { if (raceLoaded) drawPodium(); else { gfx::beginFrame(0); finishFrame(); } return; }
     if (screen == SCR_GARAGE) { if (raceLoaded) drawGarageView(); else { gfx::beginFrame(0); finishFrame(); } return; }
-    bool pausedOptions = (screen == SCR_OPTIONS || screen == SCR_CONTROLS) && optionsFrom == SCR_PAUSE && raceLoaded;
+    bool pausedOptions = (screen == SCR_OPTIONS || screen == SCR_CONTROLS || screen == SCR_REALISM) && optionsFrom == SCR_PAUSE && raceLoaded;
     if (pausedOptions) { drawRaceView(); drawOptionsFlat(); finishFrame(); return; }
     if (screen == SCR_RACE || screen == SCR_PAUSE || screen == SCR_RESULTS || screen == SCR_TEAM || screen == SCR_REEL || screen == SCR_REPLAY || screen == SCR_PHOTO) {
         if (!raceLoaded) { gfx::beginFrame(0); finishFrame(); return; }
@@ -1081,7 +1087,8 @@ void Game::draw() {
                     if (c.bestLap <= 0) strcpy(tm, "no time");
                     else if (&c == lead) formatTime(tm, c.bestLap);
                     else snprintf(tm, sizeof tm, "+%.3f", c.bestLap - lead->bestLap);
-                } else if (&c == lead) formatTime(tm, c.finishTime - race.greenTime);
+                } else if (c.rel.retired) snprintf(tm, sizeof tm, "DNF %s", RETIRE_SHORT[c.rel.cause < 0 ? MF_COUNT : c.rel.cause]);
+                else if (&c == lead) formatTime(tm, c.finishTime - race.greenTime);
                 else if (c.finished && c.lap == lead->lap) { float g = c.finishTime + c.penalty - lead->finishTime - lead->penalty; snprintf(tm, sizeof tm, "+%.3f", g); }
                 else snprintf(tm, sizeof tm, "+%d lap%s", lead->lap - c.lap, lead->lap - c.lap == 1 ? "" : "s");
                 u32 col = c.player ? GOLD : WHITE;
@@ -1103,6 +1110,7 @@ void Game::draw() {
 }
 
 void Game::updateOptions(const Pad& p, int dx, int dy, bool ok, bool back) {
+    if (screen == SCR_REALISM) { updateRealism(dx, dy, ok, back); return; }
     if (screen == SCR_CONTROLS) {
         if (rebinding >= 0) {
             // wait for the buttons to be let go, then take the next one pressed
@@ -1121,6 +1129,7 @@ void Game::updateOptions(const Pad& p, int dx, int dy, bool ok, bool back) {
         else if (id == CR_TILTDIR && (ok || dx)) { cfg.tiltInvert = !cfg.tiltInvert; cfg.save(); }
         else if (id == CR_REAR && (ok || dx)) { cfg.rearLook = !cfg.rearLook; cfg.save(); }
         else if (ok && id == CR_RESET) { cfg.resetBinds(); cfg.save(); }
+        else if (ok && id == CR_REALISM) { screen = SCR_REALISM; mechPage = false; sel = 0; }
         else if (back || (ok && id == CR_BACK)) { screen = SCR_OPTIONS; sel = 15; }
         return;
     }
@@ -1156,7 +1165,7 @@ void Game::updateOptions(const Pad& p, int dx, int dy, bool ok, bool back) {
         if (custom) { cfg.preset = 3; autoLevel = 0; }      // the player's own choice: start again from it
         if (sel == 5) autoLevel = 0;
         cfg.apply(autoLevel);
-        if (sel == 4) sound::radio("box");          // hear the new level
+        if (sel == 4) sound::radio("25_box");          // hear the new level
         if (sel == 3) sound::play("pit_wheelgun", 0.8f, 0);
     }
     if (ok && sel == 15) { screen = SCR_CONTROLS; sel = 0; rebinding = -1; }
@@ -1405,6 +1414,25 @@ int Game::controlRows(int* ids) const {
         if (cfg.tilt) ids[n++] = CR_TILTDIR;
         ids[n++] = CR_REAR;
     }
+    ids[n++] = CR_REALISM;
     ids[n++] = CR_RESET; ids[n++] = CR_BACK;
     return n;
+}
+
+void Game::updateRealism(int dx, int dy, bool ok, bool back) {
+    Realism& R = cfg.real;
+    int n = mechPage ? MF_COUNT + 1 : 12;
+    sel = (sel + dy + n) % n;
+    bool change = dx || ok;
+    if (mechPage) {
+        if (back || (ok && sel == MF_COUNT)) { mechPage = false; sel = 10; cfg.save(); return; }
+        if (change && sel < MF_COUNT && !R.full) R.mech[sel] = !R.mech[sel];
+    } else {
+        if (back || (ok && sel == 11)) { cfg.save(); screen = SCR_CONTROLS; int ids[24]; int m = controlRows(ids); for (int k = 0; k < m; k++) if (ids[k] == CR_REALISM) sel = k; return; }
+        if (ok && sel == 10) { mechPage = true; sel = 0; return; }
+        bool* flags[9] = {&R.full, &R.opponents, &R.tyres, &R.brakes, &R.cooling, &R.slipstream, &R.blowTyre, &R.ground, &R.fuel};
+        if (change && sel <= 8 && (sel == 0 || !R.full)) *flags[sel] = !*flags[sel];
+        if (sel == 9 && (dx || ok)) { R.damagePct += (dx ? dx : 1) * 25; if (R.damagePct > 200) R.damagePct = ok && !dx ? 0 : 200; if (R.damagePct < 0) R.damagePct = 0; }
+    }
+    if (change) { cfg.save(); if (raceLoaded) race.real = cfg.real; }
 }

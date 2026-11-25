@@ -2,6 +2,7 @@
 // Race control and the team: starts (rolling / standing / Le Mans), the safety car, penalties,
 // weather, tyres, fuel, pit stops, damage, flying parts, smoke and spray, and saving a race.
 #include "race.h"
+#include "settings.h"
 #include <algorithm>
 #include <cstdio>
 #include <cstring>
@@ -10,7 +11,8 @@
 const char* TYRE_NAME[TY_COUNT] = {"Soft", "Medium", "Hard", "Inter", "Wet"};
 const char* MAP_NAME[MAP_COUNT] = {"Safety car", "Normal", "Attack"};
 const char* RADIO_FILE[RADIO_COUNT] = {"bestlap", "box", "box_ack", "contact", "damage", "drivethrough", "finish",
-    "formation", "fuel", "giveback", "go", "green", "lastlap", "lemans", "limits", "overtake", "penalty", "sc", "sc_in", "tyres"};
+    "formation", "fuel", "giveback", "go", "green", "lastlap", "lemans", "limits", "overtake", "penalty", "sc", "sc_in", "tyres",
+    "engine", "gearbox", "turbo", "suspension", "puncture", "wheel", "leak", "throttle", "brakes", "steering", "overheat"};
 const char* SFX_FILE[SFX_COUNT] = {"pit_airjack_up", "pit_jack_drop", "pit_refuel", "pit_wheelgun", "podium_champagne",
     "podium_crowd", "thunder_close", "thunder_mid", "thunder_far1", "thunder_far2"};
 
@@ -371,6 +373,7 @@ void Race::setupStart() {
     int n = (int)cars.size();
     float hw = track.pts[0].hw;
     formation = false; countdown = 0; greenTime = 0;
+    launch = Launch();
     for (auto& c : cars) { c.startDelay = 0; c.v = 0; c.yaw = 0; c.lastPos = 0; }
     if (session != SES_RACE) {
         // practice / qualifying: the field spread round the lap, the player just before the line
@@ -409,6 +412,7 @@ void Race::setupStart() {
     } else {
         // up to 2010 the grid girls stand in front of the cars first: 4 s more before the lights
         countdown = era <= ERA_V8 ? 8 : 4;
+        launchArm();
         for (int k = 0; k < n; k++) {
             // F1 grid: 8 m between grid slots, staggered left and right
             float back = 10.0f + 8.0f * k;
@@ -943,6 +947,8 @@ void Race::pitStopManual(Car& c, float dt) {
 
 // ------------------------------------------------------------------ damage and parts
 void Race::addDamage(Car& c, int part, float amount) {
+    // damage sensitivity (Car realism); the 1980 cars, aluminium tubs and all, break far more easily
+    amount *= real.damageK() * (era == ERA_90S ? 1.5f : 1.0f);
     if (amount <= 0.002f) return;
     float before = c.dmg[part];
     c.dmg[part] = fminf(1, c.dmg[part] + amount);
@@ -1135,7 +1141,7 @@ bool Race::save(const char* path) const {
     FILE* f = fopen(path, "wb");
     if (!f) return false;
     SaveHead h; memset((void*)&h, 0, sizeof h);
-    memcpy(h.magic, "EMS1", 4); h.version = 7;   // v7: the body on its springs (CarBody) at the end of the Car record; v6: tyre temperatures at the end of the Car record; v5: spins, slow zones, hybrid
+    memcpy(h.magic, "EMS1", 4); h.version = 8;   // v8: CarRel (temperatures, failures, retirement) at the end of the Car record; v7: the body on its springs (CarBody) at the end of the Car record; v6: tyre temperatures at the end of the Car record; v5: spins, slow zones, hybrid
     h.set = set; h.session = session; h.playerIdx = playerIdx; h.carCount = (int)cars.size();
     h.time = time; h.countdown = countdown; h.timeScale = timeScale; h.consumeScale = consumeScale; h.startHour = startHour; h.timeAccel = timeAccel; h.greenTime = greenTime;
     h.rain = rain; h.wet = wet; h.rainTarget = rainTarget; h.rainTimer = rainTimer; h.scCooldown = scCooldown;
@@ -1154,19 +1160,21 @@ bool Race::load(const char* path) {
     FILE* f = fopen(path, "rb");
     if (!f) return false;
     SaveHead h;
-    if (fread(&h, sizeof h, 1, f) != 1 || memcmp(h.magic, "EMS1", 4) || (h.version < 5 || h.version > 7) || h.carCount <= 0 || h.carCount > 64) { fclose(f); return false; }
+    if (fread(&h, sizeof h, 1, f) != 1 || memcmp(h.magic, "EMS1", 4) || (h.version < 5 || h.version > 8) || h.carCount <= 0 || h.carCount > 64) { fclose(f); return false; }
     std::vector<Car> cs(h.carCount);
     for (auto& c : cs) {
         int def = 0;
         // version 5: no tyre temperatures; 6: no CarBody (it starts on the road)
-        size_t recSize = h.version == 7 ? sizeof(Car) : (h.version == 6 ? offsetof(Car, body) : offsetof(Car, tyreT));
+        size_t recSize = h.version == 8 ? sizeof(Car) : h.version == 7 ? offsetof(Car, rel) : (h.version == 6 ? offsetof(Car, body) : offsetof(Car, tyreT));
         if (fread(&def, 4, 1, f) != 1 || fread(&c, recSize, 1, f) != 1 || def < 0 || def >= CAR_COUNT) { fclose(f); return false; }
         if (h.version == 5) for (float& t : c.tyreT) t = 80;
         if (h.version < 7) c.body = CarBody();
+        if (h.version < 8) c.rel = CarRel();
         c.def = &CARS[def];
     }
     fclose(f);
     set = h.set; session = (Session)h.session;
+    real = cfg.real; era = CARS[set.car].era;
     if (!track.load(&TRACKS[set.track])) return false;
     plan(); setupPit();
     cars = cs; playerIdx = h.playerIdx;

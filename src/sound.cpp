@@ -51,7 +51,7 @@ bool mOnce = false;                     // the forced piece plays once (intro)  
 volatile bool mDirect = false;          // straight to the speakers / headphones, no PA effect
 
 // ---------------- one-shot sounds (pit crew, thunder, radio) and the rain loop, DATA/sfx/*.raw
-const int MAX_SFX = 40;
+const int MAX_SFX = 80;
 Clip sfx[MAX_SFX]; int sfxCount = 0;
 struct Shot { volatile int clip = -1; volatile float vol = 0, pan = 0; volatile bool loop = false; float pos = 0, g = 0; };
 Shot shots[7];                          // 0..3 effects, 4 radio, 5 rain loop, 6 crowd loop
@@ -372,11 +372,11 @@ void play(const char* name, float vol, float pan) {
 }
 void radio(const char* name) {
     char full[48]; snprintf(full, sizeof full, "radio_%s", name);
-    static char keep[24][48]; static int nk = 0;
+    static char keep[48][48]; static int nk = 0;
     // the clip table keeps the name pointer: hold the strings
     const char* key = nullptr;
     for (int i = 0; i < nk; i++) if (!strcmp(keep[i], full)) key = keep[i];
-    if (!key && nk < 24) { strcpy(keep[nk], full); key = keep[nk++]; }
+    if (!key && nk < 48) { strcpy(keep[nk], full); key = keep[nk++]; }
     if (!key) return;
     int c = sfxFor(key);
     if (c < 0) return;

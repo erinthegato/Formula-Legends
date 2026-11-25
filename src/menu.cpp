@@ -313,6 +313,7 @@ void Game::drawMenus(float dt) {
         case SCR_TROPHIES: screenTrophies(pWall); break;
         case SCR_OPTIONS: screenOptions(pWall); break;
         case SCR_CONTROLS: screenControls(pWall); break;
+        case SCR_REALISM: screenRealism(pWall); break;
         default: break;
     }
     // screens that are not in use show a standby picture
@@ -703,7 +704,7 @@ void Game::drawOptionsFlat() {
     gfx::setDepthTest(false); gfx::setBlend(true); gfx::setFog(false, 0, 1, 0);
     gfx::drawFill2D(0, 0, SCREEN_W, SCREEN_H, RGBA(6, 9, 16, 215));
     Panel P; P.R = &R; P.flat = true;
-    if (screen == SCR_OPTIONS) screenOptions(P); else screenControls(P);
+    if (screen == SCR_OPTIONS) screenOptions(P); else if (screen == SCR_REALISM) screenRealism(P); else screenControls(P);
     gfx::setBlend(false); gfx::setDepthTest(true);
 }
 
@@ -970,7 +971,7 @@ void Game::screenControls(Panel& P) {
             P.text(x + 6, y, "Tilt direction", col, 0.78f); P.textR(x + 208, y, cfg.tiltInvert ? "< Reversed >" : "< Normal >", val, 0.78f);
         } else if (id == CR_REAR) {
             P.text(x + 6, y, "Rear pad: look behind", col, 0.78f); P.textR(x + 208, y, cfg.rearLook ? "< On >" : "< Off >", val, 0.78f);
-        } else P.text(x + 6, y, id == CR_RESET ? "Reset buttons" : "Back", col, 0.78f);
+        } else P.text(x + 6, y, id == CR_RESET ? "Reset buttons" : id == CR_REALISM ? "Car realism..." : "Back", col, 0.78f);
     }
     // one line about what the selected option does
     int id = ids[sel];
@@ -978,7 +979,8 @@ void Game::screenControls(Panel& P) {
         id == CR_HELP ? "Light: no spins from steering. Strong: no slides at all" :
         id == CR_TILT ? "Turn the Vita like a wheel (the stick still works)" :
         id == CR_TILTDIR ? "Reversed if turning right steers left" :
-        id == CR_REAR ? "Hold the back of the Vita to look behind" : "";
+        id == CR_REAR ? "Hold the back of the Vita to look behind" :
+        id == CR_REALISM ? "Temperatures, slipstream, damage and mechanical problems" : "";
     P.textC(240, 224, tip, DIM, 0.66f);
     P.textC(240, 238, input::hasTouch() ? "Always: left stick steers, right stick gas / brake, R gas, L brake" : "Always: stick / D-pad steer, R gas, L brake, START pause", DIM, 0.6f);
     P.textC(240, 255, rebinding >= 0 ? "Press the new button for this action" : "X  change     O  back", DIM, 0.72f);
@@ -1357,4 +1359,58 @@ void Game::screenCareer(Panel& P) {
     }
     if (noteT > 0) { P.fill(0, P.vh - 20, P.vw, 20, RGBA(0, 0, 0, 200)); P.textC(240, P.vh - 17, note, GOLD, 0.72f); }
     else P.textC(240, P.vh - 17, careerPage == 2 ? "X / SQUARE hire   O back" : "UP/DOWN choose   X select   O back", DIM, 0.68f);
+}
+
+// ------------------------------------------------------------------ settings > controls > car realism
+void Game::screenRealism(Panel& P) {
+    Realism& R = cfg.real;
+    header(P, mechPage ? "MECHANICAL PROBLEMS" : "CAR REALISM");
+    P.fill(14, 40, 452, 196, RGBA(0, 0, 0, 120));
+    char v[12][56]; const char* tips[12] = {};
+    int n;
+    auto yn = [&](bool b, bool forced) { return forced ? "On (full)" : (b ? "On" : "Off"); };
+    if (!mechPage) {
+        bool f = R.full;
+        snprintf(v[0], 56, "Full authentic experience"); tips[0] = "Everything on, damage at least 100 %";
+        snprintf(v[1], 56, "Apply on opponents"); tips[1] = "The AI cars overheat, break down and blow tyres too";
+        snprintf(v[2], 56, "Tyre temperature and wear"); tips[2] = "Off: the tyres never wear and are always warm";
+        snprintf(v[3], 56, "Brake temperature"); tips[3] = "Cold brakes bite less; overheated ones fade (1980 steel discs early)";
+        snprintf(v[4], 56, "Engine cooling and damage"); tips[4] = "Sitting in another car's tow heats the engine";
+        snprintf(v[5], 56, "Slipstreaming"); tips[5] = "Less drag right behind another car";
+        snprintf(v[6], 56, "Blow tyre when worn"); tips[6] = "A worn-out tyre can burst";
+        snprintf(v[7], 56, "Ground contact"); tips[7] = "Kerbs and gravel knock the floor and suspension";
+        snprintf(v[8], 56, "Consume fuel"); tips[8] = "Off: the tank never runs down";
+        snprintf(v[9], 56, "Damage sensitivity"); tips[9] = "How much a hit hurts (the 1980 cars take 50 % more)";
+        snprintf(v[10], 56, "Mechanical problems..."); tips[10] = "Which failures can happen (1980 cars break far more often)";
+        snprintf(v[11], 56, "Back");
+        n = 12;
+        const char* val[12] = {R.full ? "On" : "Off", yn(R.opponents, f), yn(R.tyres, f), yn(R.brakes, f), yn(R.cooling, f),
+                               yn(R.slipstream, f), yn(R.blowTyre, f), yn(R.ground, f), yn(R.fuel, f), nullptr, nullptr, nullptr};
+        char dmg[16]; snprintf(dmg, sizeof dmg, "%d %%", (int)(R.damageK() * 100 + 0.5f)); val[9] = dmg;
+        for (int i = 0; i < n; i++) {
+            float y = 46 + i * 15.6f + (i >= 10 ? 4 : 0);
+            bool on = i == sel;
+            if (on) P.fill(20, y - 2, 440, 15, RGBA(255, 150, 40, 230));
+            bool dim = f && i >= 1 && i <= 8;
+            P.text(28, y, v[i], on ? INK : (dim ? DIM : WHITE), 0.76f);
+            if (val[i]) { char b[24]; snprintf(b, sizeof b, "< %s >", val[i]); P.textR(452, y, b, on ? INK : (dim ? DIM : GOLD), 0.76f); }
+        }
+    } else {
+        for (int k = 0; k < MF_COUNT; k++) snprintf(v[k], 56, "%s", MECH_NAME[k]);
+        snprintf(v[MF_COUNT], 56, "Back");
+        tips[MF_TURBO] = "Turbo cars only: the 1980 Viry and every car from 2014";
+        tips[MF_PUNCTURE] = "A flat tyre: box for a new set";
+        tips[MF_LEAK] = "The engine overheats until it lets go";
+        tips[MF_THROTTLE] = "The throttle cuts out, or the brakes go soft";
+        n = MF_COUNT + 1;
+        for (int i = 0; i < n; i++) {
+            float y = 50 + i * 17.5f + (i == MF_COUNT ? 6 : 0);
+            bool on = i == sel;
+            if (on) P.fill(20, y - 2, 440, 16, RGBA(255, 150, 40, 230));
+            P.text(28, y, v[i], on ? INK : (R.full && i < MF_COUNT ? DIM : WHITE), 0.78f);
+            if (i < MF_COUNT) P.textR(452, y, R.mechOn(i) ? (R.full ? "< On (full) >" : "< On >") : "< Off >", on ? INK : (R.full ? DIM : GOLD), 0.78f);
+        }
+    }
+    if (sel >= 0 && sel < n && tips[sel]) P.textC(240, 240, tips[sel], DIM, 0.64f);
+    P.textC(240, 255, "LEFT/RIGHT or X change     O back", DIM, 0.72f);
 }

@@ -5,6 +5,7 @@
 #pragma once
 #include <vector>
 #include "track.h"
+#include "realism.h"
 
 struct ClassPhys {
     float topKmh;        // reference top speed (the AI's flat-out limit)
@@ -28,7 +29,9 @@ enum DmgPart { DM_NOSE = 0, DM_WING, DM_LEFT, DM_RIGHT, DM_SUSP, DM_ENGINE, DM_C
 // engineer radio clips (DATA/sfx/radio_*.raw) and other one-shot sounds (DATA/sfx/*.raw)
 enum Radio { RADIO_BESTLAP = 0, RADIO_BOX, RADIO_BOX_ACK, RADIO_CONTACT, RADIO_DAMAGE, RADIO_DRIVETHROUGH,
              RADIO_FINISH, RADIO_FORMATION, RADIO_FUEL, RADIO_GIVEBACK, RADIO_GO, RADIO_GREEN, RADIO_LASTLAP,
-             RADIO_LEMANS, RADIO_LIMITS, RADIO_OVERTAKE, RADIO_PENALTY, RADIO_SC, RADIO_SC_IN, RADIO_TYRES, RADIO_COUNT };
+             RADIO_LEMANS, RADIO_LIMITS, RADIO_OVERTAKE, RADIO_PENALTY, RADIO_SC, RADIO_SC_IN, RADIO_TYRES,
+             RADIO_ENGINE, RADIO_GEARBOX, RADIO_TURBO, RADIO_SUSPENSION, RADIO_PUNCTURE, RADIO_WHEEL, RADIO_LEAK,
+             RADIO_THROTTLE, RADIO_BRAKES, RADIO_STEERING, RADIO_OVERHEAT, RADIO_COUNT };
 enum Sfx { SFX_AIRJACK = 0, SFX_JACKDROP, SFX_REFUEL, SFX_WHEELGUN, SFX_CHAMPAGNE, SFX_CROWD,
            SFX_THUNDER_CLOSE, SFX_THUNDER_MID, SFX_THUNDER_FAR1, SFX_THUNDER_FAR2, SFX_COUNT };
 extern const char* RADIO_FILE[RADIO_COUNT];
@@ -100,7 +103,7 @@ struct Car {
     float startDelay = 0;         // Le Mans start: driver running to the car
     // tyres, fuel, drivers
     int tyre = TY_MEDIUM; float wear = 0;
-    void coldTyres() { for (float& t : tyreT) t = 45; }   // a fresh set straight from the rack
+    void coldTyres() { for (float& t : tyreT) t = 45; rel.flat = -1; }   // a fresh set straight from the rack
     float tyreTemp() const { return (tyreT[0] + tyreT[1] + tyreT[2] + tyreT[3]) * 0.25f; }
     float fuel = 1;               // 0..1 of the tank
     int driver = 0; float stint = 0;   // who is driving, and for how long (race seconds) since the last change
@@ -149,6 +152,7 @@ struct Car {
     bool drsReq = false;          // the player pressed DRS in this zone (closes on the brakes)
     bool hold = false;            // the intro: this car stands still where it was put (not driven)
     CarBody body;                 // (save version 7) suspension and the car in the air
+    CarRel rel;                   // (save version 8) temperatures, slipstream, mechanical problems, retirement
 
     float damage() const { float m = 0; for (float x : dmg) m = m > x ? m : x; return m; }
 };
@@ -271,6 +275,14 @@ struct Race {
     std::vector<Particle> parts;
     std::vector<float> fireT;     // seconds each car (by its index in cars) keeps burning after a big crash (not saved)
     void crashFire(Car& c, float amount);
+    // car realism (settings menu, copied from cfg at the start) and mechanical problems (reliability.cpp)
+    Realism real;
+    bool realFor(const Car& c) const { return c.player || real.opponents || real.full; }
+    void reliability(Car& c, float dt);
+    void failure(Car& c, int kind);
+    void retire(Car& c, int cause);
+    void retiredDrive(Car& c, float dt);
+    void slipstream(float dt);
     // pit lane (distances along the lap, wrapping)
     float pitIn = 0, pitOut = 0, pitWallFrom = 0, pitWallTo = 0;
     float laneD = 0, boxD = 0;
@@ -295,6 +307,24 @@ struct Race {
     struct DrsZone { float detect, from, to; };
     std::vector<DrsZone> drsZones;
     bool drsPress = false;        // the DRS button went down this frame (set by the game)
+    // the standing-start launch (launch.cpp): the player keeps the revs in the green band while the
+    // lights come on, then drops the clutch (DRS or gear-up button) once when they go out
+    enum LaunchState { LS_OFF = 0, LS_REV, LS_WAIT, LS_RUN };
+    struct Launch {
+        int state = LS_OFF;
+        float rev = 0.05f;        // 0 idle .. 1 limiter (the bar)
+        float lo = 0, hi = 0;     // the green band
+        float hold = 0;           // the lights stay on this much longer (random) before going out
+        float inBand = 0, sampled = 0;   // time in the band over the last part of the countdown
+        float revAtDrop = 0, reaction = 0, quality = 0;
+        bool jumped = false, dropped = false;
+        int effect = 0; float effectT = 0;   // 1 boost, 2 wheelspin, 3 bog-down
+        u32 seed = 1;
+    } launch;
+    void launchArm();
+    float launchCountdown(float dt, float throttle, bool clutch);   // returns how much the countdown runs
+    void launchBefore(Car& c, float dt, bool clutch);   // player control while the clutch is in / just after
+    void launchAfter(Car& c, float dt);                 // the launch's effect, after the physics step
     std::vector<unsigned char> ersSec;   // per track point: 0 corner, 1 corner exit, 2 straight
     void setupErs();
     int ersSecAt(float s) const { return ersSec.empty() ? 0 : ersSec[track.index(s)]; }

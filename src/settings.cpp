@@ -51,6 +51,8 @@ void Config::apply(int autoLevel) const {
 }
 
 static const int VERSION = 7;
+const char* MECH_NAME[MF_COUNT] = {"Engine failure", "Gearbox and clutch failure", "Turbo failure", "Suspension failure",
+    "Puncture", "Lose wheel", "Oil and water leak", "Throttle and brake problems", "Broken steering rod"};
 
 void Config::save() const {
     FILE* f = fopen("settings.cfg", "wb");
@@ -59,6 +61,10 @@ void Config::save() const {
             preset, (int)vsync, fps, distance, (int)scenery, (int)effects3d, (int)showFps, attract, pitCam, (int)autoQuality);
     for (int a = 0; a < ACT_COUNT; a++) fprintf(f, " %d", bind[a]);
     fprintf(f, "\ndrive %d\nvita %d %d %d %d\ncockpit %d %d\nsteering %d %d %d\n", (int)spins, tilt, (int)tiltInvert, (int)mirror, (int)rearLook, (int)hideWheel, (int)cockpitHud, 1, steerHelp, 1);
+    fprintf(f, "realism %d %d %d %d %d %d %d %d %d %d", (int)real.full, (int)real.opponents, (int)real.tyres, (int)real.brakes,
+            (int)real.cooling, (int)real.slipstream, (int)real.blowTyre, (int)real.ground, (int)real.fuel, real.damagePct);
+    for (bool m : real.mech) fprintf(f, " %d", (int)m);
+    fprintf(f, "\n");
     fclose(f);
 }
 
@@ -83,6 +89,15 @@ void Config::load() {
     int scv = -1, shp = -1, hdl = 1;
     if (ok && fscanf(f, "\nsteering %d %d %d", &scv, &shp, &hdl) >= 2) {
         (void)scv; (void)hdl; c.steerHelp = shp < -1 ? -1 : (shp > 2 ? 2 : shp); }   // (optional line)
+    {   // (optional line) car realism
+        int r[10 + MF_COUNT];
+        if (ok && fscanf(f, "\nrealism %d %d %d %d %d %d %d %d %d %d", &r[0], &r[1], &r[2], &r[3], &r[4], &r[5], &r[6], &r[7], &r[8], &r[9]) == 10) {
+            Realism& R = c.real;
+            R.full = r[0]; R.opponents = r[1]; R.tyres = r[2]; R.brakes = r[3]; R.cooling = r[4]; R.slipstream = r[5];
+            R.blowTyre = r[6]; R.ground = r[7]; R.fuel = r[8]; R.damagePct = r[9] < 0 ? 0 : (r[9] > 200 ? 200 : r[9] / 25 * 25);
+            for (int k = 0; k < MF_COUNT; k++) if (fscanf(f, " %d", &r[10 + k]) == 1) R.mech[k] = r[10 + k] != 0;
+        }
+    }
     fclose(f);
     if (!ok) return;
     auto in = [](int x, int lo, int hi) { return x < lo ? lo : (x > hi ? hi : x); };

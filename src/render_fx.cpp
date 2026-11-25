@@ -1066,6 +1066,7 @@ void Renderer::drawCockpitHud(const Race& r) {
         font.draw(SCREEN_W - w + 2, 8, pit, RGBA(255, 220, 60), 0.9f);
     }
     drawQte(r);
+    drawLaunch(r);
     gfx::setBlend(false); gfx::setDepthTest(true);
 }
 
