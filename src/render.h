@@ -28,7 +28,10 @@ struct Renderer {
     int rearLightMode(const Race& r, const Car& c) const;
     static bool rearLightLit(int mode, float t);
     bool eraPartsLoaded[ERA_COUNT] = {};
-    Model safetyCar[ERA_COUNT];        // each era's safety car (tools/gen_safety_cars.py; tyres on the model)
+    Model safetyCar[ERA_COUNT];
+    // where each car last stood in its box (the crew go back in from there after it has gone)
+    struct StopSpot { V3 pos, fwd, left; bool valid = false; };
+    StopSpot stopSpot[64];        // each era's safety car (tools/gen_safety_cars.py; tyres on the model)
     void loadEraParts(int era);
     // crew / driver poses made in Blender (tools/blender/pit_crew.py -> tools/gen_crew.py): DATA/models/crew_<anim>_<frame>.emm
     enum { ANIM_IDLE = 0, ANIM_WHEELGUN, ANIM_PUSH, ANIM_CELEBRATE, ANIM_COUNT };

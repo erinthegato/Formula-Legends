@@ -647,14 +647,14 @@ int main(int argc, char** argv) {
             Pad q{}; g.frame(1.0f / 60, q);
             const Car& c = g.race.cars[who];
             float toBox = g.race.pitRel(g.race.boxS(c)) - g.race.pitRel(c.s);
-            if (!started && c.pit == PIT_IN && toBox < 75) { started = true; fprintf(stderr, "car %d coming in at %.1f s\n", who, g.race.time); }
+            if (!started && c.pit == PIT_IN && toBox < 165) { started = true; fprintf(stderr, "car %d coming in at %.1f s\n", who, g.race.time); }
             if (c.pit == PIT_STOP && !stopped) {
                 V3 bw = g.race.track.world(g.race.boxS(c), g.race.boxD);
                 fprintf(stderr, "stop: car s %.1f d %.2f  box s %.1f d %.2f  car-box %.2f m\n", c.s, c.d, g.race.boxS(c), g.race.boxD, len(c.pos - bw));
             }
             if (c.pit == PIT_STOP) stopped = true;
             if (stopped && c.pit == PIT_OUT && leftAt < 0) leftAt = g.race.time;
-            if (leftAt > 0 && g.race.time - leftAt > 1.6f) break;
+            if (leftAt > 0 && g.race.time - leftAt > 3.6f) break;
             if (!started || (step % 3)) continue;
             float bs = g.race.boxS(c);
             V3 p, t, l; float hw; g.race.track.frame(bs, p, t, l, hw);

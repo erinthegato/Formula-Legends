@@ -787,7 +787,9 @@ void Race::pitStop(Car& c, float dt) {
     c.v = 0; c.throttle = 0; c.brake = 1;
     if (session != SES_RACE) { garageMove(*this, c, dt, sfxEvents); pose(c); return; }
     c.rpm = c.def->idleRpm;
-    c.d += (boxD - c.d) * fminf(1, dt * 3);
+    // the car stays where it stopped (the crew line up on it); only our car, going into the garage,
+    // is first put square on the box
+    if (c.pitPhase <= -2) c.d += (boxD - c.d) * fminf(1, dt * 3);
     pose(c);
     if (c.pitPhase == -2) return;                 // the team screen is open
     // crews work at real speed, but a long race shown in a short time squeezes the stop
