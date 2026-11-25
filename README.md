@@ -143,4 +143,4 @@ Music: 'Take On The World' by All Good Folks on #Uppbeat https://uppbeat.io/c/al
 Music: 'Salsa' by Hey Pluto! on #Uppbeat https://uppbeat.io/c/hey-pluto  License code: CCZCUH212QC10SVI (2025 era menu music)
 2016 era menu music: six songs from Uppbeat (uppbeat.io) and one from Epidemic Sound (epidemicsound.com)
 2025 era menu music: Salsa and twelve more songs from Uppbeat (uppbeat.io)
-1998 era menu music: 'Home in A Minor', 'Midnight Walker', 'Midnight Resolve' and 'Fast Flying Lap', made for Formula Legends
+1998 era menu music: 'Home in A Minor', 'Midnight Walker', 'Midnight Resolve' and 'Fast Flying Lap', made for Formula Legends; three songs by Ruzer from Epidemic Sound (epidemicsound.com) and one from Uppbeat (uppbeat.io)

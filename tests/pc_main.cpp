@@ -319,7 +319,7 @@ int main(int argc, char** argv) {
             for (int i = 0; i < n; i++) {
                 sound::musicSkip(1); sound::update();
                 if (strstr(sound::nowPlaying(), "Salsa") || strstr(sound::nowPlaying(), "DISTRXCT")) salsa++;   // (2025 songs)
-                if (strstr(sound::nowPlaying(), "Formula Legends - ")) orig++;      // the 1998 originals
+                if (strstr(sound::nowPlaying(), "Formula Legends - ") || strstr(sound::nowPlaying(), "Ruzer")) orig++;      // the 1998 songs
                 if (strstr(sound::nowPlaying(), "Exekat - Big Rush") || strstr(sound::nowPlaying(), "Velveteen")) h16++;   // (2016 songs)
             }
             printf("era %d: 2025 songs (Salsa, DISTRXCT) %d, 2016 songs (Big Rush, Velveteen) %d, 1998 songs %d, of %d songs (now: %s)\n", era, salsa, h16, orig, n, sound::nowPlaying());

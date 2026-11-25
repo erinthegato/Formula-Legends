@@ -22,3 +22,7 @@ h04_aerial.emu	IMG - Aerial	hybrid
 h05_big_rush.emu	Exekat - Big Rush	hybrid
 h06_infinity.emu	Exekat - Infinity	hybrid
 h07_fuel.emu	Hey Pluto! - Fuel	hybrid
+n01_fever_drone.emu	Ruzer - Fever Drone	90s
+n02_summit.emu	Ruzer - Summit	90s
+n03_turn_down.emu	Ruzer - Turn Down	90s
+n04_neon_vision.emu	Bosnow - Neon Vision	90s
