@@ -39,7 +39,7 @@ target_link_libraries(${PROJECT_NAME}
   SceShaccCg_stub SceKernelDmacMgr_stub SceGxm_stub SceDisplay_stub SceCommonDialog_stub
   SceAppMgr_stub SceAppUtil_stub SceIme_stub SceSysmodule_stub SceCtrl_stub SceTouch_stub
   SceMotion_stub ScePower_stub SceAudio_stub SceIofilemgr_stub
-  stdc++ pthread m c)
+  z stdc++ pthread m c)
 
 vita_create_self(eboot.bin ${PROJECT_NAME} UNSAFE)
 

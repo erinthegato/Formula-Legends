@@ -3,6 +3,7 @@
 // (8-bit palette textures, vertex colour x texture, linear fog, 480x272), so screenshots taken
 // on a PC show what the PSP draws. Input is scripted by the test program; sound is mixed on demand.
 #include "platform.h"
+#include <zlib.h>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -286,6 +287,14 @@ void* loadFile(const char* path, int* size) {
     void* p = aligned_alloc(16, (n + 16) & ~15L);
     if (fread(p, 1, n, f) != (size_t)n) { fclose(f); free(p); return nullptr; }
     fclose(f);
+    // 'FLZ1' u32 size, then a zlib stream (tools/pack_files.py)
+    if (n >= 8 && !memcmp(p, "FLZ1", 4)) {
+        uint32_t raw; memcpy(&raw, (char*)p + 4, 4);
+        void* q = aligned_alloc(16, (raw + 16) & ~15UL);
+        uLongf got = raw;
+        if (!q || uncompress((Bytef*)q, &got, (const Bytef*)p + 8, (uLong)(n - 8)) != Z_OK || got != raw) { free(p); free(q); return nullptr; }
+        free(p); p = q; n = (long)raw;
+    }
     if (size) *size = (int)n;
     if (getenv("FL_FILES")) fprintf(stderr, "load %7ld %s\n", n, path);   // FL_FILES=1: every file read, with its size
     return p;

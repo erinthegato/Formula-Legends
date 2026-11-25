@@ -48,7 +48,7 @@ struct Game {
     // then draw distance); when there is plenty of spare time again it steps back up, slowly
     int autoLevel = 0;            // 0 = the player's settings ... 4 = everything lowered
     bool autoAllowed = true;      // off in the PC tests (fixed time steps)
-    float aqT = 0, aqBusy = 0, aqCalm = 0; int aqFrames = 0;
+    float aqT = 0, aqBusy = 0, aqCalm = 0; int aqFrames = 0, aqBusyRuns = 0;   // aqBusyRuns: 2.5 s windows in a row with the work near the frame budget
     void autoQualityStep(float dt);
     void benchUpdate(float dt);
     bool raceLoaded = false;

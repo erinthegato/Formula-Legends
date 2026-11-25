@@ -21,6 +21,7 @@
 #include <cstddef>
 #include <initializer_list>
 #include "platform.h"
+#include <zlib.h>
 #include "game.h"
 #include "data.h"
 
@@ -31,9 +32,10 @@
 #endif
 
 extern "C" {
-// The game's own heap (models, circuits, sounds): a full 20-car race peaks at ~21 MB (FL_MEM=1 on the
-// PC test), so 64 MB leaves plenty; it used to reserve 200 MB.
-int _newlib_heap_size_user = 64 * 1024 * 1024;
+// The game's own heap (models, circuits, sounds): a full 20-car race peaks at ~15 MB on the PC test
+// (FL_MEM=1) and ~29 MB on the Vita (with vitaGL's own allocations), so 48 MB still leaves ~19 MB spare;
+// what it doesn't take goes to vitaGL. (It was 64 MB; before that 200 MB.)
+int _newlib_heap_size_user = 48 * 1024 * 1024;
 unsigned int sceUserMainThreadStackSize = 2 * 1024 * 1024;
 }
 
@@ -578,6 +580,14 @@ void* loadFile(const char* path, int* size) {
     if (!p) { fclose(f); return nullptr; }
     if (fread(p, 1, n, f) != (size_t)n) { fclose(f); free(p); return nullptr; }
     fclose(f);
+    // 'FLZ1' u32 size, then a zlib stream: packed on the memory card (tools/pack_files.py), unpacked here
+    if (n >= 8 && !memcmp(p, "FLZ1", 4)) {
+        uint32_t raw; memcpy(&raw, (char*)p + 4, 4);
+        void* q = memalign(64, (raw + 63) & ~63);
+        uLongf got = raw;
+        if (!q || uncompress((Bytef*)q, &got, (const Bytef*)p + 8, (uLong)(n - 8)) != Z_OK || got != raw) { free(p); free(q); return nullptr; }
+        free(p); p = q; n = (long)raw;
+    }
     if (size) *size = (int)n;
     gfx::flushCache(p, (int)n);   // memory reused from a freed file: drop old texture copies
     return p;

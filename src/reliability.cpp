@@ -21,29 +21,25 @@ static const float FAIL_W[MF_COUNT] = {0.26f, 0.18f, 0.07f, 0.10f, 0.10f, 0.03f,
 static bool turbo(const Car& c) { return c.def->era >= ERA_HYBRID || (c.def->engine && strstr(c.def->engine, "urbo")); }
 
 void Race::slipstream(float dt) {
+    // one pass over the other cars for both: turbulent air (always on: it's the aero) and the tow
     bool on = real.on(real.slipstream);
     for (auto& c : cars) {
-        // turbulent air: close behind another car the front loses downforce (always on: it's the aero)
-        float dirty = 0;
-        if (c.v > 20 && !c.rel.retired && c.pit == PIT_NONE)
+        float dirty = 0, want = 0;
+        bool running = !c.rel.retired && c.pit == PIT_NONE;
+        bool lookDirty = running && c.v > 20, lookTow = on && running && c.v > 25;
+        if (lookDirty || lookTow)
             for (auto& o : cars) {
                 if (&o == &c || o.rel.retired || o.pit != PIT_NONE) continue;
                 float gap = o.total - c.total;
-                if (gap < 3 || gap > 30 || fabsf(o.d - c.d) > 2.6f) continue;
-                dirty = fmaxf(dirty, (1 - (gap - 3) / 27.0f) * (1 - fabsf(o.d - c.d) / 2.6f * 0.5f));
+                if (gap < 3 || gap > 40) continue;
+                float side = fabsf(o.d - c.d);
+                // close behind another car the front loses downforce
+                if (lookDirty && gap <= 30 && side <= 2.6f) dirty = fmaxf(dirty, (1 - (gap - 3) / 27.0f) * (1 - side / 2.6f * 0.5f));
+                // the closest car up to 40 m ahead, nearly in line: less drag
+                if (lookTow && gap >= 4 && side <= 1.6f) want = fmaxf(want, 1 - (gap - 4) / 36.0f);
             }
         Handling& H = handOf(c);
         H.dirty += (dirty - H.dirty) * fminf(1.0f, dt * 4);
-        float want = 0;
-        if (on && c.v > 25 && !c.rel.retired && c.pit == PIT_NONE) {
-            // the closest car up to 40 m ahead, nearly in line
-            for (auto& o : cars) {
-                if (&o == &c || o.rel.retired || o.pit != PIT_NONE) continue;
-                float gap = o.total - c.total;
-                if (gap < 4 || gap > 40 || fabsf(o.d - c.d) > 1.6f) continue;
-                want = fmaxf(want, 1 - (gap - 4) / 36.0f);
-            }
-        }
         c.rel.tow += (want - c.rel.tow) * fminf(1.0f, dt * 3);
     }
 }

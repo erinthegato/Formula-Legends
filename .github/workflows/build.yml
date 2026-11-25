@@ -19,6 +19,12 @@ jobs:
           if [ ! -f $VITASDK/arm-vita-eabi/lib/libvitaGL.a ]; then
             git clone --depth 1 https://github.com/vitasdk/vdpm /tmp/vdpm && cd /tmp/vdpm && ./vdpm vitaShaRK mathneon SceShaccCgExt vitaGL
           fi
+      - name: zlib (packed models, if the image lacks it)
+        run: |
+          if [ ! -f $VITASDK/arm-vita-eabi/lib/libz.a ]; then
+            [ -d /tmp/vdpm ] || git clone --depth 1 https://github.com/vitasdk/vdpm /tmp/vdpm
+            cd /tmp/vdpm && ./vdpm zlib
+          fi
       - name: Build VPK
         run: |
           cmake -S vita -B build-vita -DCMAKE_BUILD_TYPE=Release
@@ -34,7 +40,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Build PC test (address + UB sanitizer)
-        run: make -f Makefile.pc asan
+        run: |
+          dpkg -s zlib1g-dev >/dev/null 2>&1 || (sudo apt-get update && sudo apt-get install -y zlib1g-dev)
+          make -f Makefile.pc asan
       - name: Menus
         env:
           ASAN_OPTIONS: detect_leaks=0

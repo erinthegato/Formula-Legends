@@ -10,7 +10,16 @@
 namespace {
 // data: the file as loaded (16-bit samples, or an 'ADP1' file: then adp points at its IMA ADPCM codes,
 // kept packed and decoded as it plays -- a quarter of the memory). step: source samples per output sample.
-struct Clip { const char* name = nullptr; int16_t* data = nullptr; int len = 0; const uint8_t* adp = nullptr; float step = 0.5f; };
+// ('ULW1': 8-bit mu-law, for voice and sharp sounds -- half the memory)
+struct Clip { const char* name = nullptr; int16_t* data = nullptr; int len = 0; const uint8_t* adp = nullptr, *ulaw = nullptr; float step = 0.5f; };
+int16_t ULAW[256];                      // mu-law code -> sample (built once)
+void ulawTable() {
+    for (int i = 0; i < 256; i++) {
+        int c = ~i & 0xFF, e = (c >> 4) & 7, m = c & 15;
+        int v = (((m << 3) + 0x84) << e) - 0x84;
+        ULAW[i] = (int16_t)((c & 0x80) ? -v : v);
+    }
+}
 const int MAX_CLIPS = 16;   // engine loops (the 2025 grid has one per team)
 Clip clips[MAX_CLIPS];
 int clipCount = 0;
@@ -151,11 +160,13 @@ int sfxFor(const char* name) {
     void* p = sys::loadFile(path, &size);
     if (!p) return -1;
     Clip& c = sfx[sfxCount];
-    c.name = name; c.data = (int16_t*)p; c.len = size / 2; c.adp = nullptr; c.step = 0.5f;
-    if (size >= 12 && !memcmp(p, "ADP1", 4)) {
+    c.name = name; c.data = (int16_t*)p; c.len = size / 2; c.adp = c.ulaw = nullptr; c.step = 0.5f;
+    bool adp = size >= 12 && !memcmp(p, "ADP1", 4), mu = size >= 12 && !memcmp(p, "ULW1", 4);
+    if (adp || mu) {
         uint32_t rate, n; memcpy(&rate, (char*)p + 4, 4); memcpy(&n, (char*)p + 8, 4);
-        if ((int)((n + 1) / 2) > size - 12 || rate < 4000 || rate > 44100) { sys::freeFile(p); return -1; }
-        c.adp = (const uint8_t*)p + 12; c.len = (int)n; c.step = rate / 44100.0f;
+        if ((int)(adp ? (n + 1) / 2 : n) > size - 12 || rate < 4000 || rate > 44100) { sys::freeFile(p); return -1; }
+        (adp ? c.adp : c.ulaw) = (const uint8_t*)p + 12; c.len = (int)n; c.step = rate / 44100.0f;
+        if (mu && ULAW[0] == 0) ulawTable();
     }
     return sfxCount++;
 }
@@ -221,7 +232,7 @@ void mix(int16_t* out, int frames) {
                 if (sh.decClip != ci || a < sh.decAt) { sh.decClip = ci; sh.decAt = -1; sh.dec[0] = sh.dec[1] = 0; sh.cur = 0; }
                 while (sh.decAt < a) { sh.decAt++; sh.cur = decodeNibble(sh.dec, (c.adp[sh.decAt >> 1] >> ((sh.decAt & 1) * 4)) & 15); }
                 smp = sh.cur;
-            } else smp = c.data[a];
+            } else smp = c.ulaw ? ULAW[c.ulaw[a]] : c.data[a];
             float x = smp * (1.0f / 32768.0f) * sh.g * shotVol;
             buf[i * 2] += x * gl; buf[i * 2 + 1] += x * gr;
             sh.pos += c.step;
@@ -443,7 +454,7 @@ int freeEffects() {
     while (mixBusy && sys::timeSec() - t0 < 0.25) {}        // let a mix in progress finish (one buffer, ~10 ms)
     int kb = 0;
     for (auto& s : shots) { s.vol = 0; s.g = 0; s.clip = -1; }
-    for (int i = 0; i < sfxCount; i++) { kb += (sfx[i].adp ? sfx[i].len / 2 : sfx[i].len * 2) / 1024; sys::freeFile(sfx[i].data); sfx[i] = Clip(); }
+    for (int i = 0; i < sfxCount; i++) { kb += (sfx[i].adp ? sfx[i].len / 2 : (sfx[i].ulaw ? sfx[i].len : sfx[i].len * 2)) / 1024; sys::freeFile(sfx[i].data); sfx[i] = Clip(); }
     for (auto& s : shots) { s.decClip = -1; s.decAt = -1; }
     sfxCount = 0;
     sfxHold = false;

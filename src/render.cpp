@@ -355,7 +355,9 @@ void Renderer::drawScene(const Race& r, const Camera& cam, bool hidePlayer) {
     }
     if (sceneLite) return;
     drawGhost(r, cam, tanH, tanV);
-    drawEffects(r, cam);
+    // smoke, sparks and lights: seen from outside the car, every caller draws them after the night
+    // darkness (so they glow); drawing them here too drew them twice
+    if (hidePlayer) drawEffects(r, cam);
 }
 
 // time trial: the record lap's car, see-through pale blue
@@ -477,11 +479,15 @@ void Renderer::drawCar(const Car& c, const V3& eye, const V3& fwd, float tanH, f
         if (d < 9) clip::drawModel(m.lod[lod].verts + first, count, mm);
         else gfx::drawModel(m.lod[lod].verts + first, count, mm);
     };
-    // a lost nose or wing is simply not drawn
-    part(0, ps.body);
-    if (!c.noseOff) part(ps.noseFirst, ps.noseCount);
-    if (!c.wingOff) part(ps.wingFirst, ps.wingCount);
-    if (!inside) part(ps.glassFirst, ps.glassCount);
+    // a lost nose or wing is simply not drawn; an intact car is one draw (body, nose, wing and glass
+    // follow each other in the model: see splitCar)
+    if (!c.noseOff && !c.wingOff && !inside && ps.glassFirst == ps.wingFirst + ps.wingCount) part(0, ps.glassFirst + ps.glassCount);
+    else {
+        part(0, ps.body);
+        if (!c.noseOff) part(ps.noseFirst, ps.noseCount);
+        if (!c.wingOff) part(ps.wingFirst, ps.wingCount);
+        if (!inside) part(ps.glassFirst, ps.glassCount);
+    }
     if (!c.wingOff && lod < 2 && !inside) drawFlap(c, place, d < 9);
     if (lod < 2 && !inside && !sceneLite) drawDriver(c, place, lod, d < 9);
     if (inside) { drawWheels(*c.def, place, 0, c.steer, c.wheelSpin, true, &c, &eye); return; }    // open wheels: the fronts are in view

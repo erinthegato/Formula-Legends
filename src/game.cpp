@@ -168,7 +168,11 @@ void Game::autoQualityStep(float dt) {
         int d = cfg.distance + (lv > 2 ? lv - 2 : 0); if (d > 2) d = 2;
         return d * 4 + ((cfg.scenery && lv < 2) ? 2 : 0) + ((cfg.effects3d && lv < 1) ? 1 : 0);
     };
-    if (fpsAvg < target * 0.9f && autoLevel < 4) {
+    // step down when frames drop, or before they do: the work alone fills nearly the whole frame
+    // (a vsynced frame that misses its refresh by a fraction waits for the next one)
+    bool tight = busy > budget * 0.93f && aqBusyRuns >= 1;
+    aqBusyRuns = busy > budget * 0.93f ? aqBusyRuns + 1 : 0;
+    if ((fpsAvg < target * 0.9f || tight) && autoLevel < 4) {
         int lv = autoLevel;
         while (lv < 4 && look(lv + 1) == look(autoLevel)) lv++;
         if (lv < 4) lv++;

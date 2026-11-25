@@ -8,11 +8,14 @@ into clips and give each era its own radio sound. Same engineer in every era; on
   2025  clean modern: nearly full band, light compression, a soft click
 
 usage: make_radio.py take.mp3 DATA/sfx
-writes DATA/sfx/radio_<era>_<line>.raw (16-bit mono 22050 Hz), era = 80 / 10 / 16 / 25
+writes DATA/sfx/radio_<era>_<line>.raw (ULW1: 8-bit mu-law, mono 11025 Hz -- a radio's band fits; see
+tools/sfx/adpcm.py), era = 80 / 10 / 16 / 25
 """
 import subprocess, sys, os
 import numpy as np
-from scipy.signal import butter, sosfilt
+from scipy.signal import butter, sosfilt, resample_poly
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "sfx"))
+from adpcm import ulaw
 
 SR = 22050
 LINES = ["bestlap", "box", "box_ack", "contact", "damage", "drivethrough", "finish", "formation", "fuel",
@@ -132,9 +135,10 @@ def main():
         rng = np.random.default_rng(len(tag) * 7 + int(tag))
         for name, x in zip(LINES, clips):
             y = fx(x.copy(), rng)
+            y = resample_poly(y, 1, 2)                           # 11025 Hz: radio is band-limited
             y = y / max(1e-6, np.max(np.abs(y))) * 0.82          # every clip as loud as the next
             with open(os.path.join(out, f"radio_{tag}_{name}.raw"), "wb") as f:
-                f.write((np.clip(y, -1, 1) * 32767).astype("<i2").tobytes())
+                f.write(ulaw((np.clip(y, -1, 1) * 32767).astype("<i2"), SR // 2))
     print(f"{len(clips)} lines x {len(ERAS)} eras")
 
 

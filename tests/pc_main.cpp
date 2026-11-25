@@ -923,6 +923,17 @@ int main(int argc, char** argv) {
         (void)before;
         return 0;
     }
+    if (mode == "sfx") {
+        // sfx <out.wav> <name>...: plays each effect (sound::play / radio) through the mixer, one after another
+        std::vector<int16_t> wav;
+        sound::init();
+        for (int i = 3; i < argc; i++) {
+            if (!strncmp(argv[i], "radio_", 6)) sound::radio(argv[i] + 6); else sound::play(argv[i], 1.0f, 0);
+            for (int f = 0; f < 44100 * 3 / 512; f++) { std::vector<int16_t> b(1024); pc::mixFn(b.data(), 512); wav.insert(wav.end(), b.begin(), b.end()); }
+        }
+        writeWav(argv[2], wav);
+        return 0;
+    }
     if (mode == "reliab") {
         // reliab <era> <laps> [runs]: whole races with the AI in every car; how often things break and who retires
         int era = atoi(argv[2]), laps = atoi(argv[3]), runs = argc > 4 ? atoi(argv[4]) : 1;
