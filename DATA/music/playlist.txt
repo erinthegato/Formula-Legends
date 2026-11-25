@@ -1,17 +1,17 @@
-l01_floodlights.emu	Lyria 3 - Floodlights
-l03_neon_dusk.emu	Lyria 3 - Neon Dusk
-l04_slipstream.emu	Lyria 3 - Slipstream
-l05_night_stint.emu	Lyria 3 - Night Stint
-l06_paddock_groove.emu	Lyria 3 - Paddock Groove
-l02_full_throttle.emu	Lyria 3 - Full Throttle
-l07_sunset_grid.emu	Lyria 3 - Sunset Grid
-l08_pit_lane_disco.emu	Lyria 3 - Pit Lane Disco
-l09_victory_lap.emu	Lyria 3 - Victory Lap
-l10_overcut.emu	Lyria 3 - Overcut
-l11_sunrise_stint.emu	Lyria 3 - Sunrise Stint
-l12_chequered_disco.emu	Lyria 3 - Chequered Disco
 l13_salsa.emu	Hey Pluto! - Salsa	ge
 l14_home_in_a_minor.emu	Formula Legends - Home in A Minor	90s
 l15_midnight_walker.emu	Formula Legends - Midnight Walker	90s
 l16_midnight_resolve.emu	Formula Legends - Midnight Resolve	90s
 l17_fast_flying_lap.emu	Formula Legends - Fast Flying Lap	90s
+g01_talk_about_tha.emu	Wake Yourself Up - Talk About Tha	ge
+g02_descendance.emu	Wake Yourself Up - Descendance	ge
+g03_lets_go.emu	All Good Folks - Let's Go	ge
+g04_flip_it.emu	Exekat - Flip It	ge
+g05_crime.emu	DISTRXCT - C.R.I.M.E	ge
+g06_dont_you_stop.emu	DISTRXCT - Don't You Stop	ge
+g07_money.emu	DISTRXCT - Money	ge
+g08_lose_control.emu	DISTRXCT - Lose Control	ge
+g09_wanna_be_alone.emu	DISTRXCT - Wanna Be Alone	ge
+g10_keep_calling.emu	DISTRXCT - Keep Calling	ge
+g11_stand_up.emu	Kaleidoscope - Stand Up	ge
+g12_the_nights.emu	Pecan Pie - The Nights	ge

@@ -862,7 +862,7 @@ void Game::screenHelp(Panel& P) {
         {"Intro music", "Take On The World - All Good Folks (Uppbeat)"},
         {"Attract music", "Lose My Mind - Don Toliver feat. Doja Cat"},
         {"1998 era music", "Formula Legends originals"},
-        {"2025 era music", "Salsa - Hey Pluto! (Uppbeat)"},
+        {"2025 era music", "Uppbeat (uppbeat.io)"},
         {"Cars, wheels, cockpits", "Modelled in Blender"},
         {"Pit crew, safety cars, props", "Modelled in Blender"},
         {"Circuit outlines", "bacinger/f1-circuits (MIT)"},

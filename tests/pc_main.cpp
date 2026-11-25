@@ -318,10 +318,10 @@ int main(int argc, char** argv) {
             int salsa = 0, orig = 0, n = 40;
             for (int i = 0; i < n; i++) {
                 sound::musicSkip(1); sound::update();
-                if (strstr(sound::nowPlaying(), "Salsa")) salsa++;
+                if (strstr(sound::nowPlaying(), "Salsa") || strstr(sound::nowPlaying(), "DISTRXCT")) salsa++;   // (2025 songs)
                 if (strstr(sound::nowPlaying(), "Formula Legends - ")) orig++;      // the 1998 originals
             }
-            printf("era %d: Salsa played %d, 1998 songs %d, of %d songs (now: %s)\n", era, salsa, orig, n, sound::nowPlaying());
+            printf("era %d: 2025 songs (Salsa, DISTRXCT) %d, 1998 songs %d, of %d songs (now: %s)\n", era, salsa, orig, n, sound::nowPlaying());
         }
         return 0;
     }
