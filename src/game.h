@@ -11,7 +11,11 @@
 struct Panel;
 
 // title menu: item ids (0 quick race .. 5 credits, 6 time trial) in the order they are shown
-enum { CR_HELP = 100, CR_TILT, CR_TILTDIR, CR_REAR, CR_REALISM, CR_RESET, CR_BACK };   // Controls page rows (0..ACT_COUNT-1: buttons)
+enum { CR_HELP = 100, CR_TILT, CR_TILTDIR, CR_RESET, CR_BACK };   // Controls page rows (0..ACT_COUNT-1: buttons)
+// settings categories
+enum { OC_SOUND = 0, OC_DISPLAY, OC_CAMERA, OC_CONTROLS, OC_REALISM, OC_BACK, OPT_CATS };
+static const char* const OPT_CAT_NAME[OPT_CATS] = {"Sound", "Display and performance", "Camera and cockpit", "Controls", "Car realism", "Back"};
+//   // Controls page rows (0..ACT_COUNT-1: buttons)
 static const int TITLE_ORDER[8] = {0, 6, 1, 2, 3, 7, 4, 5};   // 7: trophies
 // pause menu: item ids in the order shown (7 replay, 8 photo mode)
 static const int PAUSE_ORDER[9] = {0, 1, 2, 7, 8, 3, 4, 5, 6};
@@ -128,6 +132,8 @@ struct Game {
     float introBarTime(int bar) const;
 
     int controlRows(int* ids) const;
+    int optCat = -1;                     // settings: the open category (-1: the list of categories)
+    int optRows(int* ids) const;         // the rows of the open category (ids as in screenOptions)
     bool mechPage = false;               // Car realism: the mechanical problems page
     void screenRealism(Panel& P);
     void updateRealism(int dx, int dy, bool ok, bool back);     // the rows the Controls page shows (CR_* ids), in order

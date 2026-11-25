@@ -3,7 +3,7 @@
 #include "platform.h"
 #include "realism.h"
 
-// L and R are not bindable: they brake (L) and accelerate (R) while driving, and skip music tracks in the menus
+// L and R are not bindable: they brake (L) and accelerate (R) while driving (the rear touch pad skips songs in the menus)
 enum Button { BTN_NONE = -1, BTN_CROSS = 0, BTN_CIRCLE, BTN_SQUARE, BTN_TRIANGLE, BTN_SELECT, BTN_UP, BTN_DOWN, BTN_COUNT };
 enum Action { ACT_ACCEL = 0, ACT_BRAKE, ACT_GEAR_UP, ACT_GEAR_DOWN, ACT_CAMERA, ACT_LOOK_BACK, ACT_PIT, ACT_MAP, ACT_DRS, ACT_COUNT };
 extern const char* BUTTON_NAME[BTN_COUNT];

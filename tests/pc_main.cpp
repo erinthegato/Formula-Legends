@@ -343,11 +343,16 @@ int main(int argc, char** argv) {
         press(g, &Pad::circle); settle(30);
         press(g, &Pad::circle); press(g, &Pad::circle); press(g, &Pad::circle);      // back to the title
         g.sel = 4; press(g, &Pad::cross); settle(); shot(g, out + "/menu_options.ppm");
-        g.sel = 5; press(g, &Pad::right); g.sel = 15; press(g, &Pad::cross); settle(5);
+        g.sel = OC_SOUND; press(g, &Pad::cross); settle(5); shot(g, out + "/menu_opt_sound.ppm"); press(g, &Pad::circle);
+        g.sel = OC_DISPLAY; press(g, &Pad::cross); settle(5); shot(g, out + "/menu_opt_display.ppm"); press(g, &Pad::circle);
+        g.sel = OC_CAMERA; press(g, &Pad::cross); settle(5); shot(g, out + "/menu_opt_camera.ppm"); press(g, &Pad::circle);
+        g.sel = OC_REALISM; press(g, &Pad::cross); settle(5); shot(g, out + "/menu_realism.ppm");
+        g.sel = 10; press(g, &Pad::cross); settle(5); shot(g, out + "/menu_mech.ppm"); press(g, &Pad::circle); press(g, &Pad::circle); settle(5);
+        g.sel = OC_CONTROLS; press(g, &Pad::cross); settle(5);
         g.sel = 6; press(g, &Pad::cross); press(g, &Pad::up); press(g, &Pad::up); g.sel = 2; press(g, &Pad::square); settle(4); shot(g, out + "/menu_controls.ppm");
         fprintf(stderr, "pit request is now on: %s\n", BUTTON_NAME[cfg.bind[ACT_PIT]]);
         { int ids[24]; g.sel = g.controlRows(ids) - 2; } press(g, &Pad::cross);       // reset buttons
-        press(g, &Pad::circle); press(g, &Pad::circle); settle(5);
+        press(g, &Pad::circle); g.sel = OC_BACK; press(g, &Pad::cross); settle(5);
         g.sel = 5; press(g, &Pad::cross); settle(); shot(g, out + "/menu_help.ppm");
         press(g, &Pad::circle);
         g.sel = 7; press(g, &Pad::cross); settle(); shot(g, out + "/menu_trophies.ppm");

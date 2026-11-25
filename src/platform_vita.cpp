@@ -416,6 +416,7 @@ void poll(Pad& p) {
             p.tx[p.touches] = t.report[i].x / 4.0f; p.ty[p.touches] = t.report[i].y / 4.0f; p.touches++;
         }
     p.backTouch = sceTouchPeek(SCE_TOUCH_PORT_BACK, &t, 1) > 0 && t.reportNum > 0;
+    p.backX = p.backTouch ? t.report[0].x / 4.0f : 0;
     p.hasTilt = true; p.tilt = tiltRoll();
 }
 }

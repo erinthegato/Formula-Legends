@@ -81,6 +81,7 @@ struct Pad {
     bool hasTilt = false; float tilt = 0;   // motion sensor: roll of the console in radians (+ = turned right)
     int touches = 0; float tx[2] = {0, 0}, ty[2] = {0, 0};   // front touch screen, in 480 x 272 screen units
     bool backTouch = false;             // rear touch pad held
+    float backX = 0;                    // where on it (0..480, left to right as seen from the front)
 };
 namespace input {
 void poll(Pad& p);

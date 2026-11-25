@@ -344,7 +344,7 @@ void Game::drawMenus(float dt) {
 void Game::nowPlayingBar() {
     const char* np = sound::nowPlaying();
     if (!np[0] || sound::trackTime() > 6.0f) return;
-    char b[96]; snprintf(b, sizeof b, "%s   L / R skip", np);
+    char b[96]; snprintf(b, sizeof b, "%s   rear pad: skip", np);
     float w = R.font.width(b, 0.66f) + 14;
     gfx::setDepthTest(false); gfx::setBlend(true);
     gfx::drawFill2D(SCREEN_W - w - 4, SCREEN_H - 20, w, 16, RGBA(0, 0, 0, 160));
@@ -919,19 +919,33 @@ void Game::screenOptions(Panel& P) {
     snprintf(v[12], 56, "Auto quality:  < %s >", cfg.autoQuality ? (autoLevel ? "On (lowered)" : "On") : "Off");
     snprintf(v[13], 56, "Attract screen after:  < %d s >", cfg.attract);
     snprintf(v[14], 56, "Pit stop camera:  < %s >", cfg.pitCam ? "Your camera" : "Cinematic");
-    snprintf(v[15], 56, "Controls...");
+    snprintf(v[15], 56, "Controls...");   // (not a row now: a category)
     snprintf(v[16], 56, "Back");
     snprintf(v[17], 56, "Steering wheel:  < %s >", cfg.hideWheel ? "Hidden" : "Shown");
     snprintf(v[18], 56, "HUD in cockpit:  < %s >", !cfg.hideWheel ? "Wheel shown" : (cfg.cockpitHud ? "On" : "Off"));
     snprintf(v[19], 56, "Rear-view mirror:  < %s >", cfg.mirror ? "On" : "Off");
-    int optRows = input::hasTouch() ? 20 : 19;
-    P.text(20, 40, "SOUND", ACC, 0.66f); P.text(250, 40, "PERFORMANCE", ACC, 0.66f);
-    P.text(20, 158, "MENUS AND CAMERA", ACC, 0.66f); P.text(250, 194, "COCKPIT", ACC, 0.66f);
-    for (int i = 0; i < optRows; i++) {
-        bool left = i < 5 || (i >= 13 && i <= 16);
-        float x = left ? 14 : 244, y = i < 5 ? 54 + i * 19 : (i < 13 ? 54 + (i - 5) * 17.2f : (i <= 16 ? 172 + (i - 13) * 18 : 206 + (i - 17) * 15.5f));
-        if (i == sel) P.fill(x - 4, y - 2, 226, i >= 5 ? 16 : 18, RGBA(255, 150, 40, 230));
-        P.text(x + 2, y, v[i], i == sel ? INK : ((i == 18 && !cfg.hideWheel) ? DIM : WHITE), 0.8f);
+    if (optCat < 0) {
+        // the categories
+        static const char* SUB[OPT_CATS] = {"Master, music, engines, effects and radio volume",
+            "Optimisation, frame rate, draw distance, scenery, effects", "Menus, pit stop camera, steering wheel, HUD, mirror",
+            "Buttons, steering help, tilt steering", "Temperatures, slipstream, damage, mechanical problems", ""};
+        for (int i = 0; i < OPT_CATS; i++) {
+            float y = 46 + i * 33;
+            bool on = i == sel;
+            P.fill(40, y - 3, 400, 29, on ? RGBA(255, 150, 40, 230) : RGBA(0, 0, 0, 120));
+            P.text(52, y, OPT_CAT_NAME[i], on ? INK : WHITE, 0.9f);
+            if (SUB[i][0]) P.text(52, y + 14, SUB[i], on ? INK : DIM, 0.6f);
+        }
+        P.textC(240, 255, "X open     O back     Rear touch pad: next / previous song", DIM, 0.7f);
+        return;
+    }
+    int ids[12]; int n = optRows(ids);
+    P.text(20, 40, OPT_CAT_NAME[optCat], ACC, 0.7f);
+    for (int k = 0; k < n; k++) {
+        int i = ids[k];
+        float y = 56 + k * 19 + (i == 16 ? 6 : 0);
+        if (k == sel) P.fill(40, y - 2, 400, 17, RGBA(255, 150, 40, 230));
+        P.text(52, y, v[i], k == sel ? INK : ((i == 18 && !cfg.hideWheel) ? DIM : WHITE), 0.82f);
     }
     P.textC(240, 255, "LEFT/RIGHT change     X select     O back", DIM, 0.75f);
 }
@@ -969,9 +983,7 @@ void Game::screenControls(Panel& P) {
             P.text(x + 6, y, "Tilt steering", col, 0.78f); P.textR(x + 208, y, b, val, 0.78f);
         } else if (id == CR_TILTDIR) {
             P.text(x + 6, y, "Tilt direction", col, 0.78f); P.textR(x + 208, y, cfg.tiltInvert ? "< Reversed >" : "< Normal >", val, 0.78f);
-        } else if (id == CR_REAR) {
-            P.text(x + 6, y, "Rear pad: look behind", col, 0.78f); P.textR(x + 208, y, cfg.rearLook ? "< On >" : "< Off >", val, 0.78f);
-        } else P.text(x + 6, y, id == CR_RESET ? "Reset buttons" : id == CR_REALISM ? "Car realism..." : "Back", col, 0.78f);
+        } else P.text(x + 6, y, id == CR_RESET ? "Reset buttons" : "Back", col, 0.78f);
     }
     // one line about what the selected option does
     int id = ids[sel];
@@ -979,8 +991,7 @@ void Game::screenControls(Panel& P) {
         id == CR_HELP ? "Light: no spins from steering. Strong: no slides at all" :
         id == CR_TILT ? "Turn the Vita like a wheel (the stick still works)" :
         id == CR_TILTDIR ? "Reversed if turning right steers left" :
-        id == CR_REAR ? "Hold the back of the Vita to look behind" :
-        id == CR_REALISM ? "Temperatures, slipstream, damage and mechanical problems" : "";
+        "";
     P.textC(240, 224, tip, DIM, 0.66f);
     P.textC(240, 238, input::hasTouch() ? "Always: left stick steers, right stick gas / brake, R gas, L brake" : "Always: stick / D-pad steer, R gas, L brake, START pause", DIM, 0.6f);
     P.textC(240, 255, rebinding >= 0 ? "Press the new button for this action" : "X  change     O  back", DIM, 0.72f);

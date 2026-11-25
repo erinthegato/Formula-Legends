@@ -144,9 +144,9 @@ void Game::frame(float dt, const Pad& pad) {
     if (trackside) trackSpeakers();
     else sound::paddockSpeakers();
     sound::musicEra(set.car >= 0 && set.car < CAR_COUNT ? CARS[set.car].era % ERA_COUNT : -1);   // the era's own songs join the menu music
-    // L / R skip songs in the menus
     bool menu = (!raceLoaded || screen == SCR_RESULTS || screen == SCR_PODIUM) && screen != SCR_INTRO;
-    if (menu && screen != SCR_PODIUM && rebinding < 0) { if (pressed(pad, &Pad::r)) sound::musicSkip(1); if (pressed(pad, &Pad::l)) sound::musicSkip(-1); }
+    // a tap on the rear touch pad skips songs in the menus: right half next, left half the one before
+    if (menu && screen != SCR_PODIUM && rebinding < 0 && pad.backTouch && !prev.backTouch) sound::musicSkip(pad.backX < 240 ? -1 : 1);
     sound::update();
     prev = pad;
     draw();
@@ -594,7 +594,7 @@ void Game::update(float dt, const Pad& p) {
                 if (career.load("career.sav")) { career.apply(); careerLivery(); screen = SCR_CAREER; sel = 0; }
                 else { screen = SCR_CAREER_NEW; sel = 0; }
             } else if (sel == 3) { screen = SCR_LOAD; sel = 0; }
-            else if (sel == 4) { screen = SCR_OPTIONS; optionsFrom = SCR_TITLE; sel = 0; }
+            else if (sel == 4) { screen = SCR_OPTIONS; optionsFrom = SCR_TITLE; sel = 0; optCat = -1; }
             else if (sel == 5) screen = SCR_HELP;
             else if (sel == 7) { screen = SCR_TROPHIES; sel = 0; }
         }
@@ -781,7 +781,7 @@ void Game::update(float dt, const Pad& p) {
         if (dx && sel == 2) cam = (cam + dx + CAM_COUNT) % CAM_COUNT;
         if (pressed(p, &Pad::start) || (ok && sel == 0)) { screen = SCR_RACE; }
         else if (ok && sel == 1) startSession(race.session);
-        else if (ok && sel == 3) { screen = SCR_OPTIONS; optionsFrom = SCR_PAUSE; sel = 0; }
+        else if (ok && sel == 3) { screen = SCR_OPTIONS; optionsFrom = SCR_PAUSE; sel = 0; optCat = -1; }
         else if (ok && sel == 4 && race.session != SES_RACE) { race.toGarage(); screen = SCR_GARAGE; setupPage = true; setupSel = 0; sound::silence(); }
         else if (ok && sel == 5 && race.session != SES_RACE) { race.endSession(); screen = SCR_RESULTS; sel = 0; t = 0; sound::silence(); }
         else if (ok && sel == 6) { screen = SCR_TITLE; sel = 0; t = 0; leaveRace(); }
@@ -864,7 +864,7 @@ void Game::drawRaceView() {
     if (cine) { mode = CAM_TV + 1; c = R.cinematicCamera(race, me, race.time); }
     else if (wall) c = pitWallCamera();
     else if (mode == CAM_TV) c = R.tvCamera(race, screen == SCR_REEL ? reelFocus : race.playerIdx, 1.0f / 60);
-    else c = R.camera(race, mode, screen == SCR_RACE ? 1.0f / 60 : 0, (held(prev, ACT_LOOK_BACK) || (cfg.rearLook && prev.backTouch)) && screen == SCR_RACE && !race.qte.on);
+    else c = R.camera(race, mode, screen == SCR_RACE ? 1.0f / 60 : 0, held(prev, ACT_LOOK_BACK) && screen == SCR_RACE && !race.qte.on);
     if (screen == SCR_REPLAY || screen == SCR_PHOTO) { c = viewCam; mode = viewMode; cine = false; wall = false; }
     bool cockpit = mode == CAM_COCKPIT;
     R.drawScene(race, c, cockpit);
@@ -1127,17 +1127,26 @@ void Game::updateOptions(const Pad& p, int dx, int dy, bool ok, bool back) {
         else if (id == CR_HELP && (ok || dx)) { cfg.steerHelp = (cfg.help() + (dx ? dx : 1) + 3) % 3; cfg.save(); }
         else if (id == CR_TILT && (ok || dx)) { cfg.tilt = (cfg.tilt + (dx ? dx : 1) + 4) % 4; cfg.save(); }
         else if (id == CR_TILTDIR && (ok || dx)) { cfg.tiltInvert = !cfg.tiltInvert; cfg.save(); }
-        else if (id == CR_REAR && (ok || dx)) { cfg.rearLook = !cfg.rearLook; cfg.save(); }
         else if (ok && id == CR_RESET) { cfg.resetBinds(); cfg.save(); }
-        else if (ok && id == CR_REALISM) { screen = SCR_REALISM; mechPage = false; sel = 0; }
-        else if (back || (ok && id == CR_BACK)) { screen = SCR_OPTIONS; sel = 15; }
+        else if (back || (ok && id == CR_BACK)) { screen = SCR_OPTIONS; optCat = -1; sel = OC_CONTROLS; }
         return;
     }
-    int optRows = input::hasTouch() ? 20 : 19;              // 19: rear-view mirror (Vita)
-    sel = (sel + dy + optRows) % optRows;
-    if ((dx || ok) && sel == 19) { cfg.mirror = !cfg.mirror; cfg.save(); return; }
-    if ((dx || ok) && sel == 17) { cfg.hideWheel = !cfg.hideWheel; cfg.save(); return; }
-    if ((dx || ok) && sel == 18) {
+    if (optCat < 0) {
+        // the list of categories
+        sel = (sel + dy + OPT_CATS) % OPT_CATS;
+        if (ok && sel == OC_CONTROLS) { screen = SCR_CONTROLS; sel = 0; rebinding = -1; return; }
+        if (ok && sel == OC_REALISM) { screen = SCR_REALISM; mechPage = false; sel = 0; return; }
+        if (ok && sel < OC_CONTROLS) { optCat = sel; sel = 0; return; }
+        if (back || (ok && sel == OC_BACK)) { cfg.save(); sel = optionsFrom == SCR_TITLE ? 4 : 3; screen = optionsFrom; t = 0; }
+        return;
+    }
+    int ids[12]; int nRows = optRows(ids);
+    sel = (sel + dy + nRows) % nRows;
+    int id = ids[sel];
+    if (back || (ok && id == 16)) { cfg.save(); sel = optCat; optCat = -1; return; }
+    if ((dx || ok) && id == 19) { cfg.mirror = !cfg.mirror; cfg.save(); return; }
+    if ((dx || ok) && id == 17) { cfg.hideWheel = !cfg.hideWheel; cfg.save(); return; }
+    if ((dx || ok) && id == 18) {
         if (cfg.hideWheel) { cfg.cockpitHud = !cfg.cockpitHud; cfg.save(); }
         else { snprintf(note, sizeof note, "Hide the steering wheel first"); noteT = 1.5f; }
         return;
@@ -1145,7 +1154,7 @@ void Game::updateOptions(const Pad& p, int dx, int dy, bool ok, bool back) {
     if (dx) {
         auto step = [&](int& v, int lo, int hi) { v += dx; if (v < lo) v = lo; if (v > hi) v = hi; };
         bool custom = false;
-        switch (sel) {
+        switch (id) {
             case 0: step(cfg.master, 0, 10); break;
             case 1: step(cfg.music, 0, 10); break;
             case 2: step(cfg.engine, 0, 10); break;
@@ -1163,13 +1172,20 @@ void Game::updateOptions(const Pad& p, int dx, int dy, bool ok, bool back) {
             case 13: cfg.attract += dx * 5; if (cfg.attract < 5) cfg.attract = 5; if (cfg.attract > 30) cfg.attract = 30; break;
         }
         if (custom) { cfg.preset = 3; autoLevel = 0; }      // the player's own choice: start again from it
-        if (sel == 5) autoLevel = 0;
+        if (id == 5) autoLevel = 0;
         cfg.apply(autoLevel);
-        if (sel == 4) sound::radio("25_box");          // hear the new level
-        if (sel == 3) sound::play("pit_wheelgun", 0.8f, 0);
+        if (id == 4) sound::radio("25_box");          // hear the new level
+        if (id == 3) sound::play("pit_wheelgun", 0.8f, 0);
     }
-    if (ok && sel == 15) { screen = SCR_CONTROLS; sel = 0; rebinding = -1; }
-    else if (back || (ok && sel == 16)) { cfg.save(); sel = optionsFrom == SCR_TITLE ? 4 : 3; screen = optionsFrom; t = 0; }
+}
+
+int Game::optRows(int* ids) const {
+    int n = 0;
+    if (optCat == OC_SOUND) for (int i = 0; i <= 4; i++) ids[n++] = i;
+    if (optCat == OC_DISPLAY) for (int i = 5; i <= 12; i++) ids[n++] = i;
+    if (optCat == OC_CAMERA) { ids[n++] = 13; ids[n++] = 14; ids[n++] = 17; ids[n++] = 18; if (input::hasTouch()) ids[n++] = 19; }
+    ids[n++] = 16;   // Back
+    return n;
 }
 
 // ------------------------------------------------------------------ career mode: menus
@@ -1412,9 +1428,7 @@ int Game::controlRows(int* ids) const {
     if (input::hasTouch()) {
         ids[n++] = CR_TILT;
         if (cfg.tilt) ids[n++] = CR_TILTDIR;
-        ids[n++] = CR_REAR;
     }
-    ids[n++] = CR_REALISM;
     ids[n++] = CR_RESET; ids[n++] = CR_BACK;
     return n;
 }
@@ -1428,7 +1442,7 @@ void Game::updateRealism(int dx, int dy, bool ok, bool back) {
         if (back || (ok && sel == MF_COUNT)) { mechPage = false; sel = 10; cfg.save(); return; }
         if (change && sel < MF_COUNT && !R.full) R.mech[sel] = !R.mech[sel];
     } else {
-        if (back || (ok && sel == 11)) { cfg.save(); screen = SCR_CONTROLS; int ids[24]; int m = controlRows(ids); for (int k = 0; k < m; k++) if (ids[k] == CR_REALISM) sel = k; return; }
+        if (back || (ok && sel == 11)) { cfg.save(); screen = SCR_OPTIONS; optCat = -1; sel = OC_REALISM; return; }
         if (ok && sel == 10) { mechPage = true; sel = 0; return; }
         bool* flags[9] = {&R.full, &R.opponents, &R.tyres, &R.brakes, &R.cooling, &R.slipstream, &R.blowTyre, &R.ground, &R.fuel};
         if (change && sel <= 8 && (sel == 0 || !R.full)) *flags[sel] = !*flags[sel];
