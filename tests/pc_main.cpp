@@ -123,6 +123,8 @@ int main(int argc, char** argv) {
                 fprintf(stderr, "s %6.0f d %5.1f hw %4.1f kerb %d v %3.0f load %.2f hOff %+.3f vz %+.2f grade %+.3f\n", me.s, me.d, r.track.pts[i].hw, (int)r.track.pts[i].kerb, me.v * 3.6f, me.body.load, me.body.hOff, me.body.vz, r.track.gradeAt(me.s));
             }
             if (me.lap != lastLap) { lastLap = me.lap; if (me.lap >= 2) best = fminf(best, me.lastLap); }
+            if (getenv("FL_PARTS")) { static int mx[5], fr = 0; int n[5] = {}; for (auto& q : r.parts) n[q.kind]++; for (int k = 0; k < 5; k++) mx[k] = n[k] > mx[k] ? n[k] : mx[k];
+                if (++fr % 3600 == 0) fprintf(stderr, "particles now/max: smoke %d/%d spray %d/%d shard %d/%d spark %d/%d flame %d/%d\n", n[0], mx[0], n[1], mx[1], n[2], mx[2], n[3], mx[3], n[4], mx[4]); }
         }
         printf("%-12s era %d  best %.3f  light %.2f s  min load %.2f  max air %.2f s  max rise %.2f m\n", tid.c_str(), era, best, light, minLoad, maxAir, maxLift);
         return 0;
@@ -486,6 +488,27 @@ int main(int argc, char** argv) {
                 if (i % 12 == 0) printf("t %.1f  steer %.1f  v %5.1f  nose %6.1f deg  slide %6.1f deg  across %5.1f m  slip %.2f\n", tt, st, c.v, c.yaw * 57.3f, c.drift * 57.3f, c.d, c.slip); }
             r.update(1.0f / 60, st, th, bk, 0, false);
         }
+        return 0;
+    }
+    if (mode == "fx") {
+        // fx <car> <outdir>: sparks from under the car, an engine on fire, exhaust flames and dust,
+        // forced on for a moment and pictured from the chase camera
+        g.set.car = atoi(argv[2]); std::string out = argv[3];
+        for (int i = 0; i < TRACK_COUNT; i++) if (!strcmp(TRACKS[i].id, "monza")) g.set.track = i;
+        g.set.laps = 1; g.set.opponents = 0; g.set.weather = WX_DRY; g.aiDrivesPlayer = true;
+        g.startRace();
+        for (int f = 0; f < 30 * 14; f++) { Pad q{}; g.step(1.0f / 30, q); }
+        Race& r = g.race; Car& me = r.player();
+        for (int f = 0; f < 10; f++) {
+            r.sparks(me.pos - me.fwd * 1.8f + V3(0, 0, 0.05f), me.fwd * (me.v * 0.55f) + V3(0, 0, 1.5f), 6, 4.0f);
+            Pad q{}; g.step(1.0f / 30, q);
+        }
+        g.R.camInit = false; shot(g, out + "/fx_sparks.ppm", 0);
+        me.dmg[DM_ENGINE] = 0.95f;
+        for (int f = 0; f < 20; f++) { Pad q{}; g.step(1.0f / 30, q); }
+        g.R.camInit = false; shot(g, out + "/fx_fire.ppm", 0);
+        int n[5] = {}; for (auto& q : r.parts) n[q.kind]++;
+        printf("smoke %d spray %d shard %d spark %d flame %d\n", n[0], n[1], n[2], n[3], n[4]);
         return 0;
     }
     if (mode == "driver") {

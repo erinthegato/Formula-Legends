@@ -536,6 +536,32 @@ void Renderer::drawEffects(const Race& r, const Camera& cam, bool ownLights) {
         V3 rel = p.p - cam.eye;
         if (dot(rel, cam.fwd) < 0.5f || dot(rel, rel) > 140.0f * 140.0f) continue;
         u32 col = p.color;
+        if (p.kind == 3) {
+            // a spark: a short streak along its flight (from where it was a moment ago), white-hot
+            // when new, cooling to orange
+            if (o / 6 >= maxQ) continue;
+            V3 tail = rel - p.v * 0.014f;
+            V3 dir = rel - tail, side = cross(dir, rel);
+            float sl = len(side);
+            if (sl < 1e-5f) continue;
+            side = side * (p.size / sl);
+            int a = (int)(255 * clampf(p.life * 4, 0, 1));
+            u32 c2 = p.life > 0.3f ? RGBA(255, 235, 170, a) : RGBA(255, 150, 50, a);
+            V3 p0 = tail - side, p1 = tail + side, p2 = rel + side, p3 = rel - side;
+            WorldVertex q0{0.5f, 0.5f, c2, p0.x, p0.y, p0.z}, q1{0.5f, 0.5f, c2, p1.x, p1.y, p1.z}, q2{0.5f, 0.5f, c2, p2.x, p2.y, p2.z}, q3{0.5f, 0.5f, c2, p3.x, p3.y, p3.z};
+            v[o++] = q0; v[o++] = q1; v[o++] = q2; v[o++] = q0; v[o++] = q2; v[o++] = q3;
+            continue;
+        }
+        if (p.kind == 4) {
+            // a flame: yellow-white at first, then orange, red and gone (blue for the exhaust pops)
+            bool blue = (p.color & 0xFF0000u) > 0xC00000u;
+            if (blue) { float k = clampf(p.life / 0.16f, 0, 1); quad(rel, p.size * 1.6f, RGBA(150 + (int)(105 * (1 - k)), 170, 255, (int)(220 * k + 20))); continue; }
+            // young: a small white-yellow core; then a larger orange tongue; then dull red and gone
+            float k = clampf(p.life / 0.7f, 0, 1);
+            u32 c2 = k > 0.7f ? RGBA(255, 235, 150, 235) : (k > 0.35f ? RGBA(255, 140, 30, (int)(150 + 120 * k)) : RGBA(190, 45, 15, (int)(380 * k)));
+            quad(rel, p.size * (0.9f + 1.4f * (1 - k)), c2);
+            continue;
+        }
         if (p.kind != 2) {
             float a = (float)(col >> 24) * clampf(p.life, 0, 1);
             col = (col & 0xFFFFFFu) | ((u32)a << 24);

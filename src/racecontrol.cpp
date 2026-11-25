@@ -955,6 +955,8 @@ void Race::addDamage(Car& c, int part, float amount) {
             p.life = 1.2f; p.size = 0.12f; p.color = RGBA(40, 40, 40); p.kind = 2;
             parts.push_back(p);
         }
+    // and sparks where metal meets the barrier or the other car
+    if (amount > 0.01f) sparks(c.pos + c.fwd * ((rnd() - 0.5f) * 2.5f) + V3(0, 0, 0.25f), c.fwd * (c.v * 0.6f), 4 + (int)fminf(amount * 60, 14), 6.0f);
     if (part == DM_NOSE && c.dmg[part] > 0.75f && !c.noseOff) detach(c, DM_NOSE);
     if (part == DM_WING && c.dmg[part] > 0.7f && !c.wingOff) detach(c, DM_WING);
     if (c.player && amount > 0.06f && before < 0.95f) {
@@ -982,6 +984,21 @@ void Race::detach(Car& c, int part) {
     }
 }
 
+// A burst of sparks: tiny, bright, short-lived streaks thrown up and back, falling under gravity.
+// Only near the player (where the camera is), and only while there is room in the particle pool.
+void Race::sparks(const V3& at, const V3& vel, int n, float spread) {
+    V3 d = at - player().pos;
+    if (d.x * d.x + d.y * d.y > 120 * 120) return;
+    for (int k = 0; k < n && parts.size() < 300; k++) {
+        Particle p; p.p = at;
+        float a = rnd() * 6.2832f;                    // fanned out in every direction, mostly upwards
+        p.v = vel + V3(cosf(a) * spread, sinf(a) * spread, (0.3f + rnd()) * spread * 0.8f) * (0.4f + rnd() * 0.6f);
+        p.life = 0.18f + rnd() * 0.30f; p.size = 0.025f; p.kind = 3;
+        p.color = rnd() < 0.5f ? RGBA(255, 240, 180, 255) : RGBA(255, 180, 60, 255);
+        parts.push_back(p);
+    }
+}
+
 void Race::particles(float dt) {
     for (auto& d : debris) {
         d.life -= dt;
@@ -999,21 +1016,52 @@ void Race::particles(float dt) {
         p.life -= dt;
         p.p = p.p + p.v * dt;
         if (p.kind == 2) p.v.z -= 9.81f * dt;
+        else if (p.kind == 3) { p.v.z -= 9.81f * dt; p.v = p.v * (1 - 0.8f * dt); }          // sparks: fall, slow a little
+        else if (p.kind == 4) { p.v = p.v * (1 - 3.0f * dt); p.v.z += 2.5f * dt; p.size += dt * 0.9f; }   // flames lick upwards
         else { p.v = p.v * (1 - 1.5f * dt); p.v.z += 0.6f * dt; p.size += dt * (p.kind == 0 ? 1.6f : 2.2f); }
     }
     parts.erase(std::remove_if(parts.begin(), parts.end(), [](const Particle& p) { return p.life <= 0; }), parts.end());
     // new smoke and spray only near the player (that's where the camera is)
     const V3 cam = player().pos;
     for (auto& c : cars) {
-        if (parts.size() >= 220) break;
+        if (parts.size() >= 240) break;      // (sparks may take the pool up to 300)
         V3 dv = c.pos - cam;
         if (dv.x * dv.x + dv.y * dv.y > 150 * 150) continue;
-        float smoke = fmaxf(c.dmg[DM_ENGINE] - 0.3f, 0) + (c.slip > 0.5f && c.v > 8 && wet < 0.3f ? 0.5f : 0);
+        float smoke = fminf(fmaxf(c.dmg[DM_ENGINE] - 0.3f, 0), 0.3f) + (c.slip > 0.5f && c.v > 8 && wet < 0.3f ? 0.5f : 0);
         if (smoke > 0 && rnd() < smoke * 0.9f) {
             Particle p; p.p = c.pos - c.fwd * 2.0f + V3(0, 0, 0.5f);
             p.v = c.fwd * (c.v * 0.3f) + V3(rnd() - 0.5f, rnd() - 0.5f, 1.2f);
             p.life = 1.6f; p.size = 0.6f; p.kind = 0;
             p.color = c.dmg[DM_ENGINE] > 0.3f ? RGBA(60, 60, 60, 150) : RGBA(220, 220, 220, 110);
+            parts.push_back(p);
+        }
+        // the plank and skid blocks scraping the track: from 2016 (titanium skids) sparks fly from under
+        // the car at speed when it bottoms out -- over bumps and crests, and diving under hard braking
+        if (era >= ERA_HYBRID && c.v > 50 && c.pit == PIT_NONE && wet < 0.5f) {
+            float scrape = (c.body.load > 1.08f ? (c.body.load - 1.08f) * 6 : 0) + (c.brake > 0.6f ? 0.25f : 0) + (c.v > 80 ? 0.08f : 0);
+            if (rnd() < scrape) sparks(c.pos - c.fwd * (1.4f + rnd() * 0.8f) + c.left * ((rnd() - 0.5f) * 0.6f) + V3(0, 0, 0.04f),
+                                       c.fwd * (c.v * 0.55f) + V3(0, 0, 1.5f), 3 + (int)(rnd() * 4), 4.0f);
+        }
+        // an engine on fire: flames out of the back, black smoke above them
+        for (int k = 0; k < 2 && c.dmg[DM_ENGINE] > 0.85f; k++) {
+            Particle p; p.p = c.pos - c.fwd * (1.2f + rnd() * 0.5f) + c.left * ((rnd() - 0.5f) * 0.4f) + V3(0, 0, 0.45f);
+            p.v = c.fwd * (c.v * 0.92f) + V3((rnd() - 0.5f) * 0.6f, (rnd() - 0.5f) * 0.6f, 1.0f + rnd());
+            p.life = 0.35f + rnd() * 0.35f; p.size = 0.16f + rnd() * 0.10f; p.kind = 4; p.color = RGBA(255, 200, 80, 230);
+            parts.push_back(p);
+        }
+        // the V8s, V12s and turbos of 1980 and the 2010 V8s spit flame from the exhausts when the
+        // driver lifts and brakes from high revs
+        if (era <= ERA_V8 && c.brake > 0.5f && c.rpm > c.def->maxRpm * 0.8f && c.pit == PIT_NONE && rnd() < 0.35f) {
+            Particle p; p.p = c.pos - c.fwd * (era == ERA_90S ? 1.75f : 2.05f) + V3(0, 0, era == ERA_90S ? 0.42f : 0.55f);
+            p.v = c.fwd * (c.v * 0.85f) - c.fwd * 3.0f;
+            p.life = 0.10f + rnd() * 0.06f; p.size = 0.10f + rnd() * 0.06f; p.kind = 4; p.color = RGBA(150, 190, 255, 230);
+            parts.push_back(p);
+        }
+        // dust off the grass and gravel
+        if (c.offTrack && c.v > 10 && wet < 0.3f && rnd() < 0.6f) {
+            Particle p; p.p = c.pos - c.fwd * 1.8f + c.left * ((rnd() - 0.5f) * 1.6f) + V3(0, 0, 0.25f);
+            p.v = c.fwd * (c.v * 0.3f) + V3(rnd() - 0.5f, rnd() - 0.5f, 0.8f + rnd());
+            p.life = 1.4f; p.size = 0.5f; p.kind = 0; p.color = RGBA(150, 128, 96, 120);
             parts.push_back(p);
         }
         if (wet > 0.25f && c.v > 25 && rnd() < wet * 0.8f) {

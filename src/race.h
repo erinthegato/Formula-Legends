@@ -189,7 +189,7 @@ enum Session { SES_PRACTICE = 0, SES_QUALI, SES_RACE };
 
 struct RaceMsg { char text[64]; float time; u32 color; };
 struct Debris { V3 p, v; float yaw, pitch, spin, life, ground; int carIdx, part; };
-struct Particle { V3 p, v; float life, size; u32 color; int kind; };   // 0 smoke, 1 spray, 2 shard
+struct Particle { V3 p, v; float life, size; u32 color; int kind; };   // 0 smoke / dust, 1 spray, 2 shard, 3 spark, 4 flame
 
 // Manual pit stop: one prompt per job (fuel, jacks, each wheel, release). A marker sweeps a bar;
 // press the shown button once while it is in the green zone. No button mashing: only the first press
@@ -260,6 +260,7 @@ struct Race {
     bool zoneAt(float s) const;               // a slow zone here (not the FCY)
     void callFcy(float seconds);
     void testSafetyCar();
+    void sparks(const V3& at, const V3& vel, int n, float spread);   // a burst of sparks (near the camera only)
     void addSlowZone(float s, float seconds);
     PitQte qte;                   // the player's manual pit stop
     float scCooldown = 0;
