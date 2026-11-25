@@ -7,7 +7,7 @@
 
 Config cfg;
 const char* BUTTON_NAME[BTN_COUNT] = {"X", "O", "Square", "Triangle", "Select", "D-pad up", "D-pad down"};
-const char* ACTION_NAME[ACT_COUNT] = {"Accelerate", "Brake", "Gear up", "Gear down", "Change camera", "Look behind", "Pit request", "Engine map"};
+const char* ACTION_NAME[ACT_COUNT] = {"Accelerate", "Brake", "Gear up", "Gear down", "Change camera", "Look behind", "Pit request", "Engine map", "DRS"};
 const char* buttonName(int b) { return b >= 0 && b < BTN_COUNT ? BUTTON_NAME[b] : "None"; }
 
 bool held(const Pad& p, int b) {
@@ -50,7 +50,7 @@ void Config::apply(int autoLevel) const {
     gfx::setSync(vsync, fps == 1 ? 2 : 1);
 }
 
-static const int VERSION = 6;
+static const int VERSION = 7;
 
 void Config::save() const {
     FILE* f = fopen("settings.cfg", "wb");
@@ -66,12 +66,13 @@ void Config::load() {
     FILE* f = fopen("settings.cfg", "rb");
     if (!f) return;
     Config c; int v = 0, vs = 1, sc = 1, ef = 1, sf = 0, aq = 1;
-    bool ok = fscanf(f, "v %d\n", &v) == 1 && (v == VERSION || v == 5 || v == 4)
+    bool ok = fscanf(f, "v %d\n", &v) == 1 && (v == VERSION || v == 6 || v == 5 || v == 4)
            && fscanf(f, "sound %d %d %d %d %d\n", &c.master, &c.music, &c.engine, &c.effects, &c.radio) == 5
            && (v == 4 ? fscanf(f, "perf %d %d %d %d %d %d %d %d %d\n", &c.preset, &vs, &c.fps, &c.distance, &sc, &ef, &sf, &c.attract, &c.pitCam) == 9
                       : fscanf(f, "perf %d %d %d %d %d %d %d %d %d %d\n", &c.preset, &vs, &c.fps, &c.distance, &sc, &ef, &sf, &c.attract, &c.pitCam, &aq) == 10)
            && fscanf(f, "bind") == 0;
-    for (int a = 0; ok && a < ACT_COUNT; a++) ok = fscanf(f, " %d", &c.bind[a]) == 1 && c.bind[a] >= BTN_NONE && c.bind[a] < BTN_COUNT;
+    int nb = v < 7 ? ACT_DRS : ACT_COUNT;    // files before v7 have no DRS bind
+    for (int a = 0; ok && a < nb; a++) ok = fscanf(f, " %d", &c.bind[a]) == 1 && c.bind[a] >= BTN_NONE && c.bind[a] < BTN_COUNT;
     int sp = 1;
     if (ok && v >= 6) ok = fscanf(f, "\ndrive %d", &sp) == 1;     // (older files: spins on)
     c.spins = sp != 0;

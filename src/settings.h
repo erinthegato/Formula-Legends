@@ -4,7 +4,7 @@
 
 // L and R are not bindable: they brake (L) and accelerate (R) while driving, and skip music tracks in the menus
 enum Button { BTN_NONE = -1, BTN_CROSS = 0, BTN_CIRCLE, BTN_SQUARE, BTN_TRIANGLE, BTN_SELECT, BTN_UP, BTN_DOWN, BTN_COUNT };
-enum Action { ACT_ACCEL = 0, ACT_BRAKE, ACT_GEAR_UP, ACT_GEAR_DOWN, ACT_CAMERA, ACT_LOOK_BACK, ACT_PIT, ACT_MAP, ACT_COUNT };
+enum Action { ACT_ACCEL = 0, ACT_BRAKE, ACT_GEAR_UP, ACT_GEAR_DOWN, ACT_CAMERA, ACT_LOOK_BACK, ACT_PIT, ACT_MAP, ACT_DRS, ACT_COUNT };
 extern const char* BUTTON_NAME[BTN_COUNT];
 extern const char* ACTION_NAME[ACT_COUNT];
 
@@ -33,7 +33,7 @@ struct Config {
     int help() const;   // PS Vita: holding the rear touch pad looks behind (off: fingers resting on it would)
     int pitCam = 0;          // pit stops and the garage: 0 cinematic camera, 1 your own camera        // seconds idle on the main menu before the highlights start (5..30)
     // BTN_NONE = the action has no button
-    int bind[ACT_COUNT] = {BTN_CROSS, BTN_SQUARE, BTN_NONE, BTN_NONE, BTN_TRIANGLE, BTN_CIRCLE, BTN_SELECT, BTN_UP};
+    int bind[ACT_COUNT] = {BTN_CROSS, BTN_SQUARE, BTN_NONE, BTN_NONE, BTN_TRIANGLE, BTN_CIRCLE, BTN_SELECT, BTN_UP, BTN_DOWN};
 
     void load();
     void save() const;

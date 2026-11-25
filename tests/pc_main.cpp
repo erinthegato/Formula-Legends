@@ -53,15 +53,20 @@ int main(int argc, char** argv) {
         // play the intro with the real audio clock and grab frames at the sync points
         std::string out = argv[2];
         std::vector<int16_t> wav;
-        float marks[] = {2.6f, 9.0f, 10.5f, 13.6f, 15.6f, 17.8f, 19.4f, 21.0f, 23.4f, 26.8f, 28.4f, 30.2f, 32.0f, 34.5f, 38.0f, 40.2f, 41.6f,
-                         43.0f, 44.6f, 46.4f, 47.6f, 49.8f, 52.0f, 54.4f, 55.6f, 57.2f, 58.6f, 60.0f};
+        // a frame 0.6 s into each shot, and every cut against the beat grid in DATA/music/intro.txt
+        float marks[] = {2.6f, 5.0f, 7.0f, 8.9f, 9.6f};       // the logo strobe
         const int NM = sizeof(marks) / sizeof(marks[0]);
-        int mi = 0;
-        for (int f = 0; f < 60 * 70 && g.screen == SCR_INTRO; f++) {
+        int mi = 0, lastShot = -1; float cutAt = -1;
+        for (int f = 0; f < 60 * 80 && g.screen == SCR_INTRO; f++) {
             Pad q{}; g.frame(1.0f / 60, q);
             if (pc::mixFn) { std::vector<int16_t> b(735 * 2); pc::mixFn(b.data(), 735); if (f % 2 == 0) wav.insert(wav.end(), b.begin(), b.end()); }
-            if (f % 120 == 0) fprintf(stderr, "f %d pos %.2f t %.2f screen %d\n", f, g.introPos, g.t, (int)g.screen);
             if (mi < NM && g.introPos >= marks[mi]) { char b[48]; snprintf(b, sizeof b, "/intro_%03d.ppm", (int)(marks[mi] * 10)); pc::saveShot((out + b).c_str()); mi++; }
+            if (g.introShot != lastShot) {
+                lastShot = g.introShot; cutAt = g.introPos;
+                float beat = (g.introPos - g.introBeat0) / g.introPeriod;
+                fprintf(stderr, "cut: shot %d at %.3f s of music = beat %.2f (bar %.2f)\n", g.introShot, g.introPos, beat, beat / 4);
+            }
+            if (cutAt >= 0 && g.introPos >= cutAt + 0.6f) { char b[48]; snprintf(b, sizeof b, "/intro_shot%02d.ppm", lastShot); pc::saveShot((out + b).c_str()); cutAt = -1; }
         }
         fprintf(stderr, "intro ended: screen %d at %.1f s of music\n", (int)g.screen, g.introPos);
         return 0;
@@ -424,9 +429,37 @@ int main(int argc, char** argv) {
         shot(g, std::string(argv[2]) + "/podium_b.ppm");
         return 0;
     }
+    if (mode == "drsers") {
+        // drsers <era 2|3> <map 0-2>: Monza practice. The AI drives; on the straights the pad takes
+        // over (steer 0, flat out) so DRS must wait for the button. Prints the ERS time per state
+        // and section, and when the flap opened against when the button was pressed.
+        int era = argc > 2 ? atoi(argv[2]) : 2, map = argc > 3 ? atoi(argv[3]) : 1;
+        for (int i = 0; i < TRACK_COUNT; i++) if (!strcmp(TRACKS[i].id, "monza")) g.set.track = i;
+        g.ttMode = true; g.set.car = eraFirstCar(era); g.set.weather = WX_DRY;
+        g.startSession(SES_PRACTICE);
+        g.race.toGarage(); g.race.flyingLap(g.set.setup);
+        Race& r = g.race; r.player().su.map = map;
+        float st[3][3] = {}; float simT = 0; int presses = 0, opens = 0, early = 0; float pressAt = -1;
+        while (r.player().lap < 3 && simT < 400) {
+            Car& me = r.player();
+            int z = r.drsZoneAt(me.s), zn = r.drsZoneAt(me.s + 40);
+            bool pad = (z >= 0 || zn >= 0) && me.lap >= 1;
+            if (pad && pressAt < 0 && r.track.wrap(me.s - r.drsZones[z].from) > 150) { r.drsPress = true; pressAt = simT; presses++; }
+            if (z < 0) pressAt = -1;
+            bool wasOpen = me.drs;
+            r.update(1.0f / 60, 0, pad ? 1 : 0, 0, 0, !pad); simT += 1.0f / 60;
+            r.sfxEvents.clear();
+            if (me.drs && !wasOpen) { opens++; if (pressAt < 0) early++; printf("DRS open at s %.0f lap %d pad %d zone %d (press %s)\n", me.s, me.lap, (int)pad, z, pressAt < 0 ? "none" : "yes"); }
+            st[me.ersState][r.ersSecAt(me.s)] += 1.0f / 60;
+        }
+        printf("era %d map %d: presses %d opens %d without press %d  best lap %.3f\n", era, map, presses, opens, early, r.player().bestLap);
+        const char* SN[3] = {"idle", "deploy", "harvest"};
+        for (int a = 0; a < 3; a++) printf("  %-8s corner %5.1f s  exit %5.1f s  straight %5.1f s\n", SN[a], st[a][0], st[a][1], st[a][2]);
+        return 0;
+    }
     if (mode == "handling") {
         // scripted driver: accelerate, then steer <amount> for 1.5 s, then let go
-        RaceSettings rs; rs.track = 2; rs.car = 1; rs.opponents = 5; rs.weather = WX_DRY;
+        RaceSettings rs; rs.track = 2; rs.car = argc > 5 ? eraFirstCar(atoi(argv[5])) : 1; rs.opponents = 5; rs.weather = WX_DRY;
         float amount = (float)atof(argv[2]); float brake = argc > 3 ? (float)atof(argv[3]) : 0;
         g.race.start(rs, SES_PRACTICE);
         Race& r = g.race; float t0 = -1;
@@ -434,7 +467,7 @@ int main(int argc, char** argv) {
             Car& c = r.player();
             float st = 0, th = 1, bk = 0;
             if (t0 < 0 && c.v > (argc > 4 ? atof(argv[4]) : 55)) t0 = r.time;
-            if (t0 >= 0) { float tt = r.time - t0; if (tt < 0.8f) { st = amount; th = brake > 0 ? 0 : 0.6f; bk = brake; } else th = 0.5f; if (tt > 4) break;
+            if (t0 >= 0) { float tt = r.time - t0; if (tt < 0.8f) { st = amount; th = brake > 0 ? 0 : 0.6f; bk = brake; } else { th = 0.5f; if (getenv("FL_COUNTER") && tt < 1.6f) st = -(float)atof(getenv("FL_COUNTER")) * (amount > 0 ? 1 : -1); } if (tt > 4) break;
                 if (i % 12 == 0) printf("t %.1f  steer %.1f  v %5.1f  nose %6.1f deg  slide %6.1f deg  across %5.1f m  slip %.2f\n", tt, st, c.v, c.yaw * 57.3f, c.drift * 57.3f, c.d, c.slip); }
             r.update(1.0f / 60, st, th, bk, 0, false);
         }

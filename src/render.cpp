@@ -965,8 +965,13 @@ void Renderer::drawNewInstruments(const Race& r, const Car& c, const M4& car, co
         d.text(0.170f, 0.024f, "FUEL", 0.008f, dim);
         d.bar(0.153f, 0.008f, 0.040f, 0.008f, c.fuel, c.fuel > 0.15f ? cyan : red);
         snprintf(b, sizeof b, "%.1f L", fuelLaps); d.text(0.173f, -0.002f, b, 0.0085f, white);
-        d.text(0.170f, -0.016f, c.boosting ? "BOOST" : "ERS", 0.008f, c.boosting ? RGBA(255, 240, 120) : dim);
-        d.bar(0.153f, -0.030f, 0.040f, 0.008f, c.ers, c.boosting ? RGBA(255, 240, 120) : RGBA(80, 230, 140));
+        {
+            static const char* ST[3] = {"ERS", "DEPLOY", "HARVEST"};
+            int st = c.ersState < 0 || c.ersState > 2 ? 0 : c.ersState;
+            u32 ec = st == 1 ? RGBA(255, 240, 120) : (st == 2 ? RGBA(90, 170, 255) : RGBA(80, 230, 140));
+            d.text(0.170f, -0.016f, ST[st], 0.008f, st ? ec : dim);
+            d.bar(0.153f, -0.030f, 0.040f, 0.008f, c.ers, ec);
+        }
     } else {
         // ---------------- LMGT3: instrument cluster behind the wheel (right-hand drive)
         Display d{*this, panel(V3(0.45f, -0.38f, 0.955f), 0, 0.42f)};
@@ -1065,9 +1070,12 @@ void Renderer::drawSpeedBox(const Car& c) {
     gfx::drawFill2D(SCREEN_W - 108, SCREEN_H - 10, 98 * rpmF, 3, rpmF > 0.92f ? RGBA(255, 60, 40) : RGBA(80, 200, 255));
     if (c.def->era >= ERA_HYBRID) {
         // hybrid battery above the speed panel; it glows while boosting
-        u32 ec = c.boosting ? RGBA(255, 240, 120) : RGBA(80, 230, 140);
+        // DEPLOY (yellow) while it spends, HARVEST (blue) while it charges, ERS (green) otherwise
+        static const char* ST[3] = {"ERS", "DEPLOY", "HARVEST"};
+        int st = c.ersState < 0 || c.ersState > 2 ? 0 : c.ersState;
+        u32 ec = st == 1 ? RGBA(255, 240, 120) : (st == 2 ? RGBA(90, 170, 255) : RGBA(80, 230, 140));
         gfx::drawFill2D(SCREEN_W - 112, SCREEN_H - 66, 106, 12, panel);
-        font.draw(SCREEN_W - 109, SCREEN_H - 67, c.boosting ? "BOOST" : "ERS", ec, 0.6f);
+        font.draw(SCREEN_W - 109, SCREEN_H - 67, ST[st], ec, 0.6f);
         gfx::drawFill2D(SCREEN_W - 74, SCREEN_H - 63, 64, 5, RGBA(60, 60, 70, 200));
         gfx::drawFill2D(SCREEN_W - 74, SCREEN_H - 63, 64 * c.ers, 5, ec);
     }
@@ -1127,8 +1135,11 @@ void Renderer::drawHUD(const Race& r, int mode) {
     if (r.ep().drs && r.session != SES_RACE ? true : r.drsOn) {
         if (r.ep().drs) {
             bool have = c.drsZone >= 0, open = c.drs;
+            // in the zone with DRS but the flap still shut: flash, press the DRS button
+            bool ready = have && !open && r.drsOn && r.drsZoneAt(c.s) == c.drsZone && !r.autoPlayer;
+            bool blink = ready && ((int)(r.time * 6) & 1);
             float x = SCREEN_W - 172, y = SCREEN_H - 30;
-            gfx::drawFill2D(x, y, 40, 18, open ? RGBA(40, 200, 90, 230) : RGBA(0, 0, 0, 140));
+            gfx::drawFill2D(x, y, 40, 18, open ? RGBA(40, 200, 90, 230) : (blink ? RGBA(40, 200, 90, 150) : RGBA(0, 0, 0, 140)));
             if (have && !open) { gfx::drawFill2D(x, y, 40, 2, RGBA(40, 200, 90)); gfx::drawFill2D(x, y + 16, 40, 2, RGBA(40, 200, 90)); }
             font.drawCentre(x + 20, y + 1, "DRS", open || have ? RGBA(255, 255, 255) : RGBA(130, 130, 140), 0.85f);
         }

@@ -127,6 +127,9 @@ struct Car {
     bool slowLim = false;                   // the 80 km/h limiter holds (engages once you are down to 80 in a zone)
     // hybrid (Hypercars): the battery charges under braking and gives extra power out of the corners
     float ers = 1; bool boosting = false;
+    int ersState = 0;             // 0 idle, 1 deploying, 2 harvesting (for the HUD)
+    float ersBurst = 0;           // seconds left of a button (DRS) deployment
+    float yawCmd = 0;             // the player's steering after the car's turn-in lag (heavier eras turn in slower)
     int contactWarn = 0;
     float penalty = 0;            // seconds added to the result
     bool driveThrough = false; int dtLaps = 0;
@@ -143,6 +146,7 @@ struct Car {
     // DRS: allowed in the zone it was detected for (within a second of the car ahead), open while
     // in that zone and not braking; drsFlap animates the flap 0 (shut) .. 1 (open)
     int drsZone = -1; bool drs = false; float drsFlap = 0;
+    bool drsReq = false;          // the player pressed DRS in this zone (closes on the brakes)
     bool hold = false;            // the intro: this car stands still where it was put (not driven)
     CarBody body;                 // (save version 7) suspension and the car in the air
 
@@ -287,6 +291,10 @@ struct Race {
     // DRS zones (worked out from the circuit's long straights)
     struct DrsZone { float detect, from, to; };
     std::vector<DrsZone> drsZones;
+    bool drsPress = false;        // the DRS button went down this frame (set by the game)
+    std::vector<unsigned char> ersSec;   // per track point: 0 corner, 1 corner exit, 2 straight
+    void setupErs();
+    int ersSecAt(float s) const { return ersSec.empty() ? 0 : ersSec[track.index(s)]; }
     bool drsOn = false;                         // DRS enabled now (race: from lap 3, dry, no safety car)
     void setupDrs();
     void updateDrs(float dt);

@@ -15,13 +15,15 @@ const ClassPhys& Race::phys(int era) {
     // (mu +1 % with the momentum physics, which costs a few tenths over crests and kerbs)
     static ClassPhys E[ERA_COUNT] = {{350, 1.333f, 52, 1.95f, 1.08f, 3.0f, 95,  0,   false, true,  false},   // 1998 V10
                                      {335, 1.424f, 48, 2.10f, 1.15f, 3.1f, 160, 0,   false, false, false},   // 2010 V8
-                                     {345, 1.434f, 50, 2.10f, 1.18f, 3.2f, 100, 120, true,  false, true},    // 2016 hybrid
-                                     {345, 1.535f, 47, 2.20f, 1.12f, 3.4f, 100, 120, true,  false, true}};   // 2025 ground effect
-    // AI on Hard, dry, best of 3 laps (Monza / Spa / Monaco / Suzuka) against the real pole times:
-    //   1998 1:23.9 1:49.5 1:15.7 1:36.4 (real 1:25.3 1:48.7 1:19.8 1:36.3)
-    //   2010 1:23.0 1:45.8 1:13.0 1:31.9 (real 1:21.9 1:45.8 1:13.8 1:30.8)
-    //   2016 1:21.3 1:45.0 1:12.0 1:31.2 (real 1:21.1 1:46.7 1:13.6 1:30.6)
-    //   2025 1:19.4 1:40.3 1:09.5 1:27.2 (real 1:18.8 1:40.5 1:10.0 1:27.0)
+                                     {331, 1.415f, 50, 2.05f, 1.30f, 3.2f, 100, 120, true,  false, true},    // 2016 hybrid
+                                     {327, 1.390f, 47, 1.95f, 1.35f, 3.4f, 100, 120, true,  false, true}};   // 2025 ground effect
+    // The game's own pecking order (not the real one): 2010 is the quickest, 2016 a little slower,
+    // 2025 the heaviest and slowest; 1998 is close to 2010 on fast tracks, slower in slow corners.
+    // AI on Hard, dry, best of 3 laps (Monza / Spa / Monaco / Suzuka):
+    //   1998 1:22.6 1:47.1 1:14.5 1:33.2
+    //   2010 1:22.3 1:44.9 1:11.7 1:29.8
+    //   2016 1:22.3 1:45.0 1:12.7 1:31.2
+    //   2025 1:23.4 1:46.0 1:13.0 1:32.1
 #ifndef PLATFORM_VITA
     // tests: FL_PHYS="era mu dfV cdA cap" overrides one era's numbers (lap-time tuning)
     static bool once = false;
@@ -35,6 +37,19 @@ const ClassPhys& Race::phys(int era) {
 #endif
     return E[era < 0 ? 0 : era % ERA_COUNT];
 }
+
+// how each era's car behaves at and past the limit (the player's car; the AI drives on the line)
+//   1998: grooved tyres, little downforce: always on the edge, slides early and the slides grow
+//   2010: lots of grip right up to the edge, a quick turn-in; it bites back, but less than 1998
+//   2016: hybrid torque, stable and forgiving, a touch of understeer
+//   2025: the heaviest: slower to turn in and to stop, planted in fast corners, understeer in slow ones
+struct EraFeel { float stepOut, stepRate, feed, settle, spin, kick, turnIn, slowGrip; };
+static const EraFeel FEEL[ERA_COUNT] = {
+    //  stepOut stepRate feed  settle spin   kick  turnIn slowGrip
+    {   0.28f,  1.20f,  0.95f, 2.6f,  0.75f, 1.10f, 14.0f, 1.00f },   // 1998
+    {   0.42f,  1.50f,  0.75f, 3.4f,  0.62f, 0.85f, 16.0f, 1.00f },   // 2010
+    {   0.40f,  1.00f,  0.45f, 4.2f,  0.62f, 0.95f, 11.0f, 0.97f },   // 2016
+    {   0.42f,  0.85f,  0.40f, 4.6f,  0.62f, 0.60f,  7.5f, 0.92f }};  // 2025
 
 static uint32_t seed = 7;
 static float frand() { seed = seed * 1664525u + 1013904223u; return (seed >> 8) * (1.0f / 16777216.0f); }
@@ -60,6 +75,7 @@ bool Race::start(const RaceSettings& s0, Session ses, const std::vector<int>* gr
     plan();
     setupPit();
     setupDrs();
+    setupErs();
     cars.clear(); msgs.clear(); debris.clear(); parts.clear(); sfxEvents.clear(); markFirst.clear();
     sc = SafetyCar(); scCooldown = 60; fcy = 0; fcyWarn = 0; zones.clear();
     rubber = clampf(s.rubber, 0, 1); rubberMsg = (int)(rubber * 4); radioPending = -1; formation = false; timeAccel = 1;
@@ -329,18 +345,28 @@ void Race::physics(Car& c, float dt) {
     float wingD = (c.su.wing - 3) * 0.06f, wingDrag = 1 + (c.su.wing - 3) * 0.045f;
     float P = c.def->powerKW * 1000 * (1 - 0.45f * c.dmg[DM_ENGINE]) * MAP_POWER[map];
     if (c.fuel <= 0) P *= 0.08f;                         // out of fuel: crawling on the last drops
-    // hybrid (2014 on): braking charges the battery, flat-out acceleration spends it: +120 kW (MGU-K)
-    // for up to ~16 s. Normal map: out of corners only (under 270 km/h); Attack: whenever flat out;
-    // Safety-car map: charge only.
-    c.boosting = false;
+    // hybrid (2014 on): braking charges the battery, deploying spends it: +120 kW (MGU-K) for up to
+    // ~16 s a lap. It deploys by itself on parts of the track, set by the engine map:
+    //   Safety-car map: never (charge only, and a trickle more while lifting)
+    //   Normal: corner exits;  Attack: exits and all the straights
+    // The DRS button adds a burst (with the flap, or on its own outside a DRS zone).
+    // Normal also harvests a little at full throttle at the end of long straights (as real cars do).
+    c.boosting = false; c.ersState = 0;
+    c.ersBurst = fmaxf(0, c.ersBurst - dt);
     if (p.ersKW > 0 && c.pit == PIT_NONE && !hybridOff) {
-        if (c.brake > 0.1f && c.v > 8) c.ers = fminf(1.0f, c.ers + c.brake * fminf(c.v / 50.0f, 1.0f) * 0.10f * dt);
-        bool want = map != MAP_SC && c.throttle > 0.9f && c.brake < 0.05f && c.v > 14 && !sc.state && !formation && !slowAt(c.s);
-        if (map == MAP_NORMAL && c.v > 75.0f) want = false;
+        if (c.brake > 0.1f && c.v > 8) { c.ers = fminf(1.0f, c.ers + c.brake * fminf(c.v / 50.0f, 1.0f) * 0.10f * dt); c.ersState = 2; }
+        else if (map == MAP_SC && c.throttle < 0.5f && c.v > 15) { c.ers = fminf(1.0f, c.ers + 0.02f * dt); c.ersState = 2; }
+        int sec = ersSecAt(c.s);
+        bool flat = c.throttle > 0.9f && c.brake < 0.05f && c.v > 14 && !sc.state && !formation && !slowAt(c.s);
+        bool want = flat && map != MAP_SC && (sec == 1 || (map == MAP_ATTACK && sec == 2));
+        if (flat && c.ersBurst > 0) want = true;
         if (want && c.ers > 0.01f && c.fuel > 0) {
-            c.boosting = true;
+            c.boosting = true; c.ersState = 1;
             c.ers = fmaxf(0.0f, c.ers - 0.062f * dt);
             P += p.ersKW * 1000.0f * (1 - 0.45f * c.dmg[DM_ENGINE]);
+        } else if (flat && map == MAP_NORMAL && sec == 2 && c.v > 0.93f * topSpeed(c.def)) {
+            c.ers = fminf(1.0f, c.ers + 0.03f * dt); c.ersState = 2;          // "super clipping"
+            P *= 0.96f;
         }
     }
     int i = track.index(c.s);
@@ -365,7 +391,9 @@ void Race::physics(Car& c, float dt) {
     // the tyres' share of the load (CarBody): light over a crest, none in the air, a little more in a dip
     // (tyres grip less than in proportion to load, so ~load^0.7)
     float loadK = c.body.init ? powf(clampf(c.body.load, 0, 1.4f), 0.7f) : 1.0f;
-    float latMax = p.muBase * gripScale * surfaceGrip() * G * aeroK * gripMul * loadK;
+    // ground-effect / heavy cars: less grip in slow corners (fades out by ~180 km/h)
+    float slowK = 1 - (1 - FEEL[era % ERA_COUNT].slowGrip) * clampf((50.0f - c.v) / 25.0f, 0, 1);
+    float latMax = p.muBase * gripScale * surfaceGrip() * G * aeroK * gripMul * loadK * slowK;
     if (c.player) playerLatMax = latMax;
 
     // ---- longitudinal
@@ -394,7 +422,9 @@ void Race::physics(Car& c, float dt) {
     float accLong = acc;
 
     // ---- steering / yaw (c.yawRate holds the wanted rate, set by player input or AI)
-    float want = c.yawRate + (c.dmg[DM_SUSP] * 0.04f * c.v / 30.0f) * (c.dmg[DM_LEFT] > c.dmg[DM_RIGHT] ? 1 : -1) * (c.player ? 1 : 0);
+    if (c.human) c.yawCmd += (c.yawRate - c.yawCmd) * fminf(1.0f, dt * FEEL[era % ERA_COUNT].turnIn);
+    else c.yawCmd = c.yawRate;
+    float want = c.yawCmd + (c.dmg[DM_SUSP] * 0.04f * c.v / 30.0f) * (c.dmg[DM_LEFT] > c.dmg[DM_RIGHT] ? 1 : -1) * (c.player ? 1 : 0);
     float maxRate = c.v > 1 ? latMax / c.v : 3.0f;
     c.slip = 0;
     float travel = c.yaw;                       // direction the car moves in (relative to the track)
@@ -414,8 +444,9 @@ void Race::physics(Car& c, float dt) {
         // drift while the car keeps going where the grip takes it (travel = yaw - drift).
         float rot = 0;
         if (c.human && !c.spinning && spinsOn) {
-            const float STEP_OUT = 0.35f, SPIN = 0.62f;
-            if (ex > STEP_OUT && c.v > 15) rot += sgW * fminf((ex - STEP_OUT) * 1.3f, 1.1f) * dt;
+            const EraFeel& F = FEEL[era % ERA_COUNT];
+            const float STEP_OUT = F.stepOut, SPIN = F.spin;
+            if (ex > STEP_OUT && c.v > 15) rot += sgW * fminf((ex - STEP_OUT) * 1.3f * F.stepRate, 1.1f) * dt;
             // F1 06-style handling: the car stays planted unless the throttle is stabbed (0 -> full in a blink)
             // in a slow, loaded corner, which kicks the rear out; opposite lock catches it
             {
@@ -424,12 +455,12 @@ void Race::physics(Car& c, float dt) {
                 float load = maxRate > 0 ? clampf((fabsf(want) / maxRate - 0.7f) * 3.5f, 0, 1) : 0;
                 float slow = clampf((42.0f - c.v) / 22.0f, 0, 1);
                 float kick = playerStab * load * slow * clampf((c.throttle - 0.7f) * 3.3f, 0, 1);
-                if (kick > 0 && c.v > 8) rot += sgW * kick * 0.5f * dt;
+                if (kick > 0 && c.v > 8) rot += sgW * kick * 0.5f * F.kick * dt;
             }
             float sd = c.drift > 0 ? 1.0f : -1.0f, ad = fabsf(c.drift);
             bool counter = fabsf(c.yawRate) > 0.02f && (c.yawRate > 0 ? 1.0f : -1.0f) != sd;
-            if (ad > 0.12f && !counter) rot += sd * ad * (0.9f + c.throttle * 1.6f) * dt;   // a big slide feeds itself (more on the throttle)
-            float settle = counter ? 3.5f : (ad < 0.12f ? 6.0f : 0.8f);
+            if (ad > 0.12f && !counter) rot += sd * ad * (0.9f + c.throttle * 1.6f) * F.feed * dt;   // a big slide feeds itself (more on the throttle)
+            float settle = counter ? F.settle : (ad < 0.12f ? 6.0f : 0.8f);
             rot -= c.drift * (1 - expf(-dt * settle));
             if (ad > SPIN && c.v > 12) {
                 c.spinning = true;
@@ -957,6 +988,30 @@ void Race::setupDrs() {
     }
 }
 
+// Where the battery deploys by itself: straights (curvature under 1/700 m, as for the DRS
+// zones), and corner exits: the last 60 m of each corner and the first 220 m of the road after it.
+void Race::setupErs() {
+    ersSec.clear();
+    if (ep().ersKW <= 0) return;
+    int n = track.n;
+    ersSec.assign(n, 0);
+    std::vector<unsigned char> straight(n);
+    for (int i = 0; i < n; i++) {
+        float k = 0; for (int j = -4; j <= 4; j++) k += fabsf(track.pts[(i + j + n) % n].curv);
+        straight[i] = k / 9 < 1.0f / 700.0f;
+    }
+    // corner exits: only after real corners (tighter than ~250 m radius), not kinks
+    int back = (int)(50 / track.step), fwd = (int)(150 / track.step);
+    for (int i = 0; i < n; i++) ersSec[i] = straight[i] ? 2 : 0;
+    for (int i = 0; i < n; i++) {
+        if (straight[i] || !straight[(i + 1) % n]) continue;        // i: the last point of a corner
+        float kMax = 0;
+        for (int j = 0; j < n && !straight[(i - j + n) % n]; j++) kMax = fmaxf(kMax, fabsf(track.pts[(i - j + n) % n].curv));
+        if (kMax < 1.0f / 250.0f) continue;
+        for (int j = -back; j <= fwd; j++) ersSec[(i + j + n) % n] = 1;
+    }
+}
+
 int Race::drsZoneAt(float s) const {
     for (int k = 0; k < (int)drsZones.size(); k++) {
         float a = drsZones[k].from, len = track.wrap(drsZones[k].to - a);
@@ -966,7 +1021,13 @@ int Race::drsZoneAt(float s) const {
 }
 
 void Race::updateDrs(float dt) {
-    if (drsZones.empty()) { for (auto& c : cars) { c.drs = false; c.drsFlap = fmaxf(0, c.drsFlap - dt * 4); } return; }
+    // the DRS button with no DRS to open: an ERS burst on its own (hybrid eras), to attack or defend
+    if (drsPress && ep().ersKW > 0 && !hybridOff) {
+        Car& me = player();
+        bool flap = drsOn && drsZoneAt(me.s) >= 0 && drsZoneAt(me.s) == me.drsZone;
+        if (!flap && !autoPlayer && me.pit == PIT_NONE && me.ers > 0.05f) me.ersBurst = 3.0f;
+    }
+    if (drsZones.empty()) { for (auto& c : cars) { c.drs = false; c.drsFlap = fmaxf(0, c.drsFlap - dt * 4); } drsPress = false; return; }
     int leadLap = 0; for (auto& c : cars) leadLap = c.lap > leadLap ? c.lap : leadLap;
     bool wasOn = drsOn;
     drsOn = ep().drs && wet < 0.25f && rain < 0.2f && !sc.state && fcy <= 0 && !formation && countdown <= 0 &&
@@ -993,10 +1054,20 @@ void Race::updateDrs(float dt) {
                 c.drsZone = ok ? k : -1;
             }
         }
-        bool open = drsOn && z >= 0 && z == c.drsZone && c.brake < 0.2f && c.pit == PIT_NONE && !c.wingOff && c.v > 22;
+        bool can = drsOn && z >= 0 && z == c.drsZone && c.brake < 0.2f && c.pit == PIT_NONE && !c.wingOff && c.v > 22;
+        // the player opens it with the DRS button (the AI opens it as soon as it may); the
+        // brakes close it, and a new press opens it again while still in the zone
+        bool byButton = c.player && !autoPlayer;
+        if (byButton) {
+            if (drsPress && can) c.drsReq = true;
+            if (!can || c.brake >= 0.2f) c.drsReq = false;
+        }
+        bool open = can && (!byButton || c.drsReq);
         if (z < 0 && c.drs) c.drsZone = -1;          // used up: the next zone needs a new detection
+        if (open && !c.drs) c.ersBurst = fmaxf(c.ersBurst, 4.0f);   // opening the flap also deploys the battery
         if (c.player && open && !c.drs) message("DRS", RGBA(80, 230, 140));
         c.drs = open;
         c.drsFlap = clampf(c.drsFlap + (open ? dt * 5 : -dt * 7), 0, 1);
     }
+    drsPress = false;
 }

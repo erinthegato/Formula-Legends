@@ -410,6 +410,7 @@ void Game::updateRace(float dt, const Pad& p) {
         } else if (bindPressed(p, ACT_CAMERA)) cam = (cam + 1) % CAM_COUNT;
     }
     if (bindPressed(p, ACT_MAP) && !manage && !race.qte.on) race.cycleMap();
+    if (bindPressed(p, ACT_DRS) && !manage && !race.qte.on) race.drsPress = true;
     // pit request: box this lap (press again to cancel)
     if (bindPressed(p, ACT_PIT) && me.pit == PIT_NONE && !me.finished) {
         me.wantPit = !me.wantPit;

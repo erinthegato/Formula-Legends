@@ -113,7 +113,7 @@ struct Game {
     bool loadSlot(int slot);
     std::vector<int> qualiGrid;   // car numbers in qualifying order
     // the intro (intro.cpp): music position, the beat grid, the shot and era block on screen
-    float introPos = 0, introBeat0 = 9.78f, introPeriod = 0.33655f, introLength = 64.0f;
+    float introPos = 0, introBeat0 = 9.887f, introPeriod = 0.48234f, introLength = 70.0f;
     int introScript = 0; float introLastPos = 0;
     int introShot = -1, introBlock = -1, introPendingBlock = -1, introCardFrames = 0;
     float introShotT0 = 0, introCamS = 0; int introFocus = 0, introFocus2 = 1; bool introCrashDone = false;

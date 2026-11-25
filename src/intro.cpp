@@ -1,5 +1,6 @@
-// The Formula Legends intro and attract movie, cut to the music. The intro (Motley Crue - Kickstart My Heart, DATA/music/intro.emu):
-// the bike revs under a flashing "CODE 4 STUDIOS", then from the first beat a highlight reel of the
+// The Formula Legends intro and attract movie, cut to the music. The intro ('Take On The World' by All Good
+// Folks on Uppbeat, DATA/music/intro.emu): "CODE 4 STUDIOS" strobes on the opening beats, then from the
+// first big hit a highlight reel of the
 // four eras, a block of shots per era on one circuit: empty-track crane shots, DRS trains, overtakes,
 // pit stops, crashes and a thunderstorm, era title cards between them, and the game's title at the end.
 // Everything is the real game: the era's cars and circuit, driven by the race code, staged per shot.
@@ -14,7 +15,10 @@ struct Block { int era; const char* track; int weather; float hour; };
 // a shot: first bar (bars of 4 beats from the music's first beat), era block, type; a text card's two lines
 struct Shot { int bar; int block; int type; const char* line1; const char* line2; };
 
-// ---- the boot intro: Kickstart My Heart (DATA/music/intro.emu, the first 64 s)
+// ---- the boot intro: Take On The World (DATA/music/intro.emu, the first 70 s, 124.4 BPM). Bar 0 is the
+// first big hit at 9.89 s. Sections: the beat comes in at bar 3, the drop at bar 11, the second half of
+// the chorus at bar 19, a 4-bar lift at 23, the energy falls away in bar 26 and the breakdown starts at
+// 27. Era cards sit on bars 3, 11 and 19, the start on 23 and the title on the breakdown at 27.
 const Block INTRO_BLOCKS[] = {
     {ERA_GE, "suzuka", WX_DRY, 14.5f},
     {ERA_90S, "monaco", WX_DRY, 15.0f},
@@ -22,11 +26,11 @@ const Block INTRO_BLOCKS[] = {
     {ERA_HYBRID, "redbullring", WX_DRY, 17.6f},
 };
 const Shot INTRO_SHOTS[] = {
-    {0, 0, SH_EMPTY}, {2, 0, SH_DRS}, {4, 0, SH_PIT}, {6, 0, SH_OVERTAKE},
-    {8, 1, SH_CARD}, {9, 1, SH_EMPTY}, {10, 1, SH_OVERTAKE}, {12, 1, SH_CRASH}, {14, 1, SH_PIT},
-    {16, 2, SH_CARD}, {17, 2, SH_STORM}, {20, 2, SH_OVERTAKE}, {22, 2, SH_CRASH},
-    {24, 3, SH_CARD}, {25, 3, SH_EMPTY}, {26, 3, SH_DRS}, {28, 3, SH_PIT}, {30, 3, SH_OVERTAKE}, {32, 3, SH_START}, {34, 3, SH_DRS}, {35, 3, SH_EMPTY},
-    {36, 3, SH_FINAL},
+    {0, 0, SH_EMPTY}, {1, 0, SH_DRS}, {2, 0, SH_OVERTAKE},
+    {3, 1, SH_CARD}, {4, 1, SH_EMPTY}, {5, 1, SH_OVERTAKE}, {7, 1, SH_CRASH}, {9, 1, SH_PIT},
+    {11, 2, SH_CARD}, {12, 2, SH_STORM}, {15, 2, SH_OVERTAKE}, {17, 2, SH_CRASH},
+    {19, 3, SH_CARD}, {20, 3, SH_DRS}, {21, 3, SH_PIT}, {22, 3, SH_OVERTAKE}, {23, 3, SH_START}, {25, 3, SH_DRS}, {26, 3, SH_EMPTY},
+    {27, 3, SH_FINAL},
 };
 
 // ---- the attract movie: Lose My Mind (Don Toliver feat. Doja Cat, DATA/music/attract.emu, the whole
@@ -434,26 +438,27 @@ static void bigText(Renderer& R, float cx, float y, const char* s, u32 col, floa
 void Game::drawIntro() {
     float p = introPos;
     const u32 BLACK = RGBA(0, 0, 0);
-    // ---- 0 .. first beat: CODE 4 STUDIOS, flashing with the bike's revs
+    // ---- 0 .. first big hit: CODE 4 STUDIOS, flashing on the opening beats
     if ((p < introBeat0 - 0.02f || introShot < 0) && !SCRIPTS[curScript].logo) { gfx::beginFrame(BLACK); finishFrame(); return; }
     if (p < introBeat0 - 0.02f || introShot < 0) {
         gfx::beginFrame(BLACK);
         gfx::setDepthTest(false); gfx::setBlend(true);
-        // the revs: a strobe that comes faster as the bike screams up, then the name holds and burns
-        static const float REV[] = {0.10f, 0.65f, 0.85f, 2.45f, 2.90f, 3.10f, 6.05f, 6.25f, 7.05f, 8.70f, 8.85f, 9.00f};
+        // a strobe on the music's beats (0.24 s + n x 0.482 s) that quickens: bars, half bars, then every
+        // beat into the first big hit, where the name holds and burns out to white
+        static const float REV[] = {0.24f, 2.17f, 4.10f, 5.06f, 6.03f, 6.99f, 7.96f, 8.44f, 8.92f, 9.40f};
         float flash = 0;
         for (float r0 : REV) { float d = p - r0; if (d >= 0 && d < 0.55f) flash = fmaxf(flash, 1 - d / 0.55f); }
-        float hold = sstep(8.6f, 9.4f, p);
+        float hold = sstep(8.9f, 9.5f, p);
         float a = fmaxf(flash, hold);
         float glow = 0.35f + 0.65f * a;
         int A = (int)(255 * clampf(0.12f + a, 0, 1));
-        // scan line and a flash of the whole screen on the biggest revs
+        // scan line and a flash of the whole screen on the strongest beats
         if (flash > 0.85f) gfx::drawFill2D(0, 0, SCREEN_W, SCREEN_H, RGBA(255, 255, 255, (int)(90 * (flash - 0.85f) / 0.15f)));
         float jitter = flash > 0.5f ? (hash1((int)(p * 60)) - 0.5f) * 4 : 0;
         bigText(R, SCREEN_W / 2 + jitter, 96, "CODE 4", RGBA(255, (int)(70 + 150 * glow), (int)(40 + 60 * glow), A), 3.6f);
         bigText(R, SCREEN_W / 2 - jitter, 150, "S T U D I O S", RGBA(255, 255, 255, A), 1.5f);
         gfx::drawFill2D(SCREEN_W / 2 - 120 * glow, 140, 240 * glow, 2, RGBA(255, 70, 40, A));
-        if (p > 9.3f) gfx::drawFill2D(0, 0, SCREEN_W, SCREEN_H, RGBA(255, 255, 255, (int)(255 * sstep(9.3f, introBeat0, p))));
+        if (p > 9.45f) gfx::drawFill2D(0, 0, SCREEN_W, SCREEN_H, RGBA(255, 255, 255, (int)(255 * sstep(9.45f, introBeat0, p))));
         gfx::setBlend(false); gfx::setDepthTest(true);
         finishFrame();
         return;

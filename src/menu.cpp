@@ -859,7 +859,7 @@ void Game::screenHelp(Panel& P) {
         {"Producer / CEO / Engineer", "Erin"},
         {"Studio", "CODE 4 Studios"},
         {"Engine", "Endurance Motor Racing 3D"},
-        {"Intro music", "Kickstart My Heart - Motley Crue"},
+        {"Intro music", "Take On The World - All Good Folks (Uppbeat)"},
         {"Attract music", "Lose My Mind - Don Toliver feat. Doja Cat"},
         {"Cars, wheels, cockpits", "Modelled in Blender"},
         {"Pit crew, safety cars, props", "Modelled in Blender"},
@@ -946,7 +946,7 @@ void Game::screenControls(Panel& P) {
     for (int k = 0; k < n; k++) {
         int id = ids[k];
         bool left = id < ACT_COUNT;
-        float x = left ? 18 : 248, y = left ? 58 + id * 19.5f : 58 + right++ * 19.5f;
+        float x = left ? 18 : 248, y = left ? 58 + id * 17.5f : 58 + right++ * 19.5f;
         if (id == CR_RESET) y += 8;                       // a little gap before reset / back
         if (id == CR_BACK) y += 8;
         bool on = k == sel;
