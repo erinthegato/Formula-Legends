@@ -698,8 +698,8 @@ def main():
     t.swatches(dict(glass=(0.08, 0.11, 0.16), white=(0.92, 0.92, 0.88), red=(0.85, 0.08, 0.06), carbon=(0.09, 0.09, 0.10),
                     cage=(0.50, 0.52, 0.56), second=(0.8, 0.1, 0.1), panel=(0.9, 0.1, 0.1), paint=(0.10, 0.10, 0.11), **G.HD_SWATCH))
     for era in ERAS:
-        print('wheel', era, write_emm(os.path.join(OUT, f'wheel_{era}.emm'), [(build_wheel(era, 18, True), t.img, 128), (build_wheel(era, 10, False), t.img, 64), (build_wheel(era, 7, False), t.img, 32)], share_tex=True))
-        print('flap', era, write_emm(os.path.join(OUT, f'flap_{era}.emm'), [(build_flap(era), t.img, 64)]))
+        # (wheel_<era>.emm and flap_<era>.emm: made in Blender now, tools/blender/cockpit_parts.py -> tools/gen_cockpit.py)
+        pass
         # (steering_<era>.emm: made in Blender now, tools/blender/cockpit_parts.py -> tools/gen_cockpit.py)
     # the career cars' livery sets
     for c in read_cars():

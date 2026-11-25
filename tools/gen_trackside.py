@@ -13,7 +13,8 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 from gen_props import Atlas, Kit, write_emm, OUT      # noqa: E402
 
-PROPS = ('gantry', 'bleacher', 'tent', 'flagpanel', 'crane', 'tecpro')
+PROPS = ('gantry', 'bleacher', 'tent', 'flagpanel', 'crane', 'tecpro',
+         'tree_pine', 'tree_round', 'tyre_stack', 'marshal_post', 'tv_tower', 'fuel_rig')
 # the circuit buildings share one 512 px atlas, stored once in grandstand.emm (Renderer::loadCommon
 # hands it to the others): flat swatches plus the pictures painted below
 SHARED = ('grandstand', 'billboard', 'ad_bridge', 'race_control', 'hospitality')

@@ -7,6 +7,8 @@ Run in Blender (Scripting tab, or the Blender MCP):
 Collection FL_Cockpit holds:
   FL_Steer_1998 / 2010 / 2016 / 2025   the steering wheels, each with the driver's gloves on its grips
   FL_Driver_LOD0 / LOD1                the driver as seen from outside: helmet, HANS, shoulders, belts, arms
+  FL_Wheel_<year>_LOD0 / 1 / 2         each era's road wheel (tyre, rim, nut; 1998 grooved, 2025 covered)
+  FL_Flap_<year>                       each era's rear wing top flap (the part DRS opens)
 Each sits under its own empty (move the empty to move the part); they stand side by side in the scene.
 
 Steering wheel axes (the game's, tools/gen_f1.py build_steering): the wheel lies in the YZ plane and
@@ -33,7 +35,12 @@ PALETTE = dict(
     carbon=(0.035, 0.035, 0.04), carbonlite=(0.09, 0.09, 0.10), alcantara=(0.06, 0.06, 0.065), alu=(0.60, 0.61, 0.64),
     screen=(0.01, 0.012, 0.02), red=(0.88, 0.07, 0.06), yellow=(0.98, 0.80, 0.05), green=(0.10, 0.75, 0.25),
     blue=(0.10, 0.35, 0.90), white=(0.94, 0.94, 0.92), orange=(1.0, 0.45, 0.05), purple=(0.55, 0.20, 0.80),
-    paddle=(0.20, 0.21, 0.23), led=(0.12, 0.14, 0.12))
+    paddle=(0.20, 0.21, 0.23), led=(0.12, 0.14, 0.12),
+    # road wheels and DRS flaps (band: the sidewall stripe, painted in the compound's colour by the game;
+    # flap / tip: the team's main and second colours)
+    band=(0.95, 0.95, 0.93), rubber=(0.055, 0.055, 0.06), tread=(0.085, 0.085, 0.09), groove=(0.02, 0.02, 0.022),
+    rim=(0.55, 0.56, 0.58), rimdark=(0.16, 0.16, 0.17), disc=(0.30, 0.22, 0.18), nut=(0.85, 0.10, 0.08),
+    cover=(0.06, 0.06, 0.065), flap=(0.10, 0.10, 0.11), tip=(0.93, 0.93, 0.91))
 
 
 def material(sw):
@@ -381,6 +388,112 @@ def driver(K, lod):
             K.cyl('Cuff' + sd, (0.405, s * 0.173, -0.389), (0.425, s * 0.169, -0.384), 0.038, 'glovetrim', sides=6)
 
 
+# ---- road wheels and DRS flaps --------------------------------------------------------------------
+# per era (tools/gen_f1.py E): rear tyre radius and width, rim radius, grooved tread (1998), wheel covers
+# (2025), and the rear wing's top flap: (leading x, trailing x, half span) of the wing
+WHEEL = {'1998': dict(R=0.330, w=0.38, rim=0.170, groove=True, cover=False),
+         '2010': dict(R=0.330, w=0.38, rim=0.170, groove=False, cover=False),
+         '2016': dict(R=0.330, w=0.38, rim=0.170, groove=False, cover=False),
+         '2025': dict(R=0.3625, w=0.45, rim=0.235, groove=False, cover=True)}
+WING = {'1998': (-1.6745, -1.9655, 0.4925), '2010': (-1.85, -2.18, 0.375), '2016': (-1.902, -2.138, 0.3675),
+        '2025': (-2.171, -2.389, 0.4875)}
+
+
+def lathe(K, name, prof, sides, mats, smooth=True):
+    """a surface of revolution about Y: prof = [(y, r)], band k between points k and k+1 uses mats[k]"""
+    R = [[(r * math.cos(2 * math.pi * i / sides), y, r * math.sin(2 * math.pi * i / sides)) for i in range(sides)]
+         for (y, r) in prof]
+    return K.rings(name, R, lambda k, i: mats[max(k, 0)], smooth=smooth, cap0=False)
+
+
+def wheel(year, K, lod):
+    """axle along Y, the outer face at +Y, centred on the axle (the game spins it about Y and squeezes
+    the fronts narrower)"""
+    W = WHEEL[year]
+    R, hw, rim = W['R'], W['w'] / 2, W['rim']
+    sides = (16, 10, 7)[lod]
+    # the tyre: inner sidewall, shoulder, tread (grooved in 1998), shoulder, outer sidewall with the stripe
+    if lod == 2:
+        prof = [(-hw, rim + 0.01), (-hw + 0.02, R), (hw - 0.02, R), (hw, rim + 0.01)]
+        mats = ['rubber', 'tread', 'rubber']
+    elif lod == 1:
+        prof = [(-hw, rim + 0.012), (-hw, R - 0.03), (-hw + 0.03, R), (hw - 0.03, R), (hw, R - 0.03), (hw, rim + 0.012)]
+        mats = ['rubber', 'rubber', 'tread', 'rubber', 'rubber']
+    else:
+        tread = [(-hw + 0.035, R)]
+        tm = []
+        if W['groove'] and lod == 0:
+            g = 0.010
+            for c in (-0.6, -0.2, 0.2, 0.6):          # four grooves round the tread (dark bands, slightly sunk)
+                y = c * (hw - 0.035)
+                tread += [(y - g, R - 0.004), (y + g, R - 0.004)]
+                tm += ['tread', 'groove']
+        tread += [(hw - 0.035, R)]
+        tm += ['tread']
+        prof = [(-hw, rim + 0.012), (-hw - 0.004, R - 0.06), (-hw + 0.004, R - 0.018)] + tread + \
+               [(hw - 0.004, R - 0.018), (hw + 0.004, R - 0.045), (hw + 0.005, R - 0.075), (hw, rim + 0.012)]
+        mats = ['rubber', 'rubber', 'rubber'] + tm + ['rubber', 'rubber', 'band' if lod == 0 else 'rubber', 'rubber']
+        assert len(mats) == len(prof) - 1
+    lathe(K, 'Tyre', prof, sides, mats, smooth=True)
+    # the inner face: closed off dark
+    K.mesh('Inner', [((rim + 0.012) * math.cos(2 * math.pi * i / sides), -hw, (rim + 0.012) * math.sin(2 * math.pi * i / sides)) for i in range(sides)],
+           [tuple(range(sides))], 'rimdark')
+    if W['cover']:
+        # 18-inch rim behind a flat aero cover, the wheel nut in the middle
+        K.cyl('Cover', (0, hw - 0.020, 0), (0, hw - 0.008, 0), rim + 0.012, 'cover', sides=sides)
+        if lod == 0:
+            lathe(K, 'Lip', [(hw - 0.012, rim + 0.014), (hw - 0.006, rim + 0.002)], sides, ['rim'], smooth=False)
+            K.cyl('Nut', (0, hw - 0.010, 0), (0, hw + 0.010, 0), 0.045, 'nut', sides=8)
+    else:
+        # 13-inch rim: the barrel, a dished face with spokes, the brake disc showing behind, the nut
+        if lod == 0:
+            lathe(K, 'Barrel', [(hw - 0.012, rim + 0.012), (hw - 0.020, rim - 0.004), (hw - 0.080, rim - 0.012)], sides,
+                  ['rim', 'rimdark'], smooth=False)
+            K.cyl('Disc', (0, hw - 0.17, 0), (0, hw - 0.14, 0), rim - 0.03, 'disc', sides=max(sides // 2, 6))
+        else:
+            K.cyl('Face', (0, hw - 0.06, 0), (0, hw - 0.02, 0), rim + 0.01, 'rim' if lod == 1 else 'rimdark', sides=sides)
+        if lod == 0:
+            for k in range(6):
+                a = 2 * math.pi * k / 6
+                c, s_ = math.cos(a), math.sin(a)
+                K.tube('Spoke%d' % k, [(0.045 * c, hw - 0.050, 0.045 * s_), (0.11 * c, hw - 0.040, 0.11 * s_),
+                                       ((rim - 0.008) * c, hw - 0.022, (rim - 0.008) * s_)], 0.012, 'rim', sides=4,
+                       smooth=False)
+        if lod == 0:
+            K.cyl('Hub', (0, hw - 0.070, 0), (0, hw - 0.030, 0), 0.050, 'rimdark', sides=8)
+        if lod < 2:
+            K.cyl('Nut', (0, hw - 0.035, 0), (0, hw - 0.005, 0), 0.034, 'nut', sides=6)
+
+
+def flap(year, K):
+    """the rear wing's top flap, its hinge (the leading edge) at the origin, running back along -X; the
+    game tilts it up when DRS opens. An aerofoil section, the team's colour on top, a second-colour tip
+    along the trailing edge, and the DRS actuator pod in the middle (2010 on)"""
+    xa, xb, span = WING[year]
+    c = (xa - xb) * 0.55
+    hs = span - 0.01
+    t = 0.022
+    # section in X-Z (leading edge at 0, trailing edge at -c), cambered: high at the front, curled up at the back
+    sec = [(0.0, 0.010), (-0.08 * c, 0.022), (-0.35 * c, 0.024), (-0.75 * c, 0.020), (-c, 0.032),
+           (-c, 0.024), (-0.75 * c, 0.008), (-0.35 * c, 0.002), (-0.08 * c, 0.000), (0.0, 0.004)]
+    n = len(sec)
+    V = [(x, -hs, z) for (x, z) in sec] + [(x, hs, z) for (x, z) in sec]
+    F = [tuple(range(n))[::-1], tuple(range(n, 2 * n))]
+    M = ['flap', 'flap']
+    for i in range(n):
+        j = (i + 1) % n
+        F.append((i, j, n + j, n + i))
+        M.append('tip' if i in (3, 4) else 'flap')          # the band along the trailing edge
+    names = ['flap', 'tip']
+    ob = K.mesh('Flap', V, F, names, smooth=False)
+    for p, m in zip(ob.data.polygons, M):
+        p.material_index = names.index(m)
+    # the gurney strip on the trailing edge
+    K.box('Gurney', (-c - 0.004, -hs, 0.024), (-c + 0.002, hs, 0.040), 'carbon')
+    if year != '1998':
+        K.box('Pod', (-0.45 * c, -0.035, 0.022), (-0.05 * c, 0.035, 0.040), 'carbon', bevel=0.004)
+
+
 # ---- build / export ------------------------------------------------------------------------------
 def clear():
     col = bpy.data.collections.get(ROOT_NAME)
@@ -405,6 +518,12 @@ def build(origin=(0.0, 6.0, 1.0)):
     for lod in (0, 1):
         root = make_root('FL_Driver_LOD%d' % lod, (ox + 1.0, oy + 0.7 * lod, oz), col)
         driver(Kit('Driver%d' % lod, root, col), lod)
+    for i, year in enumerate(ERAS):
+        for lod in (0, 1, 2):
+            root = make_root('FL_Wheel_%s_LOD%d' % (year, lod), (ox + 2.0 + 0.9 * lod, oy + 0.9 * i, oz), col)
+            wheel(year, Kit('Wheel%s_%d' % (year, lod), root, col), lod)
+        root = make_root('FL_Flap_%s' % year, (ox + 5.0, oy + 1.2 * i, oz), col)
+        flap(year, Kit('Flap%s' % year, root, col))
     return {'objects': len(col.objects)}
 
 
@@ -442,6 +561,9 @@ def export_json(path):
         out['steering'][year] = export_part(bpy.data.objects['FL_Steer_%s' % year])
     for lod in (0, 1):
         out['driver'].append(export_part(bpy.data.objects['FL_Driver_LOD%d' % lod]))
+    out['wheels'] = {y: [export_part(bpy.data.objects['FL_Wheel_%s_LOD%d' % (y, l)]) for l in (0, 1, 2)] for y in ERAS}
+    out['flaps'] = {y: export_part(bpy.data.objects['FL_Flap_%s' % y]) for y in ERAS}
     with open(path, 'w') as f:
         json.dump(out, f, separators=(',', ':'))
-    return {'steering': {y: out['steering'][y]['tris'] for y in ERAS}, 'driver': [d['tris'] for d in out['driver']]}
+    return {'steering': {y: out['steering'][y]['tris'] for y in ERAS}, 'driver': [d['tris'] for d in out['driver']],
+            'wheels': {y: [w['tris'] for w in out['wheels'][y]] for y in ERAS}, 'flaps': {y: out['flaps'][y]['tris'] for y in ERAS}}

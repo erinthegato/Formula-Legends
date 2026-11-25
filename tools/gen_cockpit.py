@@ -8,6 +8,9 @@ Reads tools/blender/cockpit_parts.json and writes, to HD/models:
   driver.emm           two levels of detail; palette entries 1-4 are the team's colours
                        (1 suit, 2 flashes, 3 helmet, 4 helmet stripe), as the pit crew
                        (the game swaps them per team: Renderer::teamTexture)
+  wheel_<era>.emm      the road wheel, three levels of detail; entries 1-4 the sidewall stripe
+                       (the game paints it in the tyre compound's colour)
+  flap_<era>.emm       the rear wing's top flap; entries 1-4 the team's main / second colour
 Every part is flat colours: one 8x8 cell per material on a 64 px texture.
 """
 import json, os, struct, sys
@@ -21,6 +24,10 @@ from build_models import swizzle                 # noqa: E402
 SRC = os.path.join(HERE, 'blender', 'cockpit_parts.json')
 ERA = {'1998': '90s', '2010': 'v8', '2016': 'hybrid', '2025': 'ge'}
 ROLES = ('suit', 'accent', 'helmet', 'stripe')   # palette entries 1-4 (team colours)
+# the wheels' sidewall stripe takes all four role slots (the game paints it in the compound's colour);
+# the flap: 1 / 3 the team's main colour, 2 / 4 its second colour
+WHEEL_ROLES = ('band', 'band_b', 'band_c', 'band_d')
+FLAP_ROLES = ('flap', 'tip', 'flap_b', 'tip_b')
 TEX = 64
 KEY = np.array([0.45, 0.35, 0.82]); KEY /= np.linalg.norm(KEY)
 
@@ -31,7 +38,7 @@ def atlas(names, palette):
     pix = np.zeros((TEX, TEX), np.uint8)
     cell = {}
     for k, m in enumerate(names):
-        r, g, b = (int(round(max(0, min(1, c)) * 255)) for c in palette[m])
+        r, g, b = (int(round(max(0, min(1, c)) * 255)) for c in palette[m.split('_')[0]])   # (band_b: a spare role slot)
         pal[k + 1] = 0xFF000000 | (b << 16) | (g << 8) | r
         cx, cy = (k % 8) * 8, (k // 8) * 8
         pix[cy:cy + 8, cx:cx + 8] = k + 1
@@ -81,8 +88,12 @@ def main(prev=None):
             if folder == 'HD/models':
                 print(f'steering {year}: {tris[0]} triangles, {dims} m, {size / 1024:.0f} KB')
         size, tris, dims = write(os.path.join(out, 'driver.emm'), d['driver'], d['palette'], ROLES)
-        if folder == 'HD/models':
-            print(f'driver: triangles {tris}, {dims} m, {size / 1024:.0f} KB')
+        print(f'driver: triangles {tris}, {dims} m, {size / 1024:.0f} KB')
+        for year, era in ERA.items():
+            size, tris, dims = write(os.path.join(out, f'wheel_{era}.emm'), d['wheels'][year], d['palette'], WHEEL_ROLES)
+            print(f'wheel {year}: triangles {tris}, {dims} m, {size / 1024:.0f} KB')
+            size, tris, dims = write(os.path.join(out, f'flap_{era}.emm'), [d['flaps'][year]], d['palette'], FLAP_ROLES)
+            print(f'flap {year}: triangles {tris}, {dims} m, {size / 1024:.0f} KB')
 
 
 if __name__ == '__main__':

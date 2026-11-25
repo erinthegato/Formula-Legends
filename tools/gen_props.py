@@ -806,9 +806,9 @@ def fuel_rig(lod):
     return k, a.img
 
 
-OTHER = {'grandstand': (grandstand, (512, 128)), 'tree_pine': (tree_pine, (256, 128)), 'tree_round': (tree_round, (256, 128)),
-         'tyre_stack': (tyre_stack, (128, 64)), 'billboard': (billboard, (512, 128)), 'marshal_post': (marshal_post, (256, 64)),
-         'fuel_rig': (fuel_rig, (128, None))}
+# (tree_pine, tree_round, tyre_stack, marshal_post, fuel_rig and tv_tower are made in Blender now:
+#  tools/blender/trackside.py -> tools/gen_trackside.py; their old code versions are kept above for reference)
+OTHER = {'grandstand': (grandstand, (512, 128)), 'billboard': (billboard, (512, 128))}
 
 
 def EXTRA(only, prev):
@@ -828,7 +828,7 @@ def EXTRA(only, prev):
 
 
 BUILDERS = {'race_control': (race_control, (512, 128)), 'ad_bridge': (ad_bridge, (512, 128)),
-            'tv_tower': (tv_tower, (256, 64)), 'hospitality': (hospitality, (512, 128))}
+            'hospitality': (hospitality, (512, 128))}
 
 
 def main():

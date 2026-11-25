@@ -23,6 +23,9 @@ flat swatches plus pictures -- sponsor boards, the timing screen, the crowd, gla
   ad_bridge     an advertising footbridge on two lattice towers (30 m span; the game stretches it)
   race_control  the race control tower with its timing screen
   hospitality   a two-storey glass team hospitality unit with a roof terrace
+
+Scenery (many of each round a circuit, so very few triangles; flat colours like the first group):
+  tree_pine, tree_round, tyre_stack, marshal_post, tv_tower, fuel_rig (the 1998 refuelling rig)
 Facing: +X points at the track (the gantry spans along X); +Z up; metres.
 
     export_all("C:/path/to/formula-legends/tools/blender/props")   # one <name>.json per object
@@ -37,7 +40,9 @@ PALETTE = dict(concrete=(0.62, 0.62, 0.60), steel=(0.60, 0.62, 0.65), carbon=(0.
                crowd1=(0.85, 0.20, 0.15), crowd2=(0.15, 0.35, 0.75), crowd3=(0.95, 0.85, 0.20),
                crowd4=(0.20, 0.60, 0.25), skin=(0.80, 0.62, 0.50),
                crowd=(0.55, 0.40, 0.38), slab=(0.24, 0.25, 0.27), cream=(0.93, 0.88, 0.75),
-               black=(0.03, 0.03, 0.035))
+               black=(0.03, 0.03, 0.035),
+               pine=(0.11, 0.27, 0.14), leaf=(0.21, 0.40, 0.14), leaf2=(0.30, 0.48, 0.17), bark=(0.30, 0.22, 0.15),
+               marshal=(1.0, 0.42, 0.04), jeans=(0.18, 0.22, 0.35), tarp=(0.22, 0.24, 0.26))
 # the decal pictures (painted by tools/gen_trackside.py), shown in Blender as their main colour
 DECALS = dict(ad1=(0.10, 0.20, 0.55), ad2=(0.10, 0.55, 0.25), ad3=(0.95, 0.80, 0.10), ad4=(0.85, 0.10, 0.10),
               ad5=(0.55, 0.85, 0.10), ad6=(0.05, 0.05, 0.05), ad7=(0.45, 0.15, 0.60), ad8=(0.20, 0.20, 0.24),
@@ -233,6 +238,168 @@ def tecpro(B):
         B.box('Strap', (-0.41, -L / 2, 0.70), (0.41, L / 2, 0.78), 'carbon')
 
 
+# ------------------------------------------------------------------ scenery (many of each round a circuit: few triangles)
+def cone_star(B, part, z0, z1, r, n, mat, twist=0.0, inner=0.78):
+    """a cone whose bottom edge zig-zags (a star): a layer of pine branches"""
+    V = []
+    for i in range(2 * n):
+        a = math.pi * i / n + twist
+        rr = r if i % 2 == 0 else r * inner
+        V.append((rr * math.cos(a), rr * math.sin(a), z0 + (0.0 if i % 2 == 0 else 0.35)))
+    V.append((0, 0, z1))
+    t = len(V) - 1
+    F = [(i, (i + 1) % (2 * n), t) for i in range(2 * n)] + [tuple(range(2 * n))[::-1]]
+    return B.mesh(part, V, F, mat)
+
+
+def blob(B, part, c, r, mat, sub, seed):
+    """a lumpy ball of leaves: an icosphere pushed in and out a little"""
+    import random
+    rnd = random.Random(seed)
+    bm = bmesh.new()
+    bmesh.ops.create_icosphere(bm, subdivisions=sub, radius=1.0)
+    V = []
+    for v in bm.verts:
+        k = 1.0 + rnd.uniform(-0.13, 0.13)
+        V.append((c[0] + v.co.x * r[0] * k, c[1] + v.co.y * r[1] * k, c[2] + v.co.z * r[2] * k))
+    F = [tuple(v.index for v in f.verts) for f in bm.faces]
+    bm.free()
+    return B.mesh(part, V, F, mat)
+
+
+def tree_pine(B):
+    """a pine: a tapering trunk and stacked star-edged layers of branches, darker underneath"""
+    if B.lod == 0:
+        B.cyl('Trunk', (0, 0, 0), (0, 0, 3.0), 0.20, 5, 'bark')
+        layers = [(1.8, 5.4, 2.8, 85), (4.0, 7.8, 2.3, 95), (6.2, 10.2, 1.85, 105), (8.6, 12.4, 1.35, 112), (10.8, 14.0, 0.85, 120)]
+        for k, (z0, z1, r, sh) in enumerate(layers):
+            cone_star(B, 'Layer', z0, z1, r, 7, ('pine', sh), twist=0.45 * k)
+    else:
+        B.cyl('Trunk', (0, 0, 0), (0, 0, 2.6), 0.20, 4, 'bark')
+        for k, (z0, z1, r, sh) in enumerate([(2.0, 8.4, 2.6, 90), (6.0, 14.0, 1.8, 110)]):
+            cone_star(B, 'Layer', z0, z1, r, 4, ('pine', sh), twist=0.5 * k, inner=0.85)
+
+
+def tree_round(B):
+    """a broadleaf tree: a trunk forking into two branches and three lumpy clumps of leaves"""
+    B.cyl('Trunk', (0, 0, 0), (0, 0, 3.6), 0.24, 5 if B.lod == 0 else 4, 'bark')
+    if B.lod == 0:
+        B.cyl('Branch', (0, 0, 3.0), (0.9, 0.6, 5.6), 0.11, 4, 'bark')
+        B.cyl('Branch', (0, 0, 3.2), (-0.9, -0.6, 5.4), 0.10, 4, 'bark')
+        blob(B, 'Crown', (0, 0, 5.7), (2.7, 2.7, 2.3), ('leaf', 100), 1, 3)
+        blob(B, 'Clump', (0.95, 0.65, 7.2), (1.8, 1.7, 1.5), ('leaf2', 100), 0, 5)
+        blob(B, 'Clump', (-1.05, -0.7, 6.7), (1.6, 1.6, 1.35), ('leaf', 115), 0, 7)
+    else:
+        blob(B, 'Crown', (0, 0, 6.0), (2.8, 2.8, 2.7), ('leaf', 100), 0, 3)
+
+
+def tyre_stack(B):
+    """five old tyres stacked 1.2 m high, the middle one painted with a red band, the hole on top"""
+    n, sides = (5, 10) if B.lod == 0 else (1, 6)
+    h = 1.2 / n
+    for i in range(n):
+        r = 0.33 if i % 2 == 0 else 0.318           # alternate tyres a touch smaller: the joins show
+        mat = ('red', 100) if (B.lod == 0 and i == 2) else ('rubber', 100 if i % 2 == 0 else 125)
+        V = [(r * math.cos(2 * math.pi * k / sides), r * math.sin(2 * math.pi * k / sides), z)
+             for z in (i * h, (i + 1) * h - 0.004) for k in range(sides)]
+        F = [(k, (k + 1) % sides, sides + (k + 1) % sides, sides + k) for k in range(sides)]
+        B.mesh('Tyre', V, F, mat)
+    # the top: a ring round the dark hole
+    top = 1.2 - 0.005
+    V = [(rr * math.cos(2 * math.pi * k / sides), rr * math.sin(2 * math.pi * k / sides), top) for rr in (0.33 * 0.95, 0.17) for k in range(sides)]
+    F = [(k, sides + k, sides + (k + 1) % sides, (k + 1) % sides) for k in range(sides)]
+    B.mesh('Top', V, F, ('rubber', 130))
+    B.mesh('Hole', [(0.17 * math.cos(2 * math.pi * k / sides), 0.17 * math.sin(2 * math.pi * k / sides), top - 0.004) for k in range(sides)],
+           [tuple(range(sides))], 'black')
+
+
+def person(B, at, suit, legs='jeans', facing=0.0, arm_up=False):
+    """a small standing figure from boxes (for the far side of the fence)"""
+    x, y, z = at
+    c, s_ = math.cos(facing), math.sin(facing)
+    def P(dx, dy, dz): return (x + dx * c - dy * s_, y + dx * s_ + dy * c, z + dz)
+    def bx(part, lo, hi, mat):
+        V = [P(a, b, d) for a in (lo[0], hi[0]) for b in (lo[1], hi[1]) for d in (lo[2], hi[2])]
+        F = [(0, 1, 3, 2), (4, 6, 7, 5), (0, 4, 5, 1), (2, 3, 7, 6), (0, 2, 6, 4), (1, 5, 7, 3)]
+        B.mesh(part, V, F, mat)
+    bx('Legs', (-0.10, -0.15, 0.0), (0.10, 0.15, 0.85), legs)
+    bx('Body', (-0.12, -0.20, 0.85), (0.12, 0.20, 1.45), suit)
+    bx('Head', (-0.10, -0.09, 1.47), (0.10, 0.09, 1.70), 'skin')
+    bx('ArmL', (-0.06, 0.20, 0.95 if not arm_up else 1.40), (0.06, 0.28, 1.42 if not arm_up else 1.95), suit)
+    bx('ArmR', (-0.06, -0.28, 0.95), (0.06, -0.20, 1.42), suit)
+
+
+def marshal_post(B):
+    """a marshal post: a white hut with a window towards the track (+X), a flat roof, the post number
+    board, a flag pole, and a marshal in orange standing by the fence"""
+    B.box('Hut', (-0.9, -1.0, 0), (0.9, 1.0, 2.3), 'white')
+    B.box('Roof', (-1.1, -1.2, 2.3), (1.2, 1.2, 2.45), 'grey')
+    B.box('Window', (0.9, -0.75, 1.25), (0.92, 0.75, 1.95), 'glass')
+    B.box('Board', (0.9, -0.6, 2.0), (0.93, 0.6, 2.28), 'orange')
+    if B.lod == 0:
+        B.box('Door', (-0.5, 1.0, 0), (0.3, 1.02, 2.0), ('grey', 120))
+        B.box('Step', (-0.9, -1.0, 0), (0.9, 1.0, 0.12), 'concrete')
+        B.cyl('Pole', (1.3, 0.9, 0), (1.3, 0.9, 3.4), 0.03, 4, 'steel')
+        B.box('Flag', (1.28, 0.93, 2.8), (1.32, 1.6, 3.3), 'yellow')
+        person(B, (1.6, -0.6, 0.0), 'marshal', legs='marshal', facing=0.0, arm_up=True)
+        B.box('Bench', (-0.6, -1.6, 0), (0.6, -1.25, 0.45), ('grey', 80))
+
+
+def tv_tower(B):
+    """a scaffold camera tower: four legs, braced, a ladder at the back, a platform with a rail, a
+    canopy with the broadcaster's band, a camera on a tripod pointing at the track (+X), its operator"""
+    w, H = 0.8, 5.8
+    legs = [(dx, dy) for dx in (-w, w) for dy in (-w, w)]
+    for (x, y) in legs:
+        B.rod('Leg', (x, y, 0), (x, y, H + 2.3), 0.05, 'steel')
+    for i, z in enumerate([0.15, 1.6, 3.05, 4.5]):
+        ring = [(-w, -w), (w, -w), (w, w), (-w, w), (-w, -w)]
+        for k, (p0, p1) in enumerate(zip(ring, ring[1:])):
+            B.rod('Rung', (p0[0], p0[1], z), (p1[0], p1[1], z), 0.03, 'steel')
+            if B.lod == 0:                          # a diagonal brace on every face, zig-zagging up
+                a, b = (p0, p1) if (i + k) % 2 == 0 else (p1, p0)
+                B.rod('Brace', (a[0], a[1], z), (b[0], b[1], z + 1.45), 0.022, 'steel')
+    if B.lod == 0:
+        for sy in (-0.22, 0.22):
+            B.rod('LadderRail', (-w - 0.15, sy, 0), (-w - 0.15, sy, H + 1.0), 0.02, 'steel')
+        for z in [0.3 * k for k in range(1, 20)]:
+            B.rod('LadderStep', (-w - 0.15, -0.22, z), (-w - 0.15, 0.22, z), 0.012, 'steel')
+    e = w + 0.2
+    B.box('Deck', (-e, -e, H), (e, e, H + 0.08), 'grey')
+    for z in ((H + 0.55, H + 1.05) if B.lod == 0 else (H + 1.05,)):
+        for (a, b) in (((-e, -e), (e, -e)), ((e, -e), (e, e)), ((e, e), (-e, e)), ((-e, e), (-e, -e))):
+            B.rod('Rail', (a[0], a[1], z), (b[0], b[1], z), 0.02, 'steel')
+    c = w + 0.4
+    B.box('Canopy', (-c, -c, H + 2.3), (c, c, H + 2.36), 'tarp')
+    B.box('Band', (-c, -c, H + 2.1), (c, c, H + 2.3), 'orange')
+    # the camera, its tripod and the operator behind it
+    B.box('Camera', (0.0, -0.13, H + 1.25), (0.65, 0.13, H + 1.55), 'carbon')
+    B.cyl('Lens', (0.65, 0, H + 1.40), (1.05, 0, H + 1.40), 0.10, 8 if B.lod == 0 else 5, 'black')
+    if B.lod == 0:
+        for ang in (0, 2.1, 4.2):
+            B.rod('Tripod', (0.25 + 0.3 * math.cos(ang), 0.3 * math.sin(ang), H + 0.08), (0.25, 0, H + 1.2), 0.015, 'carbon')
+        B.box('Viewfinder', (-0.05, 0.13, H + 1.45), (0.15, 0.22, H + 1.6), 'carbon')
+        person(B, (-0.35, 0.0, H + 0.08), 'green', facing=0.0)
+
+
+def fuel_rig(B):
+    """a 1990s refuelling rig: a red tank on a steel base, its gauge band, the boom and hose down to
+    the nozzle (towards +X, where the car stops)"""
+    B.box('Base', (-0.28, -0.28, 0), (0.28, 0.28, 0.2), 'steel')
+    B.cyl('Tank', (0, 0, 0.2), (0, 0, 1.8), 0.18, 10 if B.lod == 0 else 6, 'red')
+    B.cyl('Cap', (0, 0, 1.8), (0, 0, 1.86), 0.15, 10 if B.lod == 0 else 6, 'steel')
+    if B.lod == 0:
+        B.cyl('Gauge', (0, 0, 1.0), (0, 0, 1.12), 0.186, 10, 'white')
+        B.box('Wheels', (-0.25, -0.3, 0), (0.25, 0.3, 0.08), 'rubber')
+    B.rod('Boom', (0, 0, 1.86), (0, 0, 2.25), 0.03, 'steel')
+    pts = [(0, 0, 2.2), (0.3, 0, 2.1), (0.6, 0, 1.5), (0.7, 0.1, 0.9)]
+    for a, b in zip(pts, pts[1:]):
+        B.cyl('Hose', a, b, 0.035, 6 if B.lod == 0 else 4, 'carbon')
+    B.box('Nozzle', (0.62, 0.02, 0.72), (0.82, 0.18, 0.95), 'steel')
+    if B.lod == 0:
+        B.box('Handle', (0.82, 0.07, 0.8), (0.9, 0.13, 0.88), 'yellow')
+
+
 # ------------------------------------------------------------------ the circuit buildings (shared atlas)
 def grandstand(B):
     """10 x 31 m, 9.4 m tall; the front (+X) faces the track"""
@@ -357,11 +524,14 @@ SHARED_ATLAS = ('grandstand', 'billboard', 'ad_bridge', 'race_control', 'hospita
 
 PROPS = {'gantry': gantry, 'bleacher': bleacher, 'tent': tent, 'flagpanel': flagpanel, 'crane': crane, 'tecpro': tecpro,
          'grandstand': grandstand, 'billboard': billboard, 'ad_bridge': ad_bridge, 'race_control': race_control,
-         'hospitality': hospitality}
+         'hospitality': hospitality, 'tree_pine': tree_pine, 'tree_round': tree_round, 'tyre_stack': tyre_stack,
+         'marshal_post': marshal_post, 'tv_tower': tv_tower, 'fuel_rig': fuel_rig}
 SPOTS = {'gantry': (-8.0, 1.5), 'bleacher': (0.0, -6.0), 'tent': (0.0, 3.0), 'flagpanel': (0.0, 7.0),
          'crane': (0.0, 11.5), 'tecpro': (0.0, 17.0),
          'grandstand': (-14.0, 0.0), 'billboard': (-14.0, 22.0), 'ad_bridge': (-30.0, 0.0),
-         'race_control': (-40.0, -12.0), 'hospitality': (-40.0, 8.0)}
+         'race_control': (-40.0, -12.0), 'hospitality': (-40.0, 8.0),
+         'tree_pine': (-52.0, -10.0), 'tree_round': (-52.0, -3.0), 'tyre_stack': (-52.0, 3.0),
+         'marshal_post': (-52.0, 7.0), 'tv_tower': (-52.0, 13.0), 'fuel_rig': (-52.0, 18.0)}
 
 
 def remove(name):

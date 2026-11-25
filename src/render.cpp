@@ -189,6 +189,7 @@ void Renderer::applyLivery(int idx) {
 
 void Renderer::freeCars() {
     ghostFor = -1; std::vector<ModelVertex>().swap(ghostVerts);
+    crewPalCount = 0;                             // the team / compound palettes are made again as needed
     for (int i = 0; i < CAR_COUNT; i++) if (carLoaded[i]) { carModel[i].unload(); carLoaded[i] = false; }
     std::vector<WorldVertex>().swap(pitVerts);   // the pit lane mesh is rebuilt for the next circuit
     gfx::fastRelease(raceMark);
@@ -407,7 +408,15 @@ void Renderer::drawWheels(const CarDef& d, const M4& place, int wl, float steer,
     if (body.axleF != 0) { xf = body.axleF; xr = body.axleR; y = body.wheelY; }   // measured on the model
     float rad = wm.scale[2];
     float fw = FRONT_W[d.era % ERA_COUNT];
-    gfx::bindTexture(&wm.lod[wl].tex);
+    // the sidewall stripe in the compound's colour (the hybrid and ground-effect eras; earlier tyres
+    // carry white lettering)
+    const Texture* wt = &wm.lod[wl].tex;
+    if (car && d.era >= ERA_HYBRID) {
+        static const u32 STRIPE[TY_COUNT] = {RGBA(225, 30, 30), RGBA(250, 205, 20), RGBA(240, 240, 238), RGBA(40, 190, 60), RGBA(30, 110, 240)};
+        u32 sc = STRIPE[car->tyre < 0 || car->tyre >= TY_COUNT ? 0 : car->tyre];
+        wt = teamTexture(wt, sc, sc);
+    }
+    gfx::bindTexture(wt);
     for (int k = 0; k < (frontOnly ? 2 : 4); k++) {
         bool front = k < 2, leftSide = (k & 1) == 0;
         // open wheels: the front tyres are narrower, the rear track a touch narrower than the front
@@ -432,7 +441,8 @@ void Renderer::drawFlap(const Car& c, const M4& place, bool near) {
     const Model& f = flap[c.def->era % ERA_COUNT];
     if (!f.lodCount) return;
     M4 w = place * M4::translate(FLAP_PIVOT[c.def->era % ERA_COUNT]) * M4::rotY(-c.drsFlap * 0.85f);
-    gfx::bindTexture(&f.lod[0].tex);
+    u32 mn, sc; teamColours(c.def, mn, sc);         // the flap in the team's colour, its tip in the second
+    gfx::bindTexture(teamTexture(&f.lod[0].tex, mn ? mn : RGBA(26, 26, 28), sc));
     if (near) clip::drawModel(f.lod[0].verts, f.lod[0].count, f.matrix(w));
     else gfx::drawModel(f.lod[0].verts, f.lod[0].count, f.matrix(w));
 }
@@ -1228,7 +1238,7 @@ const Texture* Renderer::teamTexture(const Texture* tex, u32 main, u32 second) {
     CrewPal* cp = nullptr;
     for (int i = 0; i < crewPalCount && !cp; i++)
         if (crewPal[i].pixels == tex->pixels && crewPal[i].main == main && crewPal[i].second == second) cp = &crewPal[i];
-    if (!cp && crewPalCount < 40) {
+    if (!cp && crewPalCount < 48) {
         cp = &crewPal[crewPalCount++];
         cp->pixels = tex->pixels; cp->main = main; cp->second = second;
         memcpy(cp->pal, tex->palette, sizeof cp->pal);

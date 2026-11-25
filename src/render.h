@@ -44,7 +44,7 @@ struct Renderer {
     // the crew texture with each team's palette (8 KB on the GPU each; the pixels are shared)
     // (keyed by the pixels too: the crew and the driver have different textures)
     struct CrewPal { const void* pixels; u32 main, second; Texture tex; u32 pal[256] __attribute__((aligned(16))); };
-    CrewPal crewPal[40]; int crewPalCount = 0;
+    CrewPal crewPal[48]; int crewPalCount = 0;      // (emptied with the cars: each race fills its own)
     const Texture* teamTexture(const Texture* tex, u32 main, u32 second);
     // the driver in the car, made in Blender (tools/blender/cockpit_parts.py -> tools/gen_cockpit.py):
     // helmet, HANS, shoulders and arms in the team's colours; not drawn from his own seat
