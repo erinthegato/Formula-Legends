@@ -1,8 +1,11 @@
 #include "render.h"
+#include "team_colours.h"
 #include "clip.h"
 #include "settings.h"
 #include <cstdio>
 #include <cstring>
+#include <cstdlib>
+#include <malloc.h>
 
 long statVerts[6];   // track, terrain, props, car bodies, wheels, cockpit (PC test statistics)
 static const float ASPECT = (float)SCREEN_W / SCREEN_H;
@@ -42,11 +45,9 @@ bool Renderer::loadCommon() {
     for (int i = 0; i < PROP_COUNT; i++) { snprintf(p, sizeof p, "DATA/models/%s.emm", P[i]); prop[i].load(p); }
     for (int e = 0; e < ERA_COUNT; e++) {
         snprintf(p, sizeof p, "DATA/models/wheel_%s.emm", ERA_ID[e]); eraWheel[e].load(p);
-        snprintf(p, sizeof p, "DATA/models/steering_%s.emm", ERA_ID[e]); steering[e].load(p);
-        snprintf(p, sizeof p, "DATA/models/flap_%s.emm", ERA_ID[e]); flap[e].load(p);
+        // the steering wheel and DRS flap load with the first car of their era (loadEraParts)
     }
     wheel = eraWheel[0];
-    pitCrew.load("DATA/models/pit_crew.emm");
     static const char* AN[ANIM_COUNT] = {"idle", "wheelgun", "push", "celebrate"};
     for (int a = 0; a < ANIM_COUNT; a++)
         for (int f = 0; f < POSE_FRAMES; f++) {
@@ -54,6 +55,7 @@ bool Renderer::loadCommon() {
             if (!pose[a][f].load(p)) break;
             poseCount[a] = f + 1;
         }
+    if (!poseCount[ANIM_IDLE]) pitCrew.load("DATA/models/pit_crew.emm");   // the still man: only without the poses
     // only crew_idle_0 carries the crew texture (tools/build_poses.py); every other pose shares it
     for (int a = 0; a < ANIM_COUNT; a++)
         for (int f = 0; f < poseCount[a]; f++)
@@ -73,21 +75,38 @@ bool Renderer::loadCommon() {
     gfx::moveToFastMemory(font.tex);
     for (auto& w : eraWheel) for (int i = 0; i < w.lodCount; i++) gfx::moveToFastMemory(w.lod[i].tex);
     for (auto& p : prop) for (int i = 0; i < p.lodCount; i++) gfx::moveToFastMemory(p.lod[i].tex);
-    for (auto* m : {&steering[0], &steering[1], &steering[2], &steering[3], &flap[0], &flap[1], &flap[2], &flap[3], &pitCrew, &fuelRig}) if (m->lodCount) gfx::moveToFastMemory(m->lod[0].tex);
+    for (auto* m : {&pitCrew, &fuelRig}) if (m->lodCount) gfx::moveToFastMemory(m->lod[0].tex);
     for (auto& an : pose) for (auto& m : an) if (m.lodCount) gfx::moveToFastMemory(m.lod[0].tex);
     raceMark = gfx::fastMark();
     return ok;
 }
 
+// an era's steering wheel and DRS flap, the first time a car of that era is loaded (a race only
+// ever needs its own era's, so the others don't take memory)
+void Renderer::loadEraParts(int e) {
+    if (e < 0 || e >= ERA_COUNT || eraPartsLoaded[e]) return;
+    eraPartsLoaded[e] = true;
+    char p[96];
+    snprintf(p, sizeof p, "DATA/models/steering_%s.emm", ERA_ID[e]);
+    if (steering[e].load(p)) gfx::moveToFastMemory(steering[e].lod[0].tex);
+    snprintf(p, sizeof p, "DATA/models/flap_%s.emm", ERA_ID[e]);
+    if (flap[e].load(p)) gfx::moveToFastMemory(flap[e].lod[0].tex);
+}
+
 void Renderer::loadCar(int idx) {
     if (idx < 0 || idx >= CAR_COUNT || carLoaded[idx]) return;
+    loadEraParts(CARS[idx].era % ERA_COUNT);
     char p[96];
     snprintf(p, sizeof p, "DATA/models/car_%s.emm", CARS[idx].id);
     carLoaded[idx] = carModel[idx].load(p);
     if (carLoaded[idx]) splitCar(idx);
     // car textures go to video memory (faster to draw from) while there is room: with the 16-bit
     // screen there is room for the near ones (16 KB each) too
-    if (carLoaded[idx]) for (int i = 0; i < carModel[idx].lodCount; i++) gfx::moveToFastMemory(carModel[idx].lod[i].tex);
+    if (carLoaded[idx]) {
+        Model& m = carModel[idx];
+        for (int i = 0; i < m.lodCount; i++) if (!(m.sharedTex & (1u << i))) gfx::moveToFastMemory(m.lod[i].tex);
+        m.reshare();
+    }
     if (carLoaded[idx] && CARS[idx].career) applyLivery(idx);
 }
 
@@ -101,18 +120,34 @@ void Renderer::setLivery(int idx, int style, u32 a, u32 b, u32 c) {
 void Renderer::applyLivery(int idx) {
     int k = idx - CAR_PICK;
     if (k < 0 || k >= ERA_COUNT || lvyStyle[k] < 0) return;
+    // The file holds every style (about 1.5 MB); only the chosen one is kept: the 288-byte header
+    // and that style's pixels (256 KB), re-read when the player picks another style.
+    if (lvyBlob[k] && lvyLoadedStyle[k] != lvyStyle[k]) { free(lvyBlob[k]); lvyBlob[k] = nullptr; }
     if (!lvyBlob[k]) {
         char p[96]; snprintf(p, sizeof p, "DATA/models/livery_%s.lvy", CARS[idx].id);
-        int size = 0; lvyBlob[k] = sys::loadFile(p, &size);
-        if (!lvyBlob[k]) return;
-        gfx::flushCache(lvyBlob[k], size);
+        int size = 0; void* all = sys::loadFile(p, &size);
+        if (!all) return;
+        const u8* a = (const u8*)all;
+        if (size < 288 || memcmp(a, "LVY1", 4)) { sys::freeFile(all); return; }
+        u32 h[7]; memcpy(h, a + 4, 28);
+        int ns = (int)h[0] ? (int)h[0] : 1;
+        size_t per = 0; for (u32 l = 0; l < h[1] && l < 4; l++) per += (size_t)h[3 + l] * h[3 + l];
+        int st = lvyStyle[k] % ns;
+        if ((size_t)size < 288 + per * (st + 1)) { sys::freeFile(all); return; }
+        u8* one = (u8*)memalign(16, 288 + per);
+        if (!one) { sys::freeFile(all); return; }
+        memcpy(one, a, 288);
+        memcpy(one + 288, a + 288 + per * st, per);
+        u32 single = 1; memcpy(one + 4, &single, 4);      // now holds one style
+        sys::freeFile(all);
+        lvyBlob[k] = one; lvyLoadedStyle[k] = lvyStyle[k];
+        gfx::flushCache(one, (int)(288 + per));
     }
     const u8* b = (const u8*)lvyBlob[k];
-    if (memcmp(b, "LVY1", 4)) return;
     u32 head[7]; memcpy(head, b + 4, 28);
-    int styles = (int)head[0], lods = (int)head[1], roles = (int)head[2];
+    int lods = (int)head[1], roles = (int)head[2];
     const u32* sizes = head + 3;
-    int style = lvyStyle[k] % (styles ? styles : 1);
+    int style = 0;
     // the palette: fixed colours plus the three paints (and the main paint darkened, for shut lines)
     static u32 pal[ERA_COUNT][256] __attribute__((aligned(16)));
     auto dark = [](u32 c, float f) { return RGBA((int)((c & 255) * f), (int)(((c >> 8) & 255) * f), (int)(((c >> 16) & 255) * f)); };
@@ -137,6 +172,7 @@ void Renderer::applyLivery(int idx) {
         }
         px += sizes[l] * sizes[l];
     }
+    m.reshare();       // the smaller levels share level 0's freshly painted texture
 }
 
 void Renderer::freeCars() {
@@ -1140,7 +1176,19 @@ void Renderer::drawCarShowroom(int idx, float angle, float x0, float y0, float w
     drawWheels(CARS[idx], place, 0, 0, 0);
 }
 
-void Renderer::drawPerson(const M4& place, int anim, float t, bool clipped) {
+void Renderer::teamColours(const CarDef* d, u32& main, u32& second) const {
+    main = second = 0;
+    if (!d) return;
+    if (d->career) {                       // the player's own team: the colours chosen for its livery
+        int k = (int)(d - CARS) - CAR_PICK;
+        if (k >= 0 && k < ERA_COUNT && lvyStyle[k] >= 0) { main = lvyCol[k][0]; second = lvyCol[k][1]; return; }
+    }
+    main = d->colour;
+    second = RGBA(240, 240, 238);
+    for (const TeamSecond& s : TEAM_SECOND) if (!strcmp(s.id, d->id)) { second = s.abgr; break; }
+}
+
+void Renderer::drawPerson(const M4& place, int anim, float t, bool clipped, u32 main, u32 second) {
     const Model* m = &pitCrew;
     const ModelVertex* verts = nullptr;
     if (anim >= 0 && anim < ANIM_COUNT && poseCount[anim] > 0) {
@@ -1182,13 +1230,30 @@ void Renderer::drawPerson(const M4& place, int anim, float t, bool clipped) {
     }
     if (!m->lodCount) return;
     if (!verts) verts = m->lod[0].verts;
-    // The motions came out of Unity each turned its own way (measured from the visor of the helmet
-    // in the baked poses): idle and celebrate face -X, the wheel gun -Y, the push +X. Every caller
-    // places a person facing +X, so turn each motion round to that first.
-    static const float FACE[ANIM_COUNT] = {3.14159f, 1.5708f, 0.0f, 3.14159f};   // idle, wheel gun, push, celebrate
+    // The crew made in Blender (tools/blender/pit_crew.py) faces +X in every motion, the way every
+    // caller places a person. (Kept as a table in case a motion is ever authored turned round.)
+    static const float FACE[ANIM_COUNT] = {0.0f, 0.0f, 0.0f, 0.0f};   // idle, wheel gun, push, celebrate
     M4 at = place;
     if (m != &pitCrew && anim >= 0 && anim < ANIM_COUNT && FACE[anim] != 0) at = place * M4::rotZ(FACE[anim]);
-    gfx::bindTexture(&m->lod[0].tex);
+    // team colours: the same pixels with the team's own palette (tools/gen_crew.py: entries 1-4)
+    const Texture* tex = &m->lod[0].tex;
+    if ((main || second) && tex->palette) {
+        main |= 0xFF000000u; second |= 0xFF000000u;
+        CrewPal* cp = nullptr;
+        for (int i = 0; i < crewPalCount && !cp; i++) if (crewPal[i].main == main && crewPal[i].second == second) cp = &crewPal[i];
+        if (!cp && crewPalCount < 24) {
+            cp = &crewPal[crewPalCount++];
+            cp->main = main; cp->second = second;
+            memcpy(cp->pal, tex->palette, sizeof cp->pal);
+            cp->pal[1] = main; cp->pal[2] = second; cp->pal[3] = main; cp->pal[4] = second;
+            gfx::flushCache(cp->pal, sizeof cp->pal);
+        }
+        if (cp) {      // bound by address, so each team keeps its own Texture (same pixels, its palette)
+            cp->tex = *tex; cp->tex.palette = cp->pal;
+            tex = &cp->tex;
+        }
+    }
+    gfx::bindTexture(tex);
     if (clipped) clip::drawModel(verts, m->lod[0].count, m->matrix(at));
     else gfx::drawModel(verts, m->lod[0].count, m->matrix(at));
 }

@@ -76,6 +76,10 @@ struct Model {
     float axleF = 0, axleR = 0, wheelY = 0.86f, wheelR = 0;
     bool ownWheels = false;
     uint32_t flags = 0;    // EMX1 flags: bit 0 own wheels, bit 1 Unity AI interior (new instrument layout)
+    // levels of detail stored without a texture of their own use level 0's (the GPU's mipmaps already
+    // make it smaller in the distance): bit i set = lod[i] borrows lod[0]'s texture
+    uint8_t sharedTex = 0;
+    void reshare() { for (int i = 1; i < lodCount; i++) if (sharedTex & (1u << i)) lod[i].tex = lod[0].tex; }
     void* blob = nullptr;
     bool load(const char* path);
     void unload();

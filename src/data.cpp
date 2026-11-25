@@ -134,6 +134,7 @@ bool Model::load(const char* path) {
     memcpy(scale, p, 12); p += 12;
     memcpy(offset, p, 12); p += 12;
     lodCount = (int)(n > 4 ? 4 : n);
+    sharedTex = 0;
     for (int i = 0; i < lodCount; i++) {
         uint32_t vc, ts, gl; memcpy(&vc, p, 4); memcpy(&ts, p + 4, 4); memcpy(&gl, p + 8, 4);
         if (i == 0) memcpy(&cabX, p + 12, 4);
@@ -143,6 +144,7 @@ bool Model::load(const char* path) {
         p += 16;
         lod[i].tex.w = lod[i].tex.h = (int)ts;
         if (ts) { lod[i].tex.palette = (const u32*)p; p += 1024; lod[i].tex.pixels = p; p += ts * ts; }
+        else if (i > 0 && lod[0].tex.pixels) { lod[i].tex = lod[0].tex; sharedTex |= (uint8_t)(1u << i); }   // shares level 0's
         else { lod[i].tex.palette = nullptr; lod[i].tex.pixels = nullptr; }   // no texture: borrows another model's
         lod[i].verts = (const ModelVertex*)p; lod[i].count = (int)vc; p += vc * sizeof(ModelVertex);
     }

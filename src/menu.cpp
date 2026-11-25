@@ -292,7 +292,8 @@ void Game::drawMenus(float dt) {
     {
         const V3 at[4] = {V3(-5.5f, 0.9f, 0), V3(1.5f, 3.9f, 0), V3(-3.9f, -1.6f, 0), V3(-5.2f, -6.8f, 0)};
         const float yaw[4] = {-0.3f, -1.8f, 0.5f, 1.2f};
-        for (int k = 0; k < 4; k++) R.drawPerson(M4::translate(at[k] - eye) * M4::rotZ(yaw[k]), Renderer::ANIM_IDLE, t + k * 0.6f, true);
+        u32 tm, ts; R.teamColours(&CARS[showCar], tm, ts);     // the garage's crew in the team's colours
+        for (int k = 0; k < 4; k++) R.drawPerson(M4::translate(at[k] - eye) * M4::rotZ(yaw[k]), Renderer::ANIM_IDLE, t + k * 0.6f, true, tm, ts);
     }
     prop(R.fuelRig, V3(-5.0f, -2.8f, 0), 0.4f, 1);
     prop(R.prop[PROP_TYRES], V3(-5.9f, 3.9f, 0), 0, 1); prop(R.prop[PROP_TYRES], V3(-5.9f, 2.5f, 0), 0.5f, 1); prop(R.prop[PROP_TYRES], V3(6.0f, -3.9f, 0), 0.2f, 1);
@@ -630,7 +631,8 @@ void Game::drawPodium() {
             V3 at(SX[k] + (d - 1) * 0.78f, 0.8f, topZ + hop);
             M4 place = M4::translate(at - eye) * M4::rotZ(-1.5708f + (d - 1) * 0.2f);
             bool party = t > 2.5f;
-            R.drawPerson(place, party ? Renderer::ANIM_CELEBRATE : Renderer::ANIM_IDLE, t + d * 0.37f + k * 0.21f, true);
+            u32 tm, ts; R.teamColours(cls[k]->def, tm, ts);   // the drivers' helmets and suits in their team's colours
+            R.drawPerson(place, party ? Renderer::ANIM_CELEBRATE : Renderer::ANIM_IDLE, t + d * 0.37f + k * 0.21f, true, tm, ts);
         }
         float sx, sy;
         if (project(pv, V3(SX[k], 0.8f, topZ + 1.75f), sx, sy)) { podiumScr[k][0] = sx; podiumScr[k][1] = sy; }

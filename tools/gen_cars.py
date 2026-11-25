@@ -228,8 +228,10 @@ def quantise(img):
     return [0xFF000000 | (pal[i * 3 + 2] << 16) | (pal[i * 3 + 1] << 8) | pal[i * 3] for i in range(256)], np.asarray(q, np.uint8)
 
 
-def write_emm(path, lods, meta=(0.0, 0.0, 0.0), emx=None):
-    """lods: list of (Mesh, texture image, texture size). Glass triangles go last in each LOD."""
+def write_emm(path, lods, meta=(0.0, 0.0, 0.0), emx=None, share_tex=False):
+    """lods: list of (Mesh, texture image, texture size). Glass triangles go last in each LOD.
+    share_tex: levels 1+ painted from the same image as level 0 store no texture and use level 0's
+    (the Vita's mipmaps shrink it in the distance) -- saves memory with no visible change."""
     P0 = lods[0][0].arrays()[0].reshape(-1, 3)
     mn, mx = P0.min(0), P0.max(0)
     centre = (mn + mx) / 2
@@ -242,13 +244,15 @@ def write_emm(path, lods, meta=(0.0, 0.0, 0.0), emx=None):
             order = np.argsort(G, kind='stable')
             P, UV, LT, G = P[order], UV[order], LT[order], G[order]
             vc = len(P) * 3
-            t = tex.resize((ts, ts), Image.LANCZOS) if tex.size[0] != ts else tex
-            pal, pix = quantise(t)
-            # header (16 bytes): vertex count, texture size, glass vertex count, one extra number
-            # (LOD 0: cabin position x, LOD 1: number panel y, LOD 2: number panel x)
-            f.write(struct.pack('<IIIf', vc, ts, int(G.sum()) * 3, meta[li] if li < 3 else 0.0))
-            f.write(struct.pack('<256I', *pal))
-            f.write(swizzle(pix.reshape(-1), ts, ts).tobytes())
+            shared = share_tex and li > 0 and tex is lods[0][1]
+            # header (16 bytes): vertex count, texture size (0: level 0's), glass vertex count, one extra
+            # number (LOD 0: cabin position x, LOD 1: number panel y, LOD 2: number panel x)
+            f.write(struct.pack('<IIIf', vc, 0 if shared else ts, int(G.sum()) * 3, meta[li] if li < 3 else 0.0))
+            if not shared:
+                t = tex.resize((ts, ts), Image.LANCZOS) if tex.size[0] != ts else tex
+                pal, pix = quantise(t)
+                f.write(struct.pack('<256I', *pal))
+                f.write(swizzle(pix.reshape(-1), ts, ts).tobytes())
             q = np.clip(np.round((P.reshape(-1, 3) - centre) / scale * 32767), -32767, 32767).astype(np.int16)
             uv16 = np.clip(np.round(UV.reshape(-1, 2) * 32767), 0, 65535).astype(np.uint16)
             g = np.clip(np.round(LT.reshape(-1) * 255), 0, 255).astype(np.uint32)

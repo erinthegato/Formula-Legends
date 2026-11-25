@@ -156,6 +156,7 @@ void Renderer::drawPit(const Race& r, const Camera& cam) {
         if (dot(rel, rel) > 70.0f * 70.0f) continue;
         M4 place = M4::basis(c.fwd, c.left, V3(0, 0, 1), rel - V3(0, 0, c.lift));
         float tt = r.time * 3.0f + c.number;
+        u32 tm, ts; teamColours(c.def, tm, ts);        // the crew wear the team's colours
         if (c.pitPhase <= -2) {
             // in the garage: the crew round the car; when it goes out, two push at the back and one at each side
             bool pushing = c.pitPhase == -3 && c.pitTimer > 2.6f;
@@ -168,7 +169,7 @@ void Renderer::drawPit(const Race& r, const Camera& cam) {
                 bool animated = poseCount[pushing ? ANIM_PUSH : ANIM_IDLE] > 0;
                 float lean = pushing && k < 2 && !animated ? 0.25f : 0;
                 M4 p = place * M4::translate(V3(x, y, 0)) * M4::rotZ(yaw) * M4::rotY(lean);
-                drawPerson(p, pushing ? ANIM_PUSH : ANIM_IDLE, tt * 0.33f + k * 0.4f);
+                drawPerson(p, pushing ? ANIM_PUSH : ANIM_IDLE, tt * 0.33f + k * 0.4f, false, tm, ts);
             }
             continue;
         }
@@ -190,19 +191,19 @@ void Renderer::drawPit(const Race& r, const Camera& cam) {
                 bool gun = wheels && k < 4;
                 float squat = gun && !poseCount[ANIM_WHEELGUN] ? 0.7f : 1.0f;
                 M4 p = place * M4::translate(V3(WX[k], y, 0)) * M4::rotZ(yaw) * M4::scale(1, 1, squat);
-                drawPerson(p, gun ? ANIM_WHEELGUN : ANIM_IDLE, tt * 0.33f + k * 0.3f);
+                drawPerson(p, gun ? ANIM_WHEELGUN : ANIM_IDLE, tt * 0.33f + k * 0.3f, false, tm, ts);
                 if (k < 4) {
                     // wheel off (behind) and wheel on (ahead) men, standing off a little while the gun works
                     float sy = WY[k] * (in + 0.75f);
                     M4 a = place * M4::translate(V3(WX[k] - 0.75f, sy, 0)) * M4::rotZ(WY[k] > 0 ? -2.2f : 2.2f);
                     M4 b = place * M4::translate(V3(WX[k] + 0.75f, sy, 0)) * M4::rotZ(WY[k] > 0 ? -0.9f : 0.9f);
-                    drawPerson(a, ANIM_IDLE, tt * 0.33f + k * 0.5f + 1.0f);
-                    drawPerson(b, ANIM_IDLE, tt * 0.33f + k * 0.7f + 2.0f);
+                    drawPerson(a, ANIM_IDLE, tt * 0.33f + k * 0.5f + 1.0f, false, tm, ts);
+                    drawPerson(b, ANIM_IDLE, tt * 0.33f + k * 0.7f + 2.0f, false, tm, ts);
                 }
             }
             if (ph == 0 || ph == -2) {
                 M4 p = place * M4::translate(V3(-0.8f, 1.6f, 0)) * M4::rotZ(-1.57f);
-                drawPerson(p, ANIM_IDLE, tt * 0.33f + 2.0f);
+                drawPerson(p, ANIM_IDLE, tt * 0.33f + 2.0f, false, tm, ts);
             }
         }
         if (fuelRig.lodCount && r.ep().refuel) {           // refuelling only in the 1990s

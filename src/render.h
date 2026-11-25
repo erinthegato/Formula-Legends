@@ -21,12 +21,20 @@ struct Renderer {
     Model wheel, prop[PROP_COUNT], cockpit[2], steering[ERA_COUNT], pitCrew, fuelRig;
     Model eraWheel[ERA_COUNT], flap[ERA_COUNT];      // each era's road wheel and DRS flap
     void drawFlap(const Car& c, const M4& place, bool near);
-    // crew / driver poses baked from Unity AI motions (tools/unity/PspPoseExport.cs): DATA/models/crew_<anim>_<frame>.emm
+    bool eraPartsLoaded[ERA_COUNT] = {};
+    void loadEraParts(int era);
+    // crew / driver poses made in Blender (tools/blender/pit_crew.py -> tools/gen_crew.py): DATA/models/crew_<anim>_<frame>.emm
     enum { ANIM_IDLE = 0, ANIM_WHEELGUN, ANIM_PUSH, ANIM_CELEBRATE, ANIM_COUNT };
     static const int POSE_FRAMES = 4;
     Model pose[ANIM_COUNT][POSE_FRAMES]; int poseCount[ANIM_COUNT] = {};
-    // a person (crew member / driver) at `place` (metres, feet on z 0, facing +X), playing `anim` at time t
-    void drawPerson(const M4& place, int anim, float t, bool clipped = false);
+    // a person (crew member / driver) at `place` (metres, feet on z 0, facing +X), playing `anim` at time t,
+    // in a team's colours (suit and helmet: `main`, flashes and helmet stripe: `second`; 0 0 = the default)
+    void drawPerson(const M4& place, int anim, float t, bool clipped = false, u32 main = 0, u32 second = 0);
+    void teamColours(const CarDef* d, u32& main, u32& second) const;
+    // the crew texture with each team's palette (8 KB on the GPU each; the pixels are shared)
+    struct CrewPal { u32 main, second; Texture tex; u32 pal[256] __attribute__((aligned(16))); };
+    CrewPal crewPal[24]; int crewPalCount = 0;
+    int lvyLoadedStyle[ERA_COUNT] = {-1, -1, -1, -1};   // the one career livery style kept in lvyBlob
     // car models re-ordered into body / nose / rear wing (the nose and wing can come off)
     struct PartSplit { int body = 0, noseFirst = 0, noseCount = 0, wingFirst = 0, wingCount = 0, glassFirst = 0, glassCount = 0; V3 noseC, wingC; };
     PartSplit split[48][4];

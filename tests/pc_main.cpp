@@ -24,7 +24,7 @@ static void shot(Game& g, const std::string& path, float dt = 1.0f / 60) {
     g.frame(dt, p);
     pc::saveShot(path.c_str());
     fprintf(stderr, "    vertices: track %ld  terrain %ld  props %ld  cars %ld  wheels %ld\n", statVerts[0], statVerts[1], statVerts[2], statVerts[3], statVerts[4]);
-    fprintf(stderr, "  shot %s  (%ld triangles, %ld vertices sent, %ld draw calls)\n", path.c_str(), pc::trisDrawn, pc::vertsSent, pc::drawCalls);
+    fprintf(stderr, "  shot %s  (%ld triangles, %ld vertices sent, %ld draw calls, heap %.1f MB)\n", path.c_str(), pc::trisDrawn, pc::vertsSent, pc::drawCalls, sys::memUsedKB() / 1024.0);
 }
 
 static void press(Game& g, bool Pad::*b) {
@@ -557,6 +557,79 @@ int main(int argc, char** argv) {
             Pad x{}; x.cross = true; g.frame(1.0f / 30, x);
             Pad z{}; g.frame(1.0f / 30, z);
         }
+        return 0;
+    }
+    if (mode == "crewreel") {
+        // crewreel <outdir> [frames]: four crew members on the grid, one per motion (idle, wheel gun,
+        // push, celebrate), 20 frames a second, for a preview of the animations
+        std::string out = argv[2];
+        int frames = argc > 3 ? atoi(argv[3]) : 60;
+        for (int i = 0; i < TRACK_COUNT; i++) if (!strcmp(TRACKS[i].id, "monza")) g.set.track = i;
+        g.set.car = 1; g.set.laps = 1; g.set.opponents = 0; g.set.weather = 0;
+        g.aiDrivesPlayer = true;
+        g.startRace();
+        if (g.screen != SCR_RACE) { fprintf(stderr, "race did not start\n"); return 1; }
+        const Track& T = g.race.track;
+        V3 p, t, l; float hw; T.frame(T.wrap(-60), p, t, l, hw);
+        Camera cam; cam.up = V3(0, 0, 1); cam.fov = 50;
+        V3 mid = p + l * 2.0f;
+        cam.eye = mid - t * 0.4f - l * 6.2f + V3(0, 0, 1.5f);
+        cam.fwd = norm(mid + V3(0, 0, 0.75f) - cam.eye);
+        for (int f = 0; f < frames; f++) {
+            float time = f / 20.0f;
+            gfx::beginFrame(RGBA(150, 180, 220));
+            g.R.camRight = norm(cross(cam.fwd, cam.up)); g.R.camUp = cross(g.R.camRight, cam.fwd);
+            g.R.drawScene(g.race, cam, true);
+            for (int k = 0; k < 4; k++) {
+                V3 at = mid + t * ((k - 1.5f) * 1.45f);
+                at.z = p.z;
+                // turned to show each motion best: idle three quarters on, wheel gun and push side on,
+                // the celebration facing the camera
+                static const float TURN[4] = {0.6f, 1.35f, 1.3f, 0.15f};
+                float yaw = atan2f(-l.y, -l.x) + TURN[k];
+                M4 place = M4::translate(at - cam.eye) * M4::rotZ(yaw);
+                // each in a different team's colours
+                static const char* TEAM[4] = {"m25_marchetti", "m25_papaya", "m25_sterne", "m25_enstone"};
+                u32 tm = 0, ts = 0;
+                for (int i = 0; i < CAR_COUNT; i++) if (!strcmp(CARS[i].id, TEAM[k])) g.R.teamColours(&CARS[i], tm, ts);
+                g.R.drawPerson(place, k, time, true, tm, ts);
+            }
+            gfx::endFrame();
+            char b[128]; snprintf(b, sizeof b, "%s/reel_%03d.ppm", out.c_str(), f);
+            pc::saveShot(b);
+        }
+        return 0;
+    }
+    if (mode == "pitreel") {
+        // pitreel <outdir>: a car is called in on lap 1; when it stops in its box, 6 s of the
+        // stop at 20 frames a second from beside the car (the crew's real work in the game)
+        std::string out = argv[2];
+        for (int i = 0; i < TRACK_COUNT; i++) if (!strcmp(TRACKS[i].id, "monza")) g.set.track = i;
+        g.set.car = 1; g.set.laps = 3; g.set.opponents = 5; g.set.weather = 0;
+        g.aiDrivesPlayer = true;
+        g.startRace();
+        if (g.screen != SCR_RACE) { fprintf(stderr, "race did not start\n"); return 1; }
+        int who = -1;
+        for (int i = 0; i < (int)g.race.cars.size(); i++) if (!g.race.cars[i].player) { who = i; break; }
+        g.race.cars[who].wantPit = true;
+        int f = 0; float start = -1;
+        for (int step = 0; step < 60 * 400 && f < 120; step++) {
+            Pad q{}; g.frame(1.0f / 60, q);
+            const Car& c = g.race.cars[who];
+            if (start < 0 && c.pit == PIT_STOP && c.pitPhase >= 1) { start = g.race.time; fprintf(stderr, "car %d stopped at %.1f s\n", who, start); }
+            if (start < 0 || (step % 3)) continue;
+            Camera cam; cam.up = V3(0, 0, 1); cam.fov = 55;
+            // low by the right front wheel, looking back along the car
+            cam.eye = c.pos - c.left * 3.4f + c.fwd * 4.6f + V3(0, 0, 1.25f);
+            cam.fwd = norm(c.pos - c.left * 0.7f + c.fwd * 0.6f + V3(0, 0, 0.35f) - cam.eye);
+            gfx::beginFrame(RGBA(150, 180, 220));
+            g.R.camRight = norm(cross(cam.fwd, cam.up)); g.R.camUp = cross(g.R.camRight, cam.fwd);
+            g.R.drawScene(g.race, cam, false);
+            gfx::endFrame();
+            char b[128]; snprintf(b, sizeof b, "%s/pit_%03d.ppm", out.c_str(), f++);
+            pc::saveShot(b);
+        }
+        if (start < 0) { fprintf(stderr, "the car never stopped\n"); return 1; }
         return 0;
     }
     if (mode == "props") {

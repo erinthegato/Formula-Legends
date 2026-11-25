@@ -638,7 +638,7 @@ KEY_A, KEY_B, KEY_C = (1.0, 0.0, 1.0), (0.0, 1.0, 1.0), (0.5, 0.0, 1.0)
 LSTYLES = ['classic', 'band', 'split', 'nose', 'stripe', 'bull']
 
 
-def write_livery_set(path, c, s, sizes=(512, 256, 128)):
+def write_livery_set(path, c, s, sizes=(512,)):   # one size: the smaller levels share it
     keys = {rgb(KEY_A): 1, rgb(KEY_B): 2, rgb(KEY_C): 3}
     roles = {}; images = []
     for style in LSTYLES:
@@ -657,7 +657,7 @@ def write_livery_set(path, c, s, sizes=(512, 256, 128)):
         raise SystemExit(f'too many colour roles in the career livery ({len(roles)})')
     with open(path, 'wb') as f:
         f.write(b'LVY1'); f.write(struct.pack('<III', len(LSTYLES), len(sizes), len(roles)))
-        f.write(struct.pack('<4I', *(list(sizes) + [0])))
+        f.write(struct.pack('<4I', *(list(sizes) + [0] * (4 - len(sizes)))))
         tab = [(0, 0)] * 32
         for col, r in roles.items():
             tab[r] = (keys.get(col, 0), 0xFF000000 | (col[2] << 16) | (col[1] << 8) | col[0])
@@ -688,7 +688,7 @@ def main():
         meta = (0.0, s['airbox'][2] + 0.01, s['airbox'][0] - 0.25)
         # EMX1: axles and wheel track, rear wheel radius; flags: bit 2 = open-wheeler (drawn as an F1 car)
         emx = (s['xf'], s['xr'], s['wheel_y'], s['R'], 4)
-        n = write_emm(os.path.join(OUT, f"car_{c['id']}.emm"), lods, meta=meta, emx=emx)
+        n = write_emm(os.path.join(OUT, f"car_{c['id']}.emm"), lods, meta=meta, emx=emx, share_tex=True)
         print(f"{c['id']:16s} {c['era']:6s} triangles {n}")
         if prev:
             p.img.save(os.path.join(prev, f"livery_{c['id']}.png"))
@@ -698,7 +698,7 @@ def main():
     t.swatches(dict(glass=(0.08, 0.11, 0.16), white=(0.92, 0.92, 0.88), red=(0.85, 0.08, 0.06), carbon=(0.09, 0.09, 0.10),
                     cage=(0.50, 0.52, 0.56), second=(0.8, 0.1, 0.1), panel=(0.9, 0.1, 0.1), paint=(0.10, 0.10, 0.11), **G.HD_SWATCH))
     for era in ERAS:
-        print('wheel', era, write_emm(os.path.join(OUT, f'wheel_{era}.emm'), [(build_wheel(era, 18, True), t.img, 128), (build_wheel(era, 10, False), t.img, 64), (build_wheel(era, 7, False), t.img, 32)]))
+        print('wheel', era, write_emm(os.path.join(OUT, f'wheel_{era}.emm'), [(build_wheel(era, 18, True), t.img, 128), (build_wheel(era, 10, False), t.img, 64), (build_wheel(era, 7, False), t.img, 32)], share_tex=True))
         print('flap', era, write_emm(os.path.join(OUT, f'flap_{era}.emm'), [(build_flap(era), t.img, 64)]))
         print('steering', era, write_emm(os.path.join(OUT, f'steering_{era}.emm'), [(build_steering(era), t.img, 256)]))
     # the career cars' livery sets

@@ -101,6 +101,15 @@ DRS opens by itself when you have it; the DRS box by the speedometer shows it (o
   marshal light panels, recovery cranes, TecPro barriers) and exports them to `tools/blender/props/`;
   `python3 tools/gen_trackside.py` turns them into `HD/models/*.emm` with one 64 px colour texture each
   (about 15-30 KB a model). `Track::addTrackside()` places them on every circuit.
+* `tools/blender/pit_crew.py` builds the rigged pit crew member (full-face helmet, wheel gun) and his
+  four motions, keyed on the timeline (idle 1-10, wheel gun 11-20, push 21-30, celebrate 31-40);
+  `export_json()` -> `tools/blender/pit_crew.json`, then `python3 tools/gen_crew.py` writes the 16 poses
+  (`crew_<motion>_<pose>.emm`) and `src/team_colours.h`. The crew and the podium drivers wear their team's
+  colours: palette entries 1-4 of the shared 64 px texture are swapped per team (`Renderer::drawPerson`).
+* Memory: the F1 cars' smaller levels of detail share level 0's texture (`Model::sharedTex`), the career
+  livery keeps only the chosen style in memory, and each era's steering wheel and DRS flap load with
+  the first car of that era. `FL_MEM=1` prints the PC test's heap peak, `FL_FILES=1` every file it reads.
+  Previews: `fl_test crewreel <dir>` (the four motions) and `fl_test pitreel <dir>` (a real stop).
 * The F1 engine loops (`DATA/audio/f1_*.raw`) were generated with ElevenLabs sound effects;
   `tools/audio/make_engine_loops.py <folder of takes>` picks the steadiest take per era and cuts the loop.
 * Circuits: `python3 tools/build_tracks.py` -> `DATA/tracks/*.emt`. Outlines in

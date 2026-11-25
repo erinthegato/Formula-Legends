@@ -287,6 +287,7 @@ void* loadFile(const char* path, int* size) {
     if (fread(p, 1, n, f) != (size_t)n) { fclose(f); free(p); return nullptr; }
     fclose(f);
     if (size) *size = (int)n;
+    if (getenv("FL_FILES")) fprintf(stderr, "load %7ld %s\n", n, path);   // FL_FILES=1: every file read, with its size
     return p;
 }
 void freeFile(void* p) { free(p); }
