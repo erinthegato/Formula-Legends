@@ -838,15 +838,12 @@ void Game::screenHelp(Panel& P) {
     struct Line { const char* role; const char* who; };
     static const Line L[] = {
         {"Producer / CEO / Engineer", "Erin"},
-        {"Main coder", "Claude Code (Anthropic)"},
         {"Studio", "CODE 4 Studios"},
         {"Engine", "Endurance Motor Racing 3D"},
         {"Intro music", "Kickstart My Heart - Motley Crue"},
         {"Attract music", "Lose My Mind - Don Toliver feat. Doja Cat"},
-        {"Menu music", "Generated with Google Lyria 3"},
-        {"Cars, wheels, cockpits", "Generated in code"},
-        {"Pit crew, props", "Unity AI (Tripo, Gemini)"},
-        {"Engine sounds", "Generated in code"},
+        {"Cars, wheels, cockpits", "Modelled in Blender"},
+        {"Pit crew, safety cars, props", "Modelled in Blender"},
         {"Circuit outlines", "bacinger/f1-circuits (MIT)"},
         {"Circuit heights", "EU-DEM 25 m, SRTM 30 m"},
     };

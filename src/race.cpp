@@ -569,7 +569,8 @@ void Race::drive(Car& c, float dt) {
         float relS = pitRel(c.s), relBox = pitRel(boxS(c));
         bool stopping = c.pit == PIT_IN && c.pitPhase != -1;     // (-1: drive-through, no stop)
         if (stopping && relBox - relS < 30) laneT = boxD;
-        if (c.pit == PIT_OUT && relS > pitRel(pitOut) - 130) laneT = hw * 0.5f;
+        // out of the pits: stay in the lane until the pit wall has ended, then blend onto the track
+        if (c.pit == PIT_OUT && relS > pitRel(pitWallTo) + 3) laneT = hw * 0.5f;
         target = laneT;
         vt = c.pit == PIT_STOP ? 0 : 21.4f;   // 80 km/h pit limit (a touch under)
         if (stopping) {

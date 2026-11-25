@@ -147,8 +147,9 @@ void Race::setupPit() {
     pitWallFrom = track.wrap(-PIT_IN_BEFORE + 80.0f);
     pitWallTo = track.wrap(LANE_LEN - PIT_IN_BEFORE - 70.0f);
     float hw = track.pts[0].hw;
-    laneD = hw + 6.0f;
-    boxD = hw + 9.5f;
+    // the wall at hw + 2.3; the teams' pit wall stands behind it (to hw + 4.9); the fast lane, then the boxes
+    laneD = hw + 8.8f;
+    boxD = hw + 12.3f;
 }
 
 float Race::pitRel(float s) const {

@@ -99,6 +99,22 @@ void Renderer::buildPit(const Race& r) {
         addBox(pitVerts, P(a, garage, 4.6f), P(b, garage, 4.6f), P(b, garage + 12, 4.6f), P(a, garage + 12, 4.6f), RGBA(150, 152, 158));
         addBox(pitVerts, P(a, garage + 12, 0), P(b + 1, garage + 12, 0), P(b + 1, garage + 12, 4.6f), P(a, garage + 12, 4.6f), RGBA(120, 122, 128));
         addBox(pitVerts, P(b, garage, 0), P(b + 1, garage, 0), P(b + 1, garage, 4.6f), P(b, garage, 4.6f), RGBA(230, 230, 232));
+        // the team's pit wall stand opposite its garage: a raised floor behind the wall, the desk and
+        // its screens facing the track, a canopy with the team's colour along its edge
+        {
+            float sa = a + 3.5f, sb = b - 3.5f, d0 = wallD + 0.25f, d1 = wallD + 2.5f;
+            u32 dark = RGBA(34, 36, 40), grey = RGBA(150, 152, 158);
+            addBox(pitVerts, P(sa, d0, 0.5f), P(sb, d0, 0.5f), P(sb, d1, 0.5f), P(sa, d1, 0.5f), RGBA(95, 98, 104));     // floor
+            addBox(pitVerts, P(sa, d1, 0), P(sb, d1, 0), P(sb, d1, 0.5f), P(sa, d1, 0.5f), grey);                       // its edge
+            addBox(pitVerts, P(sa, d0 + 0.75f, 1.35f), P(sb, d0 + 0.75f, 1.35f), P(sb, d0 + 0.75f, 0.5f), P(sa, d0 + 0.75f, 0.5f), dark);  // desk front
+            addBox(pitVerts, P(sa, d0, 1.35f), P(sb, d0, 1.35f), P(sb, d0 + 0.75f, 1.35f), P(sa, d0 + 0.75f, 1.35f), RGBA(58, 60, 66));   // desk top
+            for (float m = sa + 0.6f; m + 1.1f < sb; m += 1.4f)      // the screens, facing the engineers
+                addBox(pitVerts, P(m, d0 + 0.3f, 1.4f), P(m + 1.1f, d0 + 0.3f, 1.4f), P(m + 1.1f, d0 + 0.3f, 2.05f), P(m, d0 + 0.3f, 2.05f), RGBA(40, 90, 140));
+            for (float x : {sa, sb})                                   // posts
+                addBox(pitVerts, P(x, d1 - 0.1f, 0.5f), P(x, d1 - 0.1f, 3.0f), P(x + 0.12f, d1 - 0.1f, 3.0f), P(x + 0.12f, d1 - 0.1f, 0.5f), grey);
+            addBox(pitVerts, P(sa - 0.3f, d0 - 0.4f, 3.0f), P(sb + 0.3f, d0 - 0.4f, 3.0f), P(sb + 0.3f, d1 + 0.3f, 3.0f), P(sa - 0.3f, d1 + 0.3f, 3.0f), RGBA(210, 212, 216));   // canopy
+            addBox(pitVerts, P(sa - 0.3f, d1 + 0.3f, 2.7f), P(sb + 0.3f, d1 + 0.3f, 2.7f), P(sb + 0.3f, d1 + 0.3f, 3.0f), P(sa - 0.3f, d1 + 0.3f, 3.0f), door);   // team fascia
+        }
         // painted box on the lane
         addBox(pitVerts, P(a + 2, r.boxD - 2.2f, 0.09f), P(a + 2.3f, r.boxD - 2.2f, 0.09f), P(a + 2.3f, r.boxD + 2.2f, 0.09f), P(a + 2, r.boxD + 2.2f, 0.09f), RGBA(250, 210, 40));
         addBox(pitVerts, P(b - 2.3f, r.boxD - 2.2f, 0.09f), P(b - 2, r.boxD - 2.2f, 0.09f), P(b - 2, r.boxD + 2.2f, 0.09f), P(b - 2.3f, r.boxD + 2.2f, 0.09f), RGBA(250, 210, 40));
@@ -340,6 +356,26 @@ void Renderer::drawPit(const Race& r, const Camera& cam) {
             gfx::bindTexture(&fuelRig.lod[0].tex);
             M4 p = place * M4::translate(V3(-0.8f, 4.0f, 0)) * M4::rotZ(1.57f);
             gfx::drawModel(fuelRig.lod[0].verts, fuelRig.lod[0].count, fuelRig.matrix(p));
+        }
+    }
+    // the race engineers in each team's pit wall stand (buildPit): three at the desk, watching the
+    // track over the wall, in their team's colours
+    {
+        float wallD = r.track.pts[0].hw + 2.3f, d = wallD + 1.45f;
+        for (int team = 0; team <= TEAMS_PER_ERA; team++) {
+            float a = PIT_BOX0 + team * 16.0f - 7.5f, sa = a + 3.5f, sb = a + 11.5f;
+            V3 mid = r.track.world(r.pitIn + (sa + sb) * 0.5f, d);
+            V3 rel = mid - cam.eye;
+            if (dot(rel, rel) > 60.0f * 60.0f) continue;
+            const CarDef& cd = team < TEAMS_PER_ERA ? CARS[eraFirstCar(r.era) + team] : CARS[careerCarIndex(r.era)];
+            u32 tm, ts; teamColours(&cd, tm, ts);
+            for (int k = 0; k < 3; k++) {
+                float rs = sa + 1.4f + k * 2.6f;
+                V3 p, t, l; float hw; r.track.frame(r.pitIn + rs, p, t, l, hw);
+                V3 at = r.track.world(r.pitIn + rs, d) + V3(0, 0, 0.5f) - cam.eye;
+                M4 place = M4::basis(t, l, V3(0, 0, 1), at) * M4::rotZ(-1.5708f + (k - 1) * 0.25f);
+                drawPerson(place, ANIM_IDLE, r.time + team * 1.7f + k * 0.9f, false, tm, ts);
+            }
         }
     }
 }

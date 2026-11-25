@@ -785,13 +785,13 @@ void Track::buildProps() {
     {
         // race control: just after the last pit garage (garages end ~105 m after the line), left of the straight
         V3 p, t, l; float hw; frame(wrap(140), p, t, l, hw);
-        V3 at = p + l * (pts[0].hw + 22); at.z = p.z;
+        V3 at = p + l * (pts[0].hw + 24.5f); at.z = p.z;
         props.push_back({PROP_CONTROL, at, atan2f(-l.y, -l.x), 1.0f});
         keepClear.push_back(at);
         // team hospitality units in a row behind the garages (pit lane: 350 m before to 250 m after the line)
         for (float s0 = -185; s0 <= 95; s0 += 31) {
             frame(wrap(s0), p, t, l, hw);
-            at = p + l * (pts[0].hw + 36); at.z = p.z;
+            at = p + l * (pts[0].hw + 38.8f); at.z = p.z;
             props.push_back({PROP_HOSPITALITY, at, atan2f(-l.y, -l.x), 1.0f});
             keepClear.push_back(at);
         }

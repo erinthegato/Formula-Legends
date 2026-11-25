@@ -634,7 +634,8 @@ int main(int argc, char** argv) {
         // 20 frames a second from its approach (the crew waiting) until just after its release
         std::string out = argv[2];
         int era = argc > 3 ? atoi(argv[3]) : 1;
-        for (int i = 0; i < TRACK_COUNT; i++) if (!strcmp(TRACKS[i].id, "monza")) g.set.track = i;
+        const char* tid = getenv("EMR_TRACK") ? getenv("EMR_TRACK") : "monza";
+        for (int i = 0; i < TRACK_COUNT; i++) if (!strcmp(TRACKS[i].id, tid)) g.set.track = i;
         g.set.car = eraFirstCar(era); g.set.laps = 3; g.set.opponents = 5; g.set.weather = WX_DRY;
         g.aiDrivesPlayer = true;
         g.startRace();
@@ -654,7 +655,16 @@ int main(int argc, char** argv) {
             }
             if (c.pit == PIT_STOP) stopped = true;
             if (stopped && c.pit == PIT_OUT && leftAt < 0) leftAt = g.race.time;
-            if (leftAt > 0 && g.race.time - leftAt > 3.6f) break;
+            // the way out: how far the car stays from the pit wall while the wall is beside it
+            if (stopped && (c.pit == PIT_OUT || (c.pit == PIT_NONE && leftAt > 0 && g.race.time - leftAt < 40))) {
+                static float worst = 1e9f;
+                float rel = g.race.pitRel(c.s), wallTo = g.race.pitRel(g.race.pitWallTo);
+                float wallD = g.race.track.pts[0].hw + 2.3f;
+                if (rel < wallTo + 1) { float m = c.d - (wallD + 0.25f) - 0.9f; if (m < worst) worst = m; }
+                if (getenv("EMR_EXITLOG") && (step % 30) == 0) fprintf(stderr, "exit rel %.0f d %.2f wallTo %.0f wall %.2f\n", rel, c.d, wallTo, wallD + 0.25f);
+                if (c.pit == PIT_NONE && worst < 1e8f) { fprintf(stderr, "closest to the pit wall on the way out: %.2f m %s\n", worst, worst < 0 ? "(HITS IT)" : "(clear)"); worst = 1e9f; break; }
+            }
+            if (leftAt > 0 && g.race.time - leftAt > 3.6f) { if (!getenv("EMR_EXIT")) break; if (g.race.time - leftAt > 40) break; continue; }
             if (!started || (step % 3)) continue;
             float bs = g.race.boxS(c);
             V3 p, t, l; float hw; g.race.track.frame(bs, p, t, l, hw);
@@ -662,6 +672,10 @@ int main(int argc, char** argv) {
             Camera cam; cam.up = V3(0, 0, 1); cam.fov = 58;
             cam.eye = box - l * 4.4f + t * 4.6f + V3(0, 0, 1.6f);
             cam.fwd = norm(box + t * 0.4f + V3(0, 0, 0.5f) - cam.eye);
+            if (getenv("EMR_STAND")) {    // from the fast lane, looking at the pit wall stands
+                cam.eye = box - l * 6.0f - t * 7.0f + V3(0, 0, 1.9f);
+                cam.fwd = norm(box - l * 10.5f + t * 2.0f + V3(0, 0, 1.2f) - cam.eye);
+            }
             if (getenv("EMR_TOP")) {      // from above the box, the car driving up the picture
                 cam.eye = box + V3(0, 0, 15.0f) - t * 0.01f; cam.up = t;
                 cam.fwd = norm(box - cam.eye);
