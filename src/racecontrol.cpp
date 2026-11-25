@@ -407,7 +407,8 @@ void Race::setupStart() {
         cars[playerIdx].startDelay = 2.6f;
         message("Le Mans start! Drivers run to their cars", RGBA(255, 220, 80), RADIO_LEMANS);
     } else {
-        countdown = 4;
+        // up to 2010 the grid girls stand in front of the cars first: 4 s more before the lights
+        countdown = era <= ERA_V8 ? 8 : 4;
         for (int k = 0; k < n; k++) {
             // F1 grid: 8 m between grid slots, staggered left and right
             float back = 10.0f + 8.0f * k;

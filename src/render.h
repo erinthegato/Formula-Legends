@@ -50,6 +50,8 @@ struct Renderer {
     // helmet, HANS, shoulders and arms in the team's colours; not drawn from his own seat
     Model driver, driverEra[ERA_COUNT];      // driverEra: an era's own driver (1980: driver_90s.emm), else driver
     void drawDriver(const Car& c, const M4& place, int lod, bool near);
+    Model gridGirl;                              // the grid girls of the 1980 and 2010 grids (tools/gen_parts_1980.py)
+    void drawGridGirl(const Race& r, const Car& c, const Camera& cam);
     int lvyLoadedStyle[ERA_COUNT] = {-1, -1, -1, -1};   // the one career livery style kept in lvyBlob
     // car models re-ordered into body / nose / rear wing (the nose and wing can come off)
     struct PartSplit { int body = 0, noseFirst = 0, noseCount = 0, wingFirst = 0, wingCount = 0, glassFirst = 0, glassCount = 0; V3 noseC, wingC; };

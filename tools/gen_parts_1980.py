@@ -8,6 +8,7 @@ tools/gen_cockpit.py turns them into the era's game models (the era's internal i
   flap_90s.emm      the top flap of the wide 1980 rear wing (its hinge at the origin, running back)
   steering_90s.emm  a small round leather-rimmed wheel on three alloy spokes, no buttons, no screen
                     (the instruments are on the dash), with the driver's gloves at a quarter to three
+  grid_girl.emm     a grid girl for the 1980 and 2010 grids, holding her car's board on a pole
   driver_90s.emm    the Blender driver (tools/blender/cockpit_parts.py) without the HANS collar and
                     the helmet's air intake, which 1980 drivers did not have, the helmet lowered onto
                     the shoulders (no long bare neck)
@@ -169,12 +170,83 @@ def driver():
     return out
 
 
+def ellipsoid(B, c, r, mat, n=8, m=5, z_from=-1.0):
+    """an ellipsoid (z_from > -1 cuts the bottom off: a cap)"""
+    c = np.array(c, float)
+    rings = []
+    for j in range(m + 1):
+        t = -math.pi / 2 + math.pi * j / m
+        z = math.sin(t)
+        if z < z_from:
+            z = z_from
+        rc = math.sqrt(max(0.0, 1 - z * z))
+        rings.append([c + np.array((r[0] * rc * math.cos(2 * math.pi * i / n), r[1] * rc * math.sin(2 * math.pi * i / n), r[2] * z)) for i in range(n)])
+    for j in range(m):
+        for i in range(n):
+            k = (i + 1) % n
+            B.face([rings[j][i], rings[j][k], rings[j + 1][k], rings[j + 1][i]], mat, c)
+
+
+def tube(B, pts, rs, mat, sides=6):
+    for (a, ra), (b, rb) in zip(zip(pts, rs), zip(pts[1:], rs[1:])):
+        a = np.array(a, float); b = np.array(b, float)
+        t = (b - a) / np.linalg.norm(b - a)
+        ref = np.array([0, 0, 1.0]) if abs(t[2]) < 0.9 else np.array([1.0, 0, 0])
+        u = np.cross(t, ref); u /= np.linalg.norm(u); w = np.cross(t, u)
+        A = [a + ra * (math.cos(2 * math.pi * k / sides) * u + math.sin(2 * math.pi * k / sides) * w) for k in range(sides)]
+        Bb = [b + rb * (math.cos(2 * math.pi * k / sides) * u + math.sin(2 * math.pi * k / sides) * w) for k in range(sides)]
+        mid = (a + b) / 2
+        for k in range(sides):
+            j = (k + 1) % sides
+            B.face([A[k], A[j], Bb[j], Bb[k]], mat, mid)
+        B.face(A, mat, mid); B.face(Bb, mat, mid)
+
+
+def grid_girl():
+    """a grid girl (1980 and 2010 grids): a team-coloured dress with a sash in the second colour, white
+    boots, holding up her car's board on a pole (the game prints the race number on it). Facing +X,
+    feet on z 0, metres. Materials suit / accent / helmet / stripe take the team's colours."""
+    B = Builder(0)
+    B.group = 'skin'
+    for s in (1, -1):                                   # legs
+        tube(B, [(0.0, s * 0.075, 0.10), (0.01, s * 0.08, 0.45), (0.0, s * 0.085, 0.72)], [0.045, 0.055, 0.065], 'skin')
+    B.group = None
+    for s in (1, -1):                                   # boots
+        B.box((-0.05, s * 0.075 - 0.045, 0.0), (0.10, s * 0.075 + 0.045, 0.06), 'accent')
+        tube(B, [(0.0, s * 0.075, 0.04), (0.0, s * 0.075, 0.30)], [0.05, 0.048], 'accent')
+    # the dress: a flared skirt and the bodice, the sash across it
+    B.group = 'dress'
+    tube(B, [(0.0, 0.0, 0.62), (0.0, 0.0, 0.92)], [0.20, 0.135], 'suit', sides=10)
+    tube(B, [(0.0, 0.0, 0.92), (0.0, 0.0, 1.12), (0.0, 0.0, 1.38)], [0.13, 0.125, 0.15], 'suit', sides=10)
+    B.group = None
+    tube(B, [(0.12, 0.11, 1.34), (0.13, -0.11, 1.02)], [0.03, 0.03], 'accent', sides=4)
+    # neck, head, hair
+    tube(B, [(0.0, 0.0, 1.38), (0.0, 0.0, 1.47)], [0.045, 0.045], 'skin')
+    B.group = 'head'
+    ellipsoid(B, (0.01, 0.0, 1.56), (0.09, 0.08, 0.11), 'skin')
+    B.group = 'hair'
+    ellipsoid(B, (-0.015, 0.0, 1.585), (0.10, 0.092, 0.11), 'hair', z_from=-0.1)
+    tube(B, [(-0.06, 0.0, 1.58), (-0.08, 0.0, 1.36)], [0.085, 0.07], 'hair', sides=8)
+    B.group = None
+    # arms: both hands on the pole held in front
+    B.group = 'arms'
+    tube(B, [(0.0, 0.17, 1.36), (0.09, 0.19, 1.25), (0.17, 0.05, 1.42)], [0.04, 0.035, 0.03], 'skin')
+    tube(B, [(0.0, -0.17, 1.36), (0.10, -0.15, 1.14), (0.17, 0.02, 1.12)], [0.04, 0.035, 0.03], 'skin')
+    B.group = None
+    # the pole and the board: white face towards +X, a frame in the team's colour
+    tube(B, [(0.18, 0.04, 0.85), (0.18, 0.04, 2.08)], [0.014, 0.014], 'stripe', sides=4)
+    B.box((0.16, -0.28, 2.05), (0.19, 0.36, 2.40), 'helmet')
+    B.box((0.19, -0.25, 2.08), (0.195, 0.33, 2.37), 'board')
+    return part(B)
+
+
 def main():
     res = dict(format='FL-parts-1980', wheels=[wheel(l) for l in (0, 1, 2)], flap=flap(), steering=steering(), driver=driver(),
-               palette=dict(leather=(0.10, 0.08, 0.07)))
+               grid_girl=grid_girl(),
+               palette=dict(leather=(0.10, 0.08, 0.07), skin=(0.86, 0.66, 0.54), hair=(0.30, 0.18, 0.09), board=(0.97, 0.97, 0.95)))
     json.dump(res, open(OUT, 'w'), separators=(',', ':'))
     print('wheel', [w['tris'] for w in res['wheels']], 'flap', res['flap']['tris'], 'steering', res['steering']['tris'],
-          'driver', [x['tris'] for x in res['driver']])
+          'driver', [x['tris'] for x in res['driver']], 'grid girl', res['grid_girl']['tris'])
 
 
 if __name__ == '__main__':

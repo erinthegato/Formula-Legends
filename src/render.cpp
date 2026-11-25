@@ -74,6 +74,7 @@ bool Renderer::loadCommon() {
             if (!pose[a][f].lod[0].tex.w && pose[0][0].lodCount) pose[a][f].lod[0].tex = pose[0][0].lod[0].tex;
     fuelRig.load("DATA/models/fuel_rig.emm");
     driver.load("DATA/models/driver.emm");
+    gridGirl.load("DATA/models/grid_girl.emm");
     driverEra[ERA_90S].load("DATA/models/driver_90s.emm");
     // a soft round blob (16x16, alpha falls off from the centre) for smoke, spray and lights
     for (int i = 0; i < 256; i++) puffPal[i] = RGBA(255, 255, 255, i);
@@ -350,6 +351,7 @@ void Renderer::drawScene(const Race& r, const Camera& cam, bool hidePlayer) {
             if (fabsf(dot(e, c.fwd)) < half && fabsf(dot(e, c.left)) < 1.35f && dot(e, c.up) < 1.9f && dot(e, c.up) > -0.5f) continue;
         }
         drawCar(c, cam.eye, cam.fwd, tanH, tanV);
+        if (r.session == SES_RACE && r.countdown > 4.0f && c.def->era <= ERA_V8 && !r.formation) drawGridGirl(r, c, cam);
     }
     if (sceneLite) return;
     drawGhost(r, cam, tanH, tanV);
@@ -746,8 +748,9 @@ void Renderer::drawCockpit(const Race& r, const Camera& cam) {
     const bool dash80 = c.def->era == ERA_90S;
     if (dash80) {
         const CockpitLayout& L = COCKPIT[0];
-        // (sitting on the cowl at the front of the cockpit, tilted back towards the driver)
-        Display d{*this, car * M4::translate(V3(L.wheel.x + 0.15f, 0, 0.625f)) * M4::rotY(-0.55f) * FACE * M4::scale(1.25f, 1.25f, 1.25f)};
+        // flat on the front wall of the cockpit (the bulkhead at x 1.05, facing the driver)
+        (void)L;
+        Display d{*this, car * M4::translate(V3(1.043f, 0, 0.455f)) * FACE * M4::scale(1.45f, 1.45f, 1.45f)};
         d.box(-0.125f, -0.048f, 0.125f, 0.048f, RGBA(14, 14, 16));
         auto dial = [&](float cx, float R0, float v, int ticks, int redFrom) {
             d.box(cx - R0 - 0.004f, -R0 - 0.004f, cx + R0 + 0.004f, R0 + 0.004f, RGBA(30, 30, 34), 0.0012f);
@@ -1287,6 +1290,36 @@ const Texture* Renderer::teamTexture(const Texture* tex, u32 main, u32 second) {
     if (!cp) return tex;
     cp->tex = *tex; cp->tex.palette = cp->pal;     // bound by address, so each team keeps its own Texture
     return &cp->tex;
+}
+
+// up to 2010, a grid girl in front of each car before the start, facing it, her board showing the car's
+// number; over the last 1.2 s before the lights she walks off to the nearer side of the track
+void Renderer::drawGridGirl(const Race& r, const Car& c, const Camera& cam) {
+    if (!gridGirl.lodCount) return;
+    V3 at = c.pos + c.fwd * 3.3f;
+    V3 face = c.fwd * -1.0f;
+    float go = clampf((5.2f - r.countdown) / 1.2f, 0, 1);       // 0 standing .. 1 gone
+    if (go >= 1) return;
+    if (go > 0) {
+        float side = c.d >= 0 ? 1.0f : -1.0f;                    // towards the nearer edge
+        at = at + c.left * (side * go * 6.0f);
+        face = norm(c.left * side + c.fwd * (-1.0f + go));
+    }
+    V3 rel = at - cam.eye;
+    float d2 = dot(rel, rel);
+    if (d2 > 120.0f * 120.0f) return;
+    V3 up(0, 0, 1), left = cross(up, face);
+    M4 place = M4::basis(face, left, up, rel);
+    if (go > 0) place = place * M4::translate(V3(0, 0, 0.03f * fabsf(sinf(go * 18.0f))));   // her step
+    u32 mn, sc; teamColours(c.def, mn, sc);
+    gfx::bindTexture(teamTexture(&gridGirl.lod[0].tex, mn ? mn : RGBA(200, 30, 30), sc));
+    if (d2 < 81) clip::drawModel(gridGirl.lod[0].verts, gridGirl.lod[0].count, gridGirl.matrix(place));
+    else gfx::drawModel(gridGirl.lod[0].verts, gridGirl.lod[0].count, gridGirl.matrix(place));
+    // the car's number on the board (both faces)
+    if (d2 < 60.0f * 60.0f && c.number > 0) {
+        char b[8]; snprintf(b, sizeof b, "%d", c.number);
+        text3D(place * M4::basis(V3(0, 1, 0), V3(0, 0, 1), V3(1, 0, 0), V3(0.20f, 0.04f, 2.20f)), b, 0.20f, RGBA(20, 20, 24), true);
+    }
 }
 
 // the driver in his seat: at the era's eye point, leaning a little into the corners

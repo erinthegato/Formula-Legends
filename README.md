@@ -9,6 +9,8 @@ engine (physics, circuits, trackside scenery, pit crews and their animations). N
     tyres, a round three-spoke wheel and analogue dials, five-speed gearboxes, no refuelling, no safety
     car (double yellows only), slow tyre stops, 9-6-4-3-2-1 points; the car is built in code
     (`tools/gen_car_1980.py`, its parts in `tools/gen_parts_1980.py`)
+  * **Grid girls** on the 1980 and 2010 grids: one in front of each car holding its number board,
+    walking off just before the lights (those starts wait 4 s longer)
   * **2010 V8**: long high noses, shark fins, no refuelling
   * **2016 hybrid**: low "finger" noses, ERS boost, DRS
   * **2025 ground effect**: the halo, wide low noses, 18-inch wheels with covers, ERS, DRS (three zones)

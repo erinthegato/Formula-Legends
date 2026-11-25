@@ -95,6 +95,8 @@ def main(prev=None):
                 print(f'steering {year}: {tris[0]} triangles, {dims} m, {size / 1024:.0f} KB')
         size, tris, dims = write(os.path.join(out, 'driver.emm'), d['driver'], d['palette'], ROLES)
         print(f'driver: triangles {tris}, {dims} m, {size / 1024:.0f} KB')
+        size, tris, dims = write(os.path.join(out, 'grid_girl.emm'), [p80['grid_girl']], d['palette'], ROLES)
+        print(f'grid girl: triangles {tris}, {dims} m, {size / 1024:.0f} KB')
         size, tris, dims = write(os.path.join(out, 'driver_90s.emm'), p80['driver'], d['palette'], ROLES)
         print(f'driver 1980 (no HANS): triangles {tris}, {size / 1024:.0f} KB')
         for year, era in ERA.items():
