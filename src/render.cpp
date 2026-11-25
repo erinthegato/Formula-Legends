@@ -1256,6 +1256,18 @@ void Renderer::drawHUD(const Race& r, int mode) {
     gfx::setDepthTest(true);
 }
 
+void Renderer::drawCarModel(int idx, const M4& place, bool withDriver) {
+    loadCar(idx);
+    if (!carLoaded[idx]) return;
+    const Model& m = carModel[idx];
+    gfx::bindTexture(&m.lod[0].tex);
+    clip::drawModel(m.lod[0].verts, m.lod[0].count, m.matrix(place));
+    Car c; c.def = &CARS[idx]; c.number = CARS[idx].numbers[0];
+    drawFlap(c, place, true);
+    if (withDriver) drawDriver(c, place, 0, true);
+    drawWheels(CARS[idx], place, 0, 0, 0);
+}
+
 void Renderer::drawCarShowroom(int idx, float angle, float x0, float y0, float w, float h) {
     loadCar(idx);
     if (!carLoaded[idx]) return;
@@ -1337,7 +1349,9 @@ void Renderer::drawDriver(const Car& c, const M4& place, int lod, bool near) {
     if (lod >= driver.lodCount) lod = driver.lodCount - 1;
     // the helmet's centre sits a little behind and below the eye
     // (the helmet sits above the camera's eye point: the eye is set low to see over the nose)
-    V3 at = COCKPIT[e].eye + V3(-0.045f, 0, 0.105f);
+    // (the 1980 driver, no HANS, sits as before; the others 4 cm lower, deeper in the cockpit, with the
+    // helmet on a shorter neck: tools/gen_cockpit.py shorter_neck)
+    V3 at = COCKPIT[e].eye + V3(-0.045f, 0, e == ERA_90S ? 0.105f : 0.065f);
     float lean = clampf(-c.steer * 0.12f, -0.12f, 0.12f) * (c.v > 10 ? 1.0f : c.v / 10.0f);
     // (leans about the base of the neck)
     M4 w = place * M4::translate(at + V3(0, 0, -0.25f)) * M4::rotX(lean) * M4::translate(V3(0, 0, 0.25f));

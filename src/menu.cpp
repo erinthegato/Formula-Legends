@@ -116,6 +116,7 @@ const Station ST_SETUP = {V3(4.8f, 3.5f, 1.7f), V3(-0.4f, -1.2f, 0.7f), 46};
 const Station ST_WALL = {V3(-2.35f, 1.72f, 1.95f), V3(-2.6f, 4.9f, 2.0f), 37};
 
 std::vector<WorldVertex> garage;
+size_t standsFirst = 0;           // the monitors on stands are the last part of the garage (left out in the showroom)
 Panel pTitle, pCarList, pCarInfo, pSetup, pSetupInfo, pWall;
 bool built = false;
 
@@ -203,6 +204,7 @@ void buildGarage(Renderer* R) {
     pWall = Panel(); pWall.R = R; pWall.vw = 480; pWall.vh = 272; pWall.k = 0.0075f;
     pWall.m = M4::basis(V3(1, 0, 0), Z, V3(0, -1, 0), V3(-2.6f, 4.87f, 2.0f));
     // monitors on stands for the other stations
+    standsFirst = garage.size();
     pTitle = standPanel(R, ST_TITLE, 2.3f, 0.74f, 0.02f, 200, 176, 0.0072f, -0.22f);
     pCarList = standPanel(R, ST_CAR, 2.2f, -0.86f, 0.0f, 200, 262, 0.0068f, 0.16f);
     pCarInfo = standPanel(R, ST_CAR, 2.0f, 0.62f, -0.62f, 270, 58, 0.0052f, -0.1f);
@@ -232,10 +234,13 @@ static void header(Panel& P, const char* title) {
 
 
 void Game::drawMenus(float dt) {
+    if (screen == SCR_HQ) { drawHQ(dt); return; }
     if (!built) buildGarage(&R);
     // the camera walks to the station of the current screen
     // the car in its box: the highlighted car, the chosen car, or (on the title) each car in turn
-    int showCar = screen == SCR_CAR ? sel : (screen == SCR_TITLE || screen == SCR_HELP ? ((int)(t / 7) + set.car) % CAR_PICK : set.car);
+    // (the main menu shows the picked era's cars in turn; the showroom the one being looked at)
+    int showCar = screen == SCR_CAR ? sel : (screen == SCR_TITLE || screen == SCR_HELP ? eraFirstCar(era) + ((int)(t / 7) + set.car) % TEAMS_PER_ERA : set.car);
+    if (screen == SCR_SHOWROOM) showCar = showroomCar;
     bool careerScreen = screen == SCR_CAREER || screen == SCR_LIVERY || (screen == SCR_CAREER_NEW && career.active);
     if (careerScreen && career.active) showCar = career.carIndex();
     R.loadCar(showCar);
@@ -248,6 +253,11 @@ void Game::drawMenus(float dt) {
     // race settings: sitting in the car (the tablet ahead, the diagnostics computer to the right)
     look += ((setupPage ? 1.0f : 0.0f) - look) * (1 - expf(-dt * 6));
     Station st = stationFor(screen);
+    if (screen == SCR_SHOWROOM) {
+        // walking round the car (kept inside the garage's walls)
+        float ex = cosf(showYaw) * showDist, ey = sinf(showYaw) * showDist * 0.78f;
+        st.eye = V3(ex, ey, 1.05f + 0.12f * showDist); st.target = V3(0, 0, 0.45f); st.fov = 46;
+    }
     Camera inCam = inCarCamera(boxCar, look);
     if (screen == SCR_SETTINGS) { st.eye = inCam.eye; st.target = inCam.eye + inCam.fwd * 3; st.fov = inCam.fov; }
     if (!menuCamInit) { menuEye = st.eye; menuTarget = st.target; menuFov = st.fov; menuCamInit = true; }
@@ -268,7 +278,9 @@ void Game::drawMenus(float dt) {
     gfx::setFog(false, 0, 1, 0);
     gfx::setDepthTest(true); gfx::setDepthWrite(true); gfx::setBlend(false);
     gfx::bindTexture(nullptr);
-    clip::drawWorld(garage.data(), (int)garage.size(), M4::translate(V3(0, 0, 0) - eye));
+    // (the showroom walks round the car: the monitors on their stands, the crew and the props are put away)
+    bool showroom = screen == SCR_SHOWROOM;
+    clip::drawWorld(garage.data(), (int)(showroom ? standsFirst : garage.size()), M4::translate(V3(0, 0, 0) - eye));
     R.camRight = norm(cross(fwd, Z)); R.camUp = cross(R.camRight, fwd);
     float tanV = tanf(menuFov * 3.14159f / 360.0f), tanH = tanV * SCREEN_W / SCREEN_H;
 
@@ -289,13 +301,13 @@ void Game::drawMenus(float dt) {
         M4 place = M4::translate(at - eye) * M4::rotZ(yaw) * M4::scale(sc, sc, sc);
         clip::drawModel(md.lod[0].verts, md.lod[0].count, md.matrix(place));
     };
-    {
+    if (!showroom) {
         const V3 at[4] = {V3(-5.5f, 0.9f, 0), V3(1.5f, 3.9f, 0), V3(-3.9f, -1.6f, 0), V3(-5.2f, -6.8f, 0)};
         const float yaw[4] = {-0.3f, -1.8f, 0.5f, 1.2f};
         u32 tm, ts; R.teamColours(&CARS[showCar], tm, ts);     // the garage's crew in the team's colours
         for (int k = 0; k < 4; k++) R.drawPerson(M4::translate(at[k] - eye) * M4::rotZ(yaw[k]), Renderer::ANIM_IDLE, t + k * 0.6f, true, tm, ts);
     }
-    prop(R.fuelRig, V3(-5.0f, -2.8f, 0), 0.4f, 1);
+    if (!showroom) prop(R.fuelRig, V3(-5.0f, -2.8f, 0), 0.4f, 1);
     prop(R.prop[PROP_TYRES], V3(-5.9f, 3.9f, 0), 0, 1); prop(R.prop[PROP_TYRES], V3(-5.9f, 2.5f, 0), 0.5f, 1); prop(R.prop[PROP_TYRES], V3(6.0f, -3.9f, 0), 0.2f, 1);
     for (int i = 0; i < 4; i++) prop(R.wheel, V3(3.0f + i * 0.5f, 4.55f, 1.28f), 1.5708f, 1);
 
@@ -319,6 +331,7 @@ void Game::drawMenus(float dt) {
     // screens that are not in use show a standby picture
     Panel* all[6] = {&pTitle, &pCarList, &pCarInfo, &pSetup, &pSetupInfo, &pWall};
     for (Panel* p : all) {
+        if (showroom && p != &pWall) { p->fills.clear(); p->glyphs.clear(); continue; }
         if (p->fills.empty() && p->glyphs.empty()) {
             if (p == &pWall) {
                 p->textC(240, 96, TRACKS[set.track].name, WHITE, 1.5f);
@@ -335,6 +348,7 @@ void Game::drawMenus(float dt) {
         R.drawCabin(boxCar, c, carRel, wheelM);
         drawInCarPanels(boxCar, c, carRel, false);
     }
+    if (screen == SCR_SHOWROOM) drawShowroomInfo();
     nowPlayingBar();
     if (cfg.showFps) drawFps();
     finishFrame();
@@ -712,15 +726,17 @@ void Game::drawOptionsFlat() {
 void Game::screenTitle(Panel& P) {
     P.fill(0, 0, P.vw, 22, RGBA(0, 0, 0, 150));
     P.fill(0, 22, P.vw, 2, ACC);
-    P.text(8, 3, "PIT GARAGE", WHITE, 0.9f);
-    const char* items[8] = {"QUICK RACE", "CHAMPIONSHIP", "CAREER", "LOAD RACE", "SETTINGS", "CREDITS", "TIME TRIAL", "TROPHIES"};
-    for (int i = 0; i < 8; i++) {
+    char b[48]; snprintf(b, sizeof b, "MAIN MENU  %s", ERA_SHORT[era]);
+    P.text(8, 3, b, WHITE, 0.9f);
+    const char* items[TITLE_N] = {"QUICK RACE", "CHAMPIONSHIP", "CAREER", "LOAD RACE", "SETTINGS", "CREDITS", "TIME TRIAL",
+                                  "TROPHIES", "SHOWROOM", "HEADQUARTERS"};
+    for (int i = 0; i < TITLE_N; i++) {
         int id = TITLE_ORDER[i];
-        float y = 27 + i * 15.6f;
-        if (id == sel) P.fill(8, y - 2, P.vw - 16, 15.5f, RGBA(255, 150, 40, 230));
-        P.textC(P.vw / 2, y, items[id], id == sel ? INK : WHITE, 0.86f);
+        float y = 26 + i * 12.6f;
+        if (id == sel) P.fill(8, y - 1.5f, P.vw - 16, 12.6f, RGBA(255, 150, 40, 230));
+        P.textC(P.vw / 2, y, items[id], id == sel ? INK : WHITE, 0.74f);
     }
-    P.textC(P.vw / 2, 156, "CODE 4 Studios", DIM, 0.62f);
+    P.textC(P.vw / 2, 158, "O  headquarters (change era)", DIM, 0.58f);
 }
 
 void Game::screenTrack(Panel& P) {
@@ -1449,4 +1465,216 @@ void Game::screenRealism(Panel& P) {
     }
     if (sel >= 0 && sel < n && tips[sel]) P.textC(240, 240, tips[sel], DIM, 0.64f);
     P.textC(240, 255, "LEFT/RIGHT or X change     O back", DIM, 0.72f);
+}
+
+// ------------------------------------------------------------------ team headquarters
+// The team principal's office: a desk with a model of each era's car on a plinth, the team's posters on
+// the wall behind, a trophy cabinet, a window over the factory. Left / right walks along the desk,
+// X picks the era (then the main menu). Built once, drawn relative to the camera like the garage.
+namespace {
+std::vector<WorldVertex> hq;
+bool hqBuilt = false;
+const float HQ_CAR_X[ERA_COUNT] = {-1.2f, -0.4f, 0.4f, 1.2f};
+const float HQ_DESK_Y = 0.95f, HQ_TOP = 0.76f, HQ_PLINTH = 0.055f, HQ_SCALE = 0.12f;
+const char* HQ_LINE1[ERA_COUNT] = {"Ground-effect wing cars: sliding skirts, 3.0 litre V8s",
+                                    "Screaming 2.4 litre V8s at 18,000 rpm, high noses",
+                                    "1.6 litre turbo hybrids: ERS boost and DRS",
+                                    "Ground effect returns: wide low noses, 18-inch wheels"};
+const char* HQ_LINE2[ERA_COUNT] = {"No safety car, no refuelling: double yellows and raw grip",
+                                    "Shark fins, and the first season without refuelling",
+                                    "Low finger noses, muted engines, huge torque",
+                                    "The halo, ERS and DRS on the closest grid yet"};
+
+void hqQuad(const V3& a, const V3& b, const V3& c, const V3& d, u32 ca, u32 cb) {
+    WorldVertex A{0, 0, ca, a.x, a.y, a.z}, B{0, 0, ca, b.x, b.y, b.z}, C{0, 0, cb, c.x, c.y, c.z}, D{0, 0, cb, d.x, d.y, d.z};
+    hq.push_back(A); hq.push_back(B); hq.push_back(C); hq.push_back(A); hq.push_back(C); hq.push_back(D);
+}
+void hqBox(const V3& lo, const V3& hi, u32 col) {
+    V3 a(lo.x, lo.y, lo.z), b(hi.x, lo.y, lo.z), c(hi.x, hi.y, lo.z), d(lo.x, hi.y, lo.z);
+    V3 e(lo.x, lo.y, hi.z), f(hi.x, lo.y, hi.z), g(hi.x, hi.y, hi.z), h(lo.x, hi.y, hi.z);
+    hqQuad(e, f, g, h, col, col);
+    hqQuad(a, b, f, e, shade(col, 0.8f), shade(col, 0.8f)); hqQuad(d, c, g, h, shade(col, 0.7f), shade(col, 0.7f));
+    hqQuad(a, d, h, e, shade(col, 0.62f), shade(col, 0.62f)); hqQuad(b, c, g, f, shade(col, 0.9f), shade(col, 0.9f));
+}
+
+void buildHQ() {
+    hqBuilt = true;
+    hq.clear();
+    const float W = 5, D = 4, H = 3.2f;
+    // a dark wood floor in planks, a rug under the desk
+    for (int i = 0; i < 20; i++) {
+        float x0 = -W + i * 0.5f;
+        u32 c = (i % 3 == 0) ? RGBA(92, 62, 40) : (i % 3 == 1 ? RGBA(104, 70, 44) : RGBA(86, 58, 38));
+        hqQuad(V3(x0, -D, 0), V3(x0 + 0.5f, -D, 0), V3(x0 + 0.5f, D, 0), V3(x0, D, 0), shade(c, 0.8f), c);
+    }
+    hqQuad(V3(-2.4f, -1.2f, 0.004f), V3(2.4f, -1.2f, 0.004f), V3(2.4f, 2.8f, 0.004f), V3(-2.4f, 2.8f, 0.004f), RGBA(40, 44, 58), RGBA(52, 56, 72));
+    // walls: deep blue-grey, a wood panel band below the dado rail
+    u32 wall = RGBA(54, 62, 80), wallHi = RGBA(70, 80, 100), panel = RGBA(70, 48, 32);
+    hqQuad(V3(-W, D, 0), V3(W, D, 0), V3(W, D, H), V3(-W, D, H), wall, wallHi);                 // behind the desk
+    hqQuad(V3(-W, D - 0.01f, 0), V3(W, D - 0.01f, 0), V3(W, D - 0.01f, 1.0f), V3(-W, D - 0.01f, 1.0f), shade(panel, 0.8f), panel);
+    hqQuad(V3(W, -D, 0), V3(W, D, 0), V3(W, D, H), V3(W, -D, H), shade(wall, 0.85f), shade(wallHi, 0.85f));   // right
+    hqQuad(V3(W - 0.01f, -D, 0), V3(W - 0.01f, D, 0), V3(W - 0.01f, D, 1.0f), V3(W - 0.01f, -D, 1.0f), shade(panel, 0.7f), shade(panel, 0.85f));
+    hqQuad(V3(-W, -D, 0), V3(W, -D, 0), V3(W, -D, H), V3(-W, -D, H), shade(wall, 0.6f), shade(wall, 0.7f));   // behind the camera
+    // the left wall with a big window over the factory: wall round the opening, the frame, the view
+    const float wy0 = -2.6f, wy1 = 2.8f, wz0 = 0.9f, wz1 = 2.7f;
+    u32 lw = shade(wall, 0.75f), lwh = shade(wallHi, 0.75f);
+    hqQuad(V3(-W, -D, 0), V3(-W, D, 0), V3(-W, D, wz0), V3(-W, -D, wz0), lw, lw);
+    hqQuad(V3(-W, -D, wz1), V3(-W, D, wz1), V3(-W, D, H), V3(-W, -D, H), lwh, lwh);
+    hqQuad(V3(-W, -D, wz0), V3(-W, wy0, wz0), V3(-W, wy0, wz1), V3(-W, -D, wz1), lw, lwh);
+    hqQuad(V3(-W, wy1, wz0), V3(-W, D, wz0), V3(-W, D, wz1), V3(-W, wy1, wz1), lw, lwh);
+    for (float y = wy0; y <= wy1 + 0.01f; y += (wy1 - wy0) / 3) hqBox(V3(-W - 0.05f, y - 0.04f, wz0), V3(-W + 0.05f, y + 0.04f, wz1), RGBA(30, 32, 36));
+    hqBox(V3(-W - 0.05f, wy0, wz0 - 0.06f), V3(-W + 0.12f, wy1, wz0), RGBA(36, 38, 44));
+    hqBox(V3(-W - 0.05f, wy0, wz1), V3(-W + 0.05f, wy1, wz1 + 0.06f), RGBA(30, 32, 36));
+    // outside: an evening sky, the factory and the test track's grass
+    hqQuad(V3(-40, -40, -2), V3(-40, 40, -2), V3(-40, 40, 30), V3(-40, -40, 30), RGBA(250, 170, 110), RGBA(60, 90, 160));
+    hqQuad(V3(-40, -40, -0.5f), V3(-W, -40, -0.5f), V3(-W, 40, -0.5f), V3(-40, 40, -0.5f), RGBA(60, 100, 56), RGBA(70, 112, 62));
+    hqBox(V3(-30, -14, -0.5f), V3(-16, 6, 5.5f), RGBA(200, 204, 214));                        // the factory
+    hqBox(V3(-30, 7, -0.5f), V3(-20, 18, 3.5f), RGBA(170, 176, 190));
+    hqBox(V3(-16.1f, -13, 3.2f), V3(-16.0f, 5, 4.4f), RGBA(120, 170, 220));                  // its glass band
+    hqQuad(V3(-15.95f, -11, 4.6f), V3(-15.95f, 3, 4.6f), V3(-15.95f, 3, 5.3f), V3(-15.95f, -11, 5.3f), RGBA(255, 150, 40), RGBA(255, 150, 40));
+    for (int i = 0; i < 6; i++) hqBox(V3(-34, -26 + i * 9.0f, -0.5f), V3(-31, -23 + i * 9.0f, 4 + (i % 3) * 2.0f), RGBA(40, 64, 40));   // trees
+    // ceiling and its lights
+    hqQuad(V3(-W, -D, H), V3(W, -D, H), V3(W, D, H), V3(-W, D, H), RGBA(44, 46, 54), RGBA(40, 42, 50));
+    for (int i = -1; i <= 1; i++) hqQuad(V3(i * 2.5f - 0.5f, -0.4f, H - 0.02f), V3(i * 2.5f + 0.5f, -0.4f, H - 0.02f), V3(i * 2.5f + 0.5f, 0.4f, H - 0.02f), V3(i * 2.5f - 0.5f, 0.4f, H - 0.02f), RGBA(255, 250, 235), RGBA(255, 250, 235));
+    // the desk: a long walnut top on two panelled ends, a modesty panel at the back
+    u32 walnut = RGBA(110, 68, 40);
+    hqBox(V3(-1.98f, 0.50f, HQ_TOP - 0.05f), V3(1.98f, 1.40f, HQ_TOP), walnut);
+    hqBox(V3(-1.93f, 0.55f, 0), V3(-1.81f, 1.35f, HQ_TOP - 0.05f), shade(walnut, 0.85f));
+    hqBox(V3(1.81f, 0.55f, 0), V3(1.93f, 1.35f, HQ_TOP - 0.05f), shade(walnut, 0.85f));
+    hqBox(V3(-1.81f, 1.20f, 0.18f), V3(1.81f, 1.26f, HQ_TOP - 0.05f), shade(walnut, 0.7f));
+    hqQuad(V3(-1.98f, 0.50f, HQ_TOP + 0.001f), V3(1.98f, 0.50f, HQ_TOP + 0.001f), V3(1.98f, 0.53f, HQ_TOP + 0.001f), V3(-1.98f, 0.53f, HQ_TOP + 0.001f), RGBA(200, 170, 90), RGBA(200, 170, 90));   // brass edge
+    // the plinths for the model cars
+    for (int e = 0; e < ERA_COUNT; e++) {
+        float x = HQ_CAR_X[e];
+        hqBox(V3(x - 0.33f, HQ_DESK_Y - 0.17f, HQ_TOP), V3(x + 0.33f, HQ_DESK_Y + 0.17f, HQ_TOP + HQ_PLINTH), RGBA(22, 22, 26));
+    }
+    // on the desk: a laptop (left), a lamp (right)
+    hqBox(V3(-1.94f, 0.62f, HQ_TOP), V3(-1.66f, 0.84f, HQ_TOP + 0.015f), RGBA(60, 62, 70));
+    hqQuad(V3(-1.94f, 0.84f, HQ_TOP + 0.015f), V3(-1.66f, 0.84f, HQ_TOP + 0.015f), V3(-1.66f, 0.90f, HQ_TOP + 0.20f), V3(-1.94f, 0.90f, HQ_TOP + 0.20f), RGBA(40, 70, 110), RGBA(80, 130, 190));
+    hqBox(V3(1.75f, 1.12f, HQ_TOP), V3(1.87f, 1.24f, HQ_TOP + 0.02f), RGBA(40, 40, 44));
+    hqBox(V3(1.80f, 1.17f, HQ_TOP + 0.02f), V3(1.82f, 1.19f, HQ_TOP + 0.42f), RGBA(180, 160, 90));
+    hqBox(V3(1.70f, 1.08f, HQ_TOP + 0.40f), V3(1.92f, 1.28f, HQ_TOP + 0.48f), RGBA(30, 60, 40));
+    // the principal's chair behind the desk
+    hqBox(V3(-0.28f, 2.55f, 0.42f), V3(0.28f, 3.05f, 0.50f), RGBA(96, 54, 34));
+    hqBox(V3(-0.28f, 2.98f, 0.50f), V3(0.28f, 3.08f, 1.05f), RGBA(96, 54, 34));
+    hqBox(V3(-0.04f, 2.76f, 0), V3(0.04f, 2.84f, 0.42f), RGBA(90, 92, 98));
+    hqBox(V3(-0.28f, 2.52f, 0), V3(0.28f, 3.08f, 0.05f), RGBA(60, 62, 68));
+    // the trophy cabinet on the right wall: glass-fronted shelves of gold cups
+    hqBox(V3(W - 0.55f, -2.6f, 0), V3(W - 0.02f, 1.2f, 2.4f), RGBA(46, 32, 24));
+    for (int s = 0; s < 4; s++) {
+        float z = 0.3f + s * 0.52f;
+        hqBox(V3(W - 0.56f, -2.5f, z), V3(W - 0.08f, 1.1f, z + 0.03f), RGBA(150, 150, 160));
+        for (int k = 0; k < 6; k++) {
+            float y = -2.25f + k * 0.58f, hh = 0.18f + ((k + s) % 3) * 0.06f;
+            hqBox(V3(W - 0.40f, y - 0.06f, z + 0.03f), V3(W - 0.28f, y + 0.06f, z + 0.07f), RGBA(60, 50, 40));
+            hqBox(V3(W - 0.38f, y - 0.03f, z + 0.07f), V3(W - 0.30f, y + 0.03f, z + 0.07f + hh), RGBA(230, 185, 60));
+            hqBox(V3(W - 0.41f, y - 0.07f, z + 0.03f + hh), V3(W - 0.27f, y + 0.07f, z + 0.10f + hh), RGBA(250, 205, 80));
+        }
+    }
+    // the four era posters behind the desk: frames (the game prints the years on them)
+    for (int e = 0; e < ERA_COUNT; e++) {
+        float x = -3.3f + e * 2.2f;
+        hqBox(V3(x - 0.60f, D - 0.06f, 1.05f), V3(x + 0.60f, D - 0.01f, 2.25f), RGBA(20, 20, 22));
+    }
+}
+}   // namespace
+
+void Game::chooseEra(int e) {
+    era = e; hqChosen = true;
+    if (set.car < 0 || set.car >= CAR_PICK || CARS[set.car].era != e) set.car = eraFirstCar(e) + ((set.car >= 0 ? set.car : 0) % TEAMS_PER_ERA);
+    bool inCal = false;
+    for (int k = 0; k < ERA_ROUNDS; k++) if (eraTrack(e, k) == set.track) inCal = true;
+    if (!inCal) set.track = eraTrack(e, 0);
+}
+
+void Game::drawHQ(float dt) {
+    if (!hqBuilt) buildHQ();
+    // the camera follows along the desk to the model being looked at
+    hqLook += (HQ_CAR_X[hqSel] - hqLook) * (1 - expf(-dt * 4.0f));
+    V3 eye(hqLook * 0.85f + sinf(t * 0.4f) * 0.02f, -0.30f, 1.16f + sinf(t * 0.31f) * 0.008f);
+    V3 target(hqLook, HQ_DESK_Y + 0.25f, HQ_TOP + 0.20f);
+    V3 fwd = norm(target - eye);
+    float fov = 42;
+    gfx::beginFrame(RGBA(30, 34, 44));
+    M4 proj = M4::perspective(fov, (float)SCREEN_W / SCREEN_H, 0.05f, 120.0f), view = M4::lookDir(V3(0, 0, 0), fwd, Z);
+    gfx::setProjection(proj); gfx::setView(view);
+    clip::setMatrices(proj, view);
+    gfx::setFog(false, 0, 1, 0);
+    gfx::setDepthTest(true); gfx::setDepthWrite(true); gfx::setBlend(false);
+    gfx::bindTexture(nullptr);
+    clip::drawWorld(hq.data(), (int)hq.size(), M4::translate(V3(0, 0, 0) - eye));
+    R.camRight = norm(cross(fwd, Z)); R.camUp = cross(R.camRight, fwd);
+    M4 rel = M4::translate(V3(0, 0, 0) - eye);
+    // the posters: the team's colours and the era's year
+    for (int e = 0; e < ERA_COUNT; e++) {
+        float x = -3.3f + e * 2.2f;
+        u32 mn, sc; R.teamColours(&CARS[eraFirstCar(e) + (set.car % TEAMS_PER_ERA)], mn, sc);
+        M4 face = rel * M4::basis(V3(1, 0, 0), Z, V3(0, -1, 0), V3(x, 3.93f, 1.65f));
+        R.quad3D(face, -0.55f, -0.55f, 0.55f, 0.55f, e == hqSel ? RGBA(250, 250, 245) : RGBA(200, 200, 196));
+        R.quad3D(face * M4::translate(V3(0, 0, 0.004f)), -0.55f, -0.55f, 0.55f, -0.15f, mn | 0xFF000000u);
+        R.quad3D(face * M4::translate(V3(0, 0, 0.006f)), -0.55f, -0.19f, 0.55f, -0.15f, sc | 0xFF000000u);
+        R.text3D(face * M4::translate(V3(0, 0.08f, 0.008f)), ERA_SHORT[e], 0.34f, RGBA(30, 30, 34), true);
+    }
+    R.text3D(rel * M4::basis(V3(1, 0, 0), Z, V3(0, -1, 0), V3(0, 3.985f, 2.55f)), "FORMULA LEGENDS RACING", 0.20f, RGBA(255, 150, 40), true);
+    // the model cars: each era's car of the player's team slot, the chosen one turning on its plinth
+    for (int e = 0; e < ERA_COUNT; e++) {
+        int idx = eraFirstCar(e) + (set.car % TEAMS_PER_ERA);
+        float yaw = e == hqSel ? -0.6f + t * 0.5f : -0.6f;
+        V3 at(HQ_CAR_X[e], HQ_DESK_Y, HQ_TOP + HQ_PLINTH);
+        M4 place = M4::translate(at - eye) * M4::rotZ(yaw) * M4::scale(HQ_SCALE, HQ_SCALE, HQ_SCALE);
+        R.drawCarModel(idx, place, true);
+        // the plaque in front of the plinth
+        M4 plaque = M4::translate(V3(HQ_CAR_X[e], HQ_DESK_Y - 0.20f, HQ_TOP + 0.03f) - eye) * M4::basis(V3(1, 0, 0), norm(V3(0, 0.45f, 1)), norm(V3(0, -1, 0.45f)), V3(0, 0, 0));
+        R.quad3D(plaque, -0.11f, -0.035f, 0.11f, 0.035f, e == hqSel ? RGBA(255, 150, 40) : RGBA(190, 160, 80));
+        R.text3D(plaque * M4::translate(V3(0, -0.022f, 0.002f)), ERA_SHORT[e], 0.045f, RGBA(20, 20, 20), true);
+    }
+    // the words: what the era is, how to pick it
+    gfx::setDepthTest(false); gfx::setBlend(true);
+    Panel P; P.R = &R; P.flat = true;
+    P.fill(0, 0, SCREEN_W, 26, RGBA(0, 0, 0, 160));
+    P.fill(0, 26, SCREEN_W, 2, ACC);
+    P.text(10, 5, "TEAM HEADQUARTERS", WHITE, 1.0f);
+    P.textR(SCREEN_W - 10, 7, "choose your era", DIM, 0.75f);
+    P.fill(0, SCREEN_H - 74, SCREEN_W, 74, RGBA(0, 0, 0, 170));
+    char b[64]; snprintf(b, sizeof b, "%s", ERA_NAME[hqSel]);
+    for (char* c = b; *c; c++) if (*c >= 'a' && *c <= 'z') *c -= 32;
+    P.textC(SCREEN_W / 2, SCREEN_H - 70, b, ACC, 1.15f);
+    P.textC(SCREEN_W / 2, SCREEN_H - 46, HQ_LINE1[hqSel], WHITE, 0.72f);
+    P.textC(SCREEN_W / 2, SCREEN_H - 32, HQ_LINE2[hqSel], DIM, 0.72f);
+    P.text(10, SCREEN_H - 16, hqChosen ? "LEFT / RIGHT  era     X  choose     O  back" : "LEFT / RIGHT  era     X  choose", DIM, 0.64f);
+    for (int e = 0; e < ERA_COUNT; e++) P.fill(SCREEN_W / 2 - 30 + e * 16, SCREEN_H - 82, 12, 4, e == hqSel ? ACC : RGBA(255, 255, 255, 90));
+    gfx::setBlend(false); gfx::setDepthTest(true);
+    nowPlayingBar();
+    if (cfg.showFps) drawFps();
+    finishFrame();
+}
+
+// the showroom: the car's team, model and numbers over the garage view
+void Game::drawShowroomInfo() {
+    const CarDef& d = CARS[showroomCar];
+    gfx::setDepthTest(false); gfx::setBlend(true);
+    Panel P; P.R = &R; P.flat = true;
+    P.fill(0, 0, SCREEN_W, 26, RGBA(0, 0, 0, 160));
+    P.fill(0, 26, SCREEN_W, 2, ACC);
+    char b[96];
+    snprintf(b, sizeof b, "SHOWROOM  %s", ERA_SHORT[d.era]);
+    P.text(10, 5, b, WHITE, 1.0f);
+    snprintf(b, sizeof b, "%d / %d", showroomCar - eraFirstCar(d.era) + 1, TEAMS_PER_ERA);
+    P.textR(SCREEN_W - 10, 7, b, DIM, 0.75f);
+    P.fill(8, 36, 170, 112, RGBA(0, 0, 0, 150));
+    P.fill(8, 36, 4, 112, d.colour | 0xFF000000u);
+    P.text(18, 40, d.team, WHITE, 1.05f);
+    snprintf(b, sizeof b, "%s %s", d.make, d.model);
+    P.text(18, 60, b, ACC, 0.8f);
+    snprintf(b, sizeof b, "Engine  %s", d.engine);
+    P.text(18, 80, b, DIM, 0.66f);
+    snprintf(b, sizeof b, "Power  %.0f hp", d.powerKW * 1.341f);
+    P.text(18, 95, b, DIM, 0.66f);
+    snprintf(b, sizeof b, "Weight  %.0f kg with driver", d.massKg);
+    P.text(18, 110, b, DIM, 0.66f);
+    snprintf(b, sizeof b, "Cars  #%d  #%d", d.numbers[0], d.numbers[1]);
+    P.text(18, 125, b, DIM, 0.66f);
+    P.fill(0, SCREEN_H - 22, SCREEN_W, 22, RGBA(0, 0, 0, 160));
+    P.text(8, SCREEN_H - 18, "LEFT/RIGHT team  L/R era  stick turn  UP/DOWN zoom  /\\ spin  O back", DIM, 0.56f);
+    gfx::setBlend(false); gfx::setDepthTest(true);
 }

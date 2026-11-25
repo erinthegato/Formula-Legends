@@ -97,7 +97,7 @@ void Game::introBegin(int script) {
     const Script& sc = SCRIPTS[script];
     int sz = 0;
     char* txt = (char*)sys::loadFile(sc.txt, &sz);
-    if (!txt) { if (script) { screen = SCR_TITLE; idle = 0; } return; }
+    if (!txt) { screen = script && hqChosen ? SCR_TITLE : SCR_HQ; idle = 0; return; }   // (no intro music: straight to headquarters)
     std::string all(txt, sz); sys::freeFile(txt);
     sscanf(all.c_str(), "beat0 %f\nperiod %f\nlength %f", &introBeat0, &introPeriod, &introLength);
     screen = SCR_INTRO; t = 0; introLastPos = 0;
@@ -111,7 +111,9 @@ void Game::introEnd() {
     sound::musicFile(nullptr);
     leaveRace();
     introBlock = -1;
-    screen = SCR_TITLE; sel = 0; t = 0; idle = 0;
+    // after the intro, headquarters (pick the era); after the attract movie, back where the player was
+    screen = hqChosen ? SCR_TITLE : SCR_HQ; sel = 0; t = 0; idle = 0;
+    hqSel = era;
 }
 
 void Game::introLoadBlock(int b) {

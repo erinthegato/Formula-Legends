@@ -95,7 +95,9 @@ struct Renderer {
     void drawHUD(const Race& r, int mode);
     void drawCarShowroom(int carIdx, float angle, float x0, float y0, float w, float h);
     void drawMap(const Track& t, const Race* r, float x, float y, float size, u32 col);
-    void drawCarAt(const Car& c, const V3& eye, const V3& fwd, float tanH, float tanV) { drawCar(c, eye, fwd, tanH, tanV); }   // (set camRight / camUp first)
+    void drawCarAt(const Car& c, const V3& eye, const V3& fwd, float tanH, float tanV) { drawCar(c, eye, fwd, tanH, tanV); }
+    // a car at any placement, scaled too (the model cars on the headquarters desk): body, flap, wheels
+    void drawCarModel(int idx, const M4& place, bool withDriver);   // (set camRight / camUp first)
     // render_fx.cpp
     void splitCar(int idx);
     void buildPit(const Race& r);

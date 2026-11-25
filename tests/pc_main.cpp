@@ -99,6 +99,29 @@ int main(int argc, char** argv) {
         fprintf(stderr, "after a button: screen %d (title %d)\n", (int)g.screen, (int)SCR_TITLE);
         return 0;
     }
+    if (mode == "hq") {
+        // hq <outdir>: headquarters (each era), pick 2016, the main menu, the showroom (two teams, turning)
+        std::string out = argv[2];
+        auto run = [&](float secs) { for (int i = 0; i < (int)(secs * 30); i++) { Pad q{}; g.frame(1.0f / 30, q); } };
+        auto shot = [&](const char* name) { pc::saveShot((out + "/" + name + ".ppm").c_str()); };
+        auto tap = [&](bool Pad::*b) { Pad q{}; q.*b = true; g.frame(1.0f / 30, q); Pad z{}; g.frame(1.0f / 30, z); };
+        sound::musicFile(nullptr); g.screen = SCR_HQ; g.hqChosen = false; g.hqSel = 0; g.t = 0;
+        run(1.5f); shot("hq_0");
+        for (int e = 1; e < ERA_COUNT; e++) { tap(&Pad::right); run(1.5f); char n[16]; snprintf(n, sizeof n, "hq_%d", e); shot(n); }
+        tap(&Pad::left); run(1.0f); tap(&Pad::cross); run(1.5f);
+        fprintf(stderr, "picked era %d, screen %d (title %d), car %d (era %d), track %s\n", g.era, (int)g.screen, (int)SCR_TITLE, g.set.car, CARS[g.set.car].era, TRACKS[g.set.track].name);
+        shot("menu");
+        // to the showroom (SHOWROOM is the 5th item)
+        for (int i = 0; i < 4; i++) tap(&Pad::down);
+        tap(&Pad::cross); run(2.5f); shot("show_0");
+        tap(&Pad::right); run(2.0f); shot("show_1");
+        { Pad q{}; q.rstickX = 1; for (int i = 0; i < 40; i++) g.frame(1.0f / 30, q); } run(0.8f); shot("show_2");
+        tap(&Pad::r); run(1.5f); shot("show_3");
+        tap(&Pad::circle); run(1.0f);
+        tap(&Pad::circle); run(1.5f);
+        fprintf(stderr, "after O, O: screen %d (hq %d)\n", (int)g.screen, (int)SCR_HQ);
+        return 0;
+    }
     if (mode == "physlap") {
         // physlap <track id> <era 0-3> <laps>: the AI drives the era's first car alone (time trial
         // rules, dry), no drawing; lap times and how often the car went light / left the ground

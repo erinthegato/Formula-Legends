@@ -79,6 +79,26 @@ def write(path, parts, palette, roles=()):
     return os.path.getsize(path), [p['tris'] for p in parts], [round(float(x), 3) for x in (mx - mn)]
 
 
+NECK_DROP = 0.06
+
+
+def shorter_neck(lods):
+    """the Blender driver's head sat too high on a long neck: the helmet (shell, visor, stripe, the
+    top intake) and the top of the neck come down 6 cm onto the HANS; the shoulders stay put"""
+    out = []
+    for lod in lods:
+        mats = lod['mats']
+        P = np.array(lod['p'], np.float64).reshape(-1, 3, 3)
+        for t, mi in enumerate(lod['m']):
+            m = mats[mi]
+            for v in range(3):
+                z = P[t, v, 2]
+                if m in ('helmet', 'visor', 'stripe', 'visorband') or (m == 'hans' and z > 0.0) or (m == 'balaclava' and z > -0.15):
+                    P[t, v, 2] -= NECK_DROP
+        out.append(dict(lod, p=P.reshape(-1).tolist()))
+    return out
+
+
 def main(prev=None):
     d = json.load(open(SRC))
     # the 1980 era (internal id 90s) has its own parts, built in code (tools/gen_parts_1980.py)
@@ -93,7 +113,7 @@ def main(prev=None):
             size, tris, dims = write(os.path.join(out, f'steering_{era}.emm'), [d['steering'][year]], d['palette'])
             if folder == 'HD/models':
                 print(f'steering {year}: {tris[0]} triangles, {dims} m, {size / 1024:.0f} KB')
-        size, tris, dims = write(os.path.join(out, 'driver.emm'), d['driver'], d['palette'], ROLES)
+        size, tris, dims = write(os.path.join(out, 'driver.emm'), shorter_neck(d['driver']), d['palette'], ROLES)
         print(f'driver: triangles {tris}, {dims} m, {size / 1024:.0f} KB')
         size, tris, dims = write(os.path.join(out, 'grid_girl.emm'), [p80['grid_girl']], d['palette'], ROLES)
         print(f'grid girl: triangles {tris}, {dims} m, {size / 1024:.0f} KB')

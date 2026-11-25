@@ -51,6 +51,10 @@ jobs:
         env:
           ASAN_OPTIONS: detect_leaks=0
         run: ./fl_test_asan intro shots 2>&1 | tail -4
+      - name: Headquarters, main menu and showroom
+        env:
+          ASAN_OPTIONS: detect_leaks=0
+        run: ./fl_test_asan hq shots 2>&1 | grep -E "picked|after"
       - name: One lap at every circuit (each era's cars)
         env:
           ASAN_OPTIONS: detect_leaks=0

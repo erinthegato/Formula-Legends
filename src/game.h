@@ -16,12 +16,15 @@ enum { CR_HELP = 100, CR_TILT, CR_TILTDIR, CR_RESET, CR_BACK };   // Controls pa
 enum { OC_SOUND = 0, OC_DISPLAY, OC_CAMERA, OC_CONTROLS, OC_REALISM, OC_BACK, OPT_CATS };
 static const char* const OPT_CAT_NAME[OPT_CATS] = {"Sound", "Display and performance", "Camera and cockpit", "Controls", "Car realism", "Back"};
 //   // Controls page rows (0..ACT_COUNT-1: buttons)
-static const int TITLE_ORDER[8] = {0, 6, 1, 2, 3, 7, 4, 5};   // 7: trophies
+// the main menu (after the era is picked at headquarters): ids 8 showroom, 9 back to headquarters
+static const int TITLE_N = 10;
+static const int TITLE_ORDER[TITLE_N] = {0, 6, 1, 2, 8, 3, 7, 4, 5, 9};   // 7: trophies
 // pause menu: item ids in the order shown (7 replay, 8 photo mode)
 static const int PAUSE_ORDER[9] = {0, 1, 2, 7, 8, 3, 4, 5, 6};
 enum Screen { SCR_TITLE, SCR_TRACK, SCR_CAR, SCR_SETTINGS, SCR_HELP, SCR_RACE, SCR_PAUSE, SCR_RESULTS,
               SCR_TEAM, SCR_PODIUM, SCR_CHAMP, SCR_LOAD, SCR_REEL, SCR_OPTIONS, SCR_CONTROLS, SCR_GARAGE, SCR_INTRO,
-              SCR_CAREER, SCR_CAREER_NEW, SCR_LIVERY, SCR_TROPHIES, SCR_REPLAY, SCR_PHOTO, SCR_REALISM };
+              SCR_CAREER, SCR_CAREER_NEW, SCR_LIVERY, SCR_TROPHIES, SCR_REPLAY, SCR_PHOTO, SCR_REALISM,
+              SCR_HQ, SCR_SHOWROOM };
 
 struct Game {
     Screen screen = SCR_TITLE;
@@ -137,6 +140,7 @@ struct Game {
     bool mechPage = false;               // Car realism: the mechanical problems page
     void screenRealism(Panel& P);
     void updateRealism(int dx, int dy, bool ok, bool back);     // the rows the Controls page shows (CR_* ids), in order
+    int hqSel = 3; bool hqChosen = false; float hqLook = 3;   // (headquarters: the era looked at, picked yet)
 private:
     void update(float dt, const Pad& pad);
     void updateRace(float dt, const Pad& p);
@@ -152,6 +156,12 @@ private:
     Camera pitWallCamera() const;
     void drawPitWall(const Camera& cam);
     void drawMenus(float dt);
+    // team headquarters: the era is picked from four model cars on the desk (menu.cpp)
+    void drawHQ(float dt);
+    void chooseEra(int e);
+    // the showroom: the era's cars in the garage, the camera walking round them (menu.cpp)
+    int showroomCar = 0; float showYaw = 0.6f, showDist = 5.2f; bool showSpin = true;
+    void drawShowroomInfo();
     void drawOptionsFlat();
     void drawFps();
     void screenTitle(Panel& P);

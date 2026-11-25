@@ -671,7 +671,10 @@ def write_livery_set(path, c, s, sizes=(512,)):   # one size: the smaller levels
 def main():
     os.makedirs(OUT, exist_ok=True)
     prev = sys.argv[1] if len(sys.argv) > 1 else None
+    only = os.environ.get('FL_ERAS', '').split(',') if os.environ.get('FL_ERAS') else None   # e.g. FL_ERAS=ge
     for c in read_cars():
+        if only and c['era'] not in only:
+            continue
         s = car_spec(c)
         career = c['id'].startswith('career')
         look = CAREER_STYLE if career else STYLES[c['id']]

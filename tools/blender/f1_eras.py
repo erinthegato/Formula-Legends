@@ -523,7 +523,9 @@ def rain_light(B, x, zc):
         B.box('RainLight', (x - 0.012, -0.042, zc - 0.03), (x + 0.008, 0.042, zc + 0.03), ('red', 45))
 
 
-def halo(B, cx=0.20, r=0.26, z_back=0.78, z_front=0.86, rim=0.66, post_x=0.81, z_mount=0.695):
+# (z_back / z_front raised 7 cm from 0.78 / 0.86: the driver's eye, and the cockpit camera, at 0.84 m
+# look under the front of the hoop as in a real car instead of straight into it)
+def halo(B, cx=0.20, r=0.26, z_back=0.85, z_front=0.93, rim=0.66, post_x=0.81, z_mount=0.695):
     """the 2025 halo: a half circle round the cockpit (open at the back), curving slightly upwards to
     the front; its two back ends run back into the sides of the airbox behind the cockpit, and a centre
     pillar holds the front on the nose"""

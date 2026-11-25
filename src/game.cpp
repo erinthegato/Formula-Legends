@@ -581,9 +581,10 @@ void Game::update(float dt, const Pad& p) {
     case SCR_TITLE:
         if (dy) {
             // TIME TRIAL (id 6) is shown second; the other items keep their ids
-            int pos = 0; for (int i = 0; i < 8; i++) if (TITLE_ORDER[i] == sel) pos = i;
-            sel = TITLE_ORDER[(pos + dy + 8) % 8];
+            int pos = 0; for (int i = 0; i < TITLE_N; i++) if (TITLE_ORDER[i] == sel) pos = i;
+            sel = TITLE_ORDER[(pos + dy + TITLE_N) % TITLE_N];
         }
+        if (back) { screen = SCR_HQ; hqSel = era; t = 0; break; }
         if (idle > cfg.attract && !aiDrivesPlayer) { idle = 0; introBegin(1); break; }
         if (ok || pressed(p, &Pad::start)) {
             t = 0;
@@ -601,8 +602,35 @@ void Game::update(float dt, const Pad& p) {
             else if (sel == 4) { screen = SCR_OPTIONS; optionsFrom = SCR_TITLE; sel = 0; optCat = -1; }
             else if (sel == 5) screen = SCR_HELP;
             else if (sel == 7) { screen = SCR_TROPHIES; sel = 0; }
+            else if (sel == 8) {
+                screen = SCR_SHOWROOM;
+                showroomCar = CARS[set.car].era == era ? set.car : eraFirstCar(era);
+                showYaw = 0.6f; showDist = 5.2f; showSpin = true;
+            } else if (sel == 9) { screen = SCR_HQ; hqSel = era; }
         }
         break;
+    case SCR_HQ:
+        // team headquarters: the four eras' cars on the desk
+        if (dx) hqSel = (hqSel + dx + ERA_COUNT) % ERA_COUNT;
+        if (idle > cfg.attract && !aiDrivesPlayer) { idle = 0; introBegin(1); break; }
+        if ((ok || pressed(p, &Pad::start)) && t > 0.3f) { chooseEra(hqSel); screen = SCR_TITLE; sel = 0; t = 0; }
+        else if (back && hqChosen) { screen = SCR_TITLE; sel = 0; t = 0; }
+        break;
+    case SCR_SHOWROOM: {
+        // left / right: the era's teams; L / R: the era; the sticks walk the camera round; up / down: closer
+        int e = CARS[showroomCar].era, k = showroomCar - eraFirstCar(e);
+        if (dx) showroomCar = eraFirstCar(e) + (k + dx + TEAMS_PER_ERA) % TEAMS_PER_ERA;
+        int de = (pressed(p, &Pad::r) ? 1 : 0) - (pressed(p, &Pad::l) ? 1 : 0);
+        if (de) { e = (e + de + ERA_COUNT) % ERA_COUNT; showroomCar = eraFirstCar(e) + k; }
+        float turn = fabsf(p.rstickX) > 0.1f ? p.rstickX : (fabsf(p.stickX) > 0.25f ? p.stickX : 0);
+        if (turn != 0) { showSpin = false; showYaw += turn * dt * 1.6f; }
+        else if (showSpin) showYaw += dt * 0.22f;
+        if (p.up) showDist = fmaxf(3.4f, showDist - dt * 2.5f);
+        if (p.down) showDist = fminf(6.4f, showDist + dt * 2.5f);
+        if (pressed(p, &Pad::triangle)) showSpin = !showSpin;
+        if (back) { screen = SCR_TITLE; sel = 8; t = 0; }
+        break;
+    }
     case SCR_REEL:
         reelSwitch -= dt;
         if (reelSwitch <= 0) {
