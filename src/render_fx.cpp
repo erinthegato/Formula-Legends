@@ -212,12 +212,22 @@ void Renderer::drawPit(const Race& r, const Camera& cam) {
         const float WY[8] = {1, -1, 1, -1, 0, 0, 1.25f, -1.25f};
         const Model& wm = eraWheel[era].lodCount ? eraWheel[era] : wheel;
         float rad = wm.lodCount ? wm.scale[2] : 0.33f;
+        // the jack men keep out of the car's way: the rear one waits beside the box (garage side, away
+        // from the fast lane) until the car has stopped, then steps in behind it; the front one -- and
+        // the 1998 lollipop man -- pull out to the garage side as the car drops off its jacks to leave
+        const float ASIDE = 1.7f;
+        float rearIn = stopped ? clampf(c.pitTotal / 0.2f, 0, 1) : (after ? 1.0f : 0.0f);
+        float frontOut = after ? 1.0f : (stopped && ph == 3 ? clampf(c.pitTimer / 0.3f, 0, 1) : 0.0f);
+        rearIn = rearIn * rearIn * (3 - 2 * rearIn); frontOut = frontOut * frontOut * (3 - 2 * frontOut);
         for (int k = 0; k < 8; k++) {
             float y = (k < 4 ? WY[k] * in : WY[k]) + (wheels && k < 4 ? sinf(tt + k) * 0.05f : 0);
             float yaw = k < 4 || k >= 6 ? (WY[k] > 0 ? -1.57f : 1.57f) : (WX[k] > 0 ? 3.14f : 0);
+            float xk = WX[k];
+            if (k == 4) { y += frontOut * ASIDE; xk += frontOut * 0.6f; yaw -= frontOut * 1.2f; }   // front: out of the way
+            if (k == 5) { y += (1 - rearIn) * ASIDE; xk -= (1 - rearIn) * 0.4f; }                  // rear: waits beside
             bool gun = (wheels || gunReady) && k < 4;
             float squat = gun && !poseCount[ANIM_WHEELGUN] ? 0.7f : 1.0f;
-            M4 p = place * M4::translate(V3(WX[k], y, 0)) * M4::rotZ(yaw) * M4::scale(1, 1, squat);
+            M4 p = place * M4::translate(V3(xk, y, 0)) * M4::rotZ(yaw) * M4::scale(1, 1, squat);
             // the gun only works while the car is up; waiting, they hold the first pose
             float at = gunReady ? 0.0f : tt * 0.33f + k * 0.3f;
             drawPerson(p, gun ? ANIM_WHEELGUN : ANIM_IDLE, at, false, tm, ts);
@@ -258,26 +268,28 @@ void Renderer::drawPit(const Race& r, const Camera& cam) {
             u32 steel = RGBA(70, 72, 78), handle = RGBA(30, 30, 34);
             float lift = stopped ? c.lift : 0;
             if (after) lift = 0;
-            M4 ground = place * M4::translate(V3(0, 0, lift));       // (the crew stand on the ground, not the car)
             for (int e = 0; e < 2; e++) {
-                float sx = e == 0 ? 1.0f : -1.0f;
-                float x0 = e == 0 ? hl - 0.15f : -hl + 0.05f;         // under the nose / the rear crash structure
-                box3D(ground, V3(x0 - 0.2f, -0.2f, 0), V3(x0 + 0.2f, 0.2f, 0.1f + lift), steel);
+                // under the nose / the rear crash structure; out with its man when he stands aside
+                float out = e == 0 ? frontOut : 1 - rearIn;
+                float x0 = e == 0 ? hl - 0.15f + out * 0.9f : -hl + 0.05f - out * 0.9f;
+                float y0 = out * ASIDE;
+                float jl = out > 0.01f ? 0.0f : lift;                  // pulled out: down on its wheels
+                M4 g = place * M4::translate(V3(0, 0, stopped && !after ? c.lift : 0));
+                box3D(g, V3(x0 - 0.2f, y0 - 0.2f, 0), V3(x0 + 0.2f, y0 + 0.2f, 0.1f + jl), steel);
                 // the handle runs from the trolley up to his hands, 1.1 m out at waist height
-                M4 h = ground * M4::translate(V3(x0, 0, 0.1f + lift)) * M4::rotZ(e == 0 ? 0.0f : 3.14159f) * M4::rotY(-0.62f);
+                M4 h = g * M4::translate(V3(x0, y0, 0.1f + jl)) * M4::rotZ(e == 0 ? 0.0f : 3.14159f) * M4::rotY(-0.62f);
                 box3D(h, V3(0, -0.03f, -0.03f), V3(1.25f, 0.03f, 0.03f), handle);
-                (void)sx;
             }
         }
         // the release
         bool go = done && ph == 3;
         if (era == 0) {
             // 1998: the lollipop man in front of the nose; the board comes up when the car may go
-            float hx = hl + 1.4f;
-            M4 p = place * M4::translate(V3(hx, 0.35f, 0)) * M4::rotZ(3.14159f);
+            float hx = hl + 1.4f, hy = 0.35f + frontOut * (ASIDE + 0.6f);     // steps aside with the front jack man
+            M4 p = place * M4::translate(V3(hx, hy, 0)) * M4::rotZ(3.14159f);
             drawPerson(p, ANIM_IDLE, tt * 0.33f + 3.0f, false, tm, ts);
-            float up = go ? 0.75f : 0.0f;
-            M4 pole = place * M4::translate(V3(hx - 0.35f, 0.2f, 0));
+            float up = go || after ? 0.75f : 0.0f;
+            M4 pole = place * M4::translate(V3(hx - 0.35f, hy - 0.15f, 0));
             box3D(pole, V3(-0.02f, -0.02f, 0.95f + up), V3(0.02f, 0.02f, 1.55f + up), RGBA(30, 30, 30));
             box3D(pole, V3(-0.03f, -0.22f, 1.5f + up), V3(0.0f, 0.22f, 1.85f + up), go ? RGBA(240, 240, 235) : RGBA(210, 25, 20));
         } else {
