@@ -166,6 +166,8 @@ ERAS['80s'] = (norm(np.tanh(x * 2.2)), idle, mx)     # driven a little harder: a
 out = os.path.join(ROOT, 'DATA', 'audio')
 for era, (x, idle, mx) in ERAS.items():
     s = np.clip(np.round(x * 32767), -32768, 32767).astype('<i2')
+    if era == 'v8':
+        continue        # the 2010 V8 is a recording now: tools/engine/v8_from_recording.py
     s.tofile(os.path.join(out, f'f1_{era}.raw'))
     print(f'f1_{era}.raw  idle {idle}  limit {mx}  ref {ref_rpm(idle, mx):.0f} rpm  rms {np.sqrt((x ** 2).mean()):.3f}')
     if len(sys.argv) > 1:

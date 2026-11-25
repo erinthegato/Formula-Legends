@@ -853,30 +853,55 @@ void Game::screenLoad(Panel& P) {
 }
 
 void Game::screenHelp(Panel& P) {
-    // credits (how to play is in the README)
+    // credits (how to play is in the README): they roll up the panel and start again
     header(P, "CREDITS");
     struct Line { const char* role; const char* who; };
     static const Line L[] = {
         {"Producer / CEO / Engineer", "Erin"},
+        {"Code", "Erin"},
         {"Studio", "CODE 4 Studios"},
         {"Engine", "Endurance Motor Racing 3D"},
+        {"", ""},
         {"Intro music", "Take On The World - All Good Folks (Uppbeat)"},
         {"Attract music", "Lose My Mind - Don Toliver feat. Doja Cat"},
         {"1980 era music", "Originals, Epidemic Sound, Uppbeat"},
         {"2016 era music", "Uppbeat, Epidemic Sound"},
         {"2025 era music", "Uppbeat (uppbeat.io)"},
+        {"", ""},
+        {"Music from Epidemic Sound", "(epidemicsound.com)"},
+        {"Epidemic Sound", "Ruzer - Fever Drone"},
+        {"Epidemic Sound", "Ruzer - Summit"},
+        {"Epidemic Sound", "Ruzer - Turn Down"},
+        {"Epidemic Sound", "Ruzer - 1988"},
+        {"Epidemic Sound", "Ben Elson - 2AM"},
+        {"Epidemic Sound", "Lupus Nocte - Inferadise"},
+        {"Epidemic Sound", "Velveteen - Do You Wanna Follow"},
+        {"", ""},
+        {"Team radio voice", "ElevenLabs"},
         {"Cars, wheels, cockpits", "Modelled in Blender"},
         {"Pit crew, safety cars, props", "Modelled in Blender"},
         {"Circuit outlines", "bacinger/f1-circuits (MIT)"},
         {"Circuit heights", "EU-DEM 25 m, SRTM 30 m"},
+        {"", ""},
+        {"Thank you for playing", "Formula Legends"},
     };
+    const float top = 44, bottom = 238, row = 16.2f;
     P.fill(30, 42, 420, 200, RGBA(0, 0, 0, 120));
     int n = sizeof(L) / sizeof(L[0]);
+    float total = n * row + (bottom - top);               // all the lines, then a screen's gap before they come round again
+    float roll = fmodf(t * 16.0f, total);
     for (int i = 0; i < n; i++) {
-        float y = 47 + i * 16.2f;              // (12 rows fit the panel)
-        bool top = i < 2;
-        P.textR(214, y, L[i].role, top ? ACC : DIM, 0.74f);
-        P.text(226, y, L[i].who, top ? GOLD : WHITE, top ? 0.86f : 0.76f);
+        float y = bottom - roll + i * row;
+        if (y < top - row) y += total;                    // (the start of the next pass)
+        if (y < top || y > bottom - 10 || !L[i].who[0]) continue;
+        // fade in at the bottom, out at the top
+        float edge = fminf(y - top, bottom - 10 - y);
+        int a = (int)(255 * fminf(1.0f, edge / 18.0f));
+        bool head = i < 2 || !strcmp(L[i].role, "Music from Epidemic Sound") || !strcmp(L[i].role, "Thank you for playing");
+        u32 rc = head ? ACC : DIM, wc = head ? GOLD : WHITE;
+        rc = (rc & 0x00FFFFFFu) | ((u32)a << 24); wc = (wc & 0x00FFFFFFu) | ((u32)a << 24);
+        P.textR(214, y, L[i].role, rc, 0.74f);
+        P.text(226, y, L[i].who, wc, head ? 0.86f : 0.76f);
     }
     P.textC(240, 255, "X or O  back", DIM, 0.75f);
 }
