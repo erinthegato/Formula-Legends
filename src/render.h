@@ -21,6 +21,12 @@ struct Renderer {
     Model wheel, prop[PROP_COUNT], cockpit[2], steering[ERA_COUNT], pitCrew, fuelRig;
     Model eraWheel[ERA_COUNT], flap[ERA_COUNT];      // each era's road wheel and DRS flap
     void drawFlap(const Car& c, const M4& place, bool near);
+    // the F1 rear light (render_fx.cpp): where it sits on each era's car, which mode it is in, and
+    // whether a flashing mode is lit at time t
+    enum { RL_OFF, RL_RAIN_STEADY, RL_RAIN, RL_HARVEST, RL_LIMITER };
+    static const V3 REAR_LIGHT[ERA_COUNT];
+    int rearLightMode(const Race& r, const Car& c) const;
+    static bool rearLightLit(int mode, float t);
     bool eraPartsLoaded[ERA_COUNT] = {};
     void loadEraParts(int era);
     // crew / driver poses made in Blender (tools/blender/pit_crew.py -> tools/gen_crew.py): DATA/models/crew_<anim>_<frame>.emm

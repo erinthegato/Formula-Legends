@@ -267,6 +267,7 @@ def car_1998(B):
     # engine cover with a round airbox over the driver; no fin
     B.loft('EngineCover', [(0.02, 0.11, 0.55, 0.92), (-0.25, 0.15, 0.50, 0.93), (-0.70, 0.19, 0.38, 0.78),
                            (-1.20, 0.17, 0.10, 0.58), (-1.60, 0.11, 0.10, 0.44), (-1.92, 0.07, 0.12, 0.34)], 'livery', n=n)
+    rain_light(B, -1.92, 0.25)
     if lod < 2:
         B.box('AirboxInlet', (0.01, -0.07, 0.76), (0.04, 0.07, 0.89), ('carbon', 40))
     for s, sn in ((1, 'L'), (-1, 'R')):
@@ -318,6 +319,7 @@ def car_2016(B):
                         (0.60, 0.30, 0.10, 0.69), (0.00, 0.31, 0.08, 0.66), (-0.35, 0.29, 0.08, 0.62)], (0.72, 0.06, 0.22), n)
     B.loft('EngineCover', [(0.02, 0.13, 0.55, 0.93), (-0.25, 0.16, 0.50, 0.94), (-0.70, 0.20, 0.38, 0.80),
                            (-1.20, 0.17, 0.10, 0.60), (-1.70, 0.10, 0.10, 0.40), (-1.95, 0.06, 0.12, 0.32)], 'livery', n=n)
+    rain_light(B, -1.95, 0.24)
     if lod < 2:
         B.box('AirboxInlet', (0.01, -0.09, 0.78), (0.04, 0.09, 0.91), ('carbon', 40))
         # the small "monkey seat" wing over the exhaust (within 100 mm of the centre)
@@ -373,6 +375,7 @@ def car_2025(B):
                         (0.50, 0.31, 0.10, 0.70), (0.00, 0.31, 0.08, 0.68), (-0.35, 0.29, 0.08, 0.64)], (0.80, 0.08, 0.22), n)
     B.loft('EngineCover', [(0.05, 0.14, 0.55, 0.95), (-0.25, 0.17, 0.50, 0.95), (-0.80, 0.21, 0.36, 0.82),
                            (-1.40, 0.17, 0.10, 0.58), (-1.90, 0.09, 0.10, 0.42), (-2.20, 0.06, 0.12, 0.36)], 'livery', n=n)
+    rain_light(B, -2.20, 0.26)
     if lod < 2:
         B.box('AirboxInlet', (0.04, -0.09, 0.80), (0.07, 0.09, 0.93), ('carbon', 40))
         B.prism('Fin', [(-0.55, 0.88), (-1.95, 0.72), (-1.95, 0.45), (-0.80, 0.62)], 0.01, 0, 'second')
@@ -447,6 +450,13 @@ def wheel_winglet(B, s, sn, gap=0.035, half_angle=38.0, t=0.01):
     F = [tuple(range(m)), tuple(range(2 * m - 1, m - 1, -1))]
     F += [(i, (i + 1) % m, m + (i + 1) % m, m + i) for i in range(m)]
     B.mesh('WingletSupport' + sn, V, F, 'carbon')
+
+
+def rain_light(B, x, zc):
+    """the single red rear light in the middle of the rear crash structure (the game lights it: rain,
+    energy harvesting, pit lane limiter -- Renderer::rearLightMode). A dark lens when off."""
+    if B.lod < 2:
+        B.box('RainLight', (x - 0.012, -0.042, zc - 0.03), (x + 0.008, 0.042, zc + 0.03), ('red', 45))
 
 
 def halo(B, cx=0.20, r=0.26, z_back=0.78, z_front=0.86, rim=0.66, post_x=0.81, z_mount=0.695):

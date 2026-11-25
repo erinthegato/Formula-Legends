@@ -292,21 +292,22 @@ void Renderer::drawEffects(const Race& r, const Camera& cam, bool ownLights) {
         quad(roof + r.sc.left * 0.45f, 0.28f, flash ? RGBA(255, 170, 20, 240) : RGBA(255, 120, 0, 90));
         quad(roof - r.sc.left * 0.45f, 0.28f, flash ? RGBA(255, 120, 0, 90) : RGBA(255, 170, 20, 240));
     }
-    if (night > 0.05f || r.rain > 0.3f) {
-        float k = fmaxf(night, r.rain * 0.6f);
-        for (const Car& c : r.cars) {
-            if (!ownLights && c.player) continue;       // from the seat we don't see our own lamps
-            V3 rel = c.pos - cam.eye;
-            if (dot(rel, rel) > 400.0f * 400.0f) continue;
-            float half = c.def->lengthM * 0.5f;
-            for (int sgn = -1; sgn <= 1; sgn += 2) {
-                V3 front = rel + c.fwd * (half - 0.2f) + c.left * (0.62f * sgn) + c.up * 0.6f;
-                V3 rear = rel - c.fwd * (half - 0.1f) + c.left * (0.6f * sgn) + c.up * 0.85f;
-                bool facing = dot(c.fwd, rel) < 0;     // we are in front of the car
-                quad(front, facing ? 0.45f : 0.22f, RGBA(255, 245, 210, (int)(230 * k)));
-                quad(rear, 0.2f, RGBA(255, 20, 20, (int)(200 * k)));
-            }
-        }
+    // Formula 1 cars carry no headlights (night races are floodlit): one red light in the middle of
+    // the rear crash structure, lit in the modes its era's rules call for (rearLightMode)
+    for (const Car& c : r.cars) {
+        if (!ownLights && c.player) continue;           // from the seat we don't see our own light
+        int mode = rearLightMode(r, c);
+        if (mode == RL_OFF) continue;
+        V3 rel = c.pos - cam.eye;
+        float d2 = dot(rel, rel);
+        if (d2 > 300.0f * 300.0f) continue;
+        float back = dot(rel, c.fwd) / sqrtf(fmaxf(d2, 0.01f));   // 1: straight behind the car
+        if (back < -0.2f) continue;                     // it shines backwards only
+        if (!rearLightLit(mode, r.time + c.number * 0.173f)) continue;
+        const V3& at = REAR_LIGHT[c.def->era % ERA_COUNT];
+        V3 p = rel + c.fwd * at.x + c.left * at.y + c.up * at.z;
+        float glow = (0.10f + 0.12f * fmaxf(night, r.rain)) * (0.55f + 0.45f * clampf(back, 0, 1));
+        quad(p, glow, RGBA(255, 28, 18, (int)(235 * clampf(back + 0.2f, 0, 1))));
     }
     if (!o) return;
     gfx::flushCache(v, o * (int)sizeof(WorldVertex));
@@ -329,6 +330,32 @@ u32 Renderer::skyColour(const Race& r) const {
     float k = 1 - n * 0.9f;
     float lf = r.lightning;
     return RGBA((int)clampf(cr * k + lf * 200, 0, 255), (int)clampf(cg * k + lf * 200, 0, 255), (int)clampf(cb * k + 12 * n + lf * 200, 0, 255));
+}
+
+// ---- the F1 rear light. Position: the tail of each era's rear crash structure (tools/blender: the
+// RainLight lens). Modes, by the rules of the time:
+//   rain     every era: on in the wet (inters / wets fitted, or real rain): steady in 1998, flashing later
+//   harvest  hybrid eras (2016, 2025): flashes fast while the MGU-K recovers energy under braking
+//   limiter  2016, 2025: flashes slowly while the pit lane speed limiter is on
+const V3 Renderer::REAR_LIGHT[ERA_COUNT] = {V3(-1.94f, 0, 0.25f), V3(-2.02f, 0, 0.28f), V3(-1.97f, 0, 0.24f), V3(-2.22f, 0, 0.26f)};
+
+int Renderer::rearLightMode(const Race& r, const Car& c) const {
+    int era = c.def->era % ERA_COUNT;
+    bool hybrid = era >= 2;
+    if (hybrid && c.pit != PIT_NONE && r.inPitLane(c)) return RL_LIMITER;
+    if (hybrid && c.pit == PIT_NONE && c.brake > 0.1f && c.v > 8 && c.ers < 0.999f) return RL_HARVEST;
+    if (c.tyre == TY_INTER || c.tyre == TY_WET || r.rain > 0.35f) return era == 0 ? RL_RAIN_STEADY : RL_RAIN;
+    return RL_OFF;
+}
+
+bool Renderer::rearLightLit(int mode, float t) {
+    switch (mode) {
+        case RL_RAIN_STEADY: return true;
+        case RL_RAIN: return fmodf(t * 4.0f, 1.0f) < 0.5f;          // 4 flashes a second
+        case RL_HARVEST: return fmodf(t * 8.0f, 1.0f) < 0.45f;      // rapid
+        case RL_LIMITER: return fmodf(t * 2.0f, 1.0f) < 0.5f;       // slow
+        default: return false;
+    }
 }
 
 float Renderer::cabinDark(const Race& r) const { return r.nightLevel() * 0.65f; }

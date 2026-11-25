@@ -41,7 +41,7 @@ OPEN = (0.78, 0.08, 0.22)            # the hollow cockpit: front x, back x, half
 
 SWATCH = dict(livery=(0.02, 0.08, 0.40), second=(1.0, 0.33, 0.02), paint=(0.02, 0.08, 0.40),
               carbon=(0.025, 0.025, 0.03), white=(0.95, 0.85, 0.10), glass=(0.10, 0.12, 0.16),
-              rubber=(0.03, 0.03, 0.03), grey=(0.55, 0.55, 0.58))
+              rubber=(0.03, 0.03, 0.03), grey=(0.55, 0.55, 0.58), red=(0.95, 0.06, 0.05))
 
 
 def material(sw, shade=100):
@@ -206,6 +206,8 @@ def build_lod(B):
     # engine cover / airbox
     B.loft('EngineCover', [(0.05, 0.12, 0.55, 0.92), (-0.2, 0.15, 0.50, 0.95), (-0.6, 0.19, FLOOR_TOP, 0.85),
                            (-1.1, 0.19, FLOOR_TOP, 0.70), (-1.6, 0.13, FLOOR_TOP, 0.54), (-2.0, 0.07, FLOOR_TOP + 0.02, 0.40)], BODY, n=n)
+    if B.lod < 2:   # the single red rear light on the crash structure (lit by the game in rain)
+        B.box('RainLight', (-2.002, 0, 0.28), (0.02, 0.084, 0.06), ('red', 45))
     B.box('AirboxInlet', (0.06, 0, 0.82), (0.04, 0.16, 0.14), CARB)
     B.prism('SharkFin', [(-0.2, 0.94), (-1.95, 0.72), (-1.95, 0.42), (-0.7, 0.62)], 0.012, 0, ACC)
     for s, sn in ((-1, 'R'), (1, 'L')):
