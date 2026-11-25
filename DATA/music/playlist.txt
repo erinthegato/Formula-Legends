@@ -35,3 +35,5 @@ e06_space_disco.emu	Tonebox - Space Disco	90s
 e07_love_in_bloom.emu	Hartzmann - Love in Bloom	90s
 e08_1988.emu	Ruzer - 1988	90s
 e09_back_to_the_future.emu	Nick Petrov - Back To The Future	90s
+e10_2am.emu	Ben Elson - 2AM	90s
+e11_inferadise.emu	Lupus Nocte - Inferadise	90s
