@@ -181,7 +181,17 @@ def make_root(name, at, col):
 
 
 # ---- steering wheels -----------------------------------------------------------------------------
-SCREEN = (-0.074, 0.074, -0.044, 0.054)       # y0, y1, z0, z1: the window the game draws its screen in
+# Where the game draws each era's screen on the wheel (Renderer::drawCockpit, WS_Z / WS_K): the
+# centre height and scale of its 0.24 x 0.154 m panel (gear, speed, lap time, rev bar, shift lights on
+# top). 1998: a small LCD at the top of the hub; 2010: a small screen; 2016 and 2025: the big screen.
+# The plate stays flat behind each window, and nothing stands in front of it.
+SCREENS = {'1998': (0.046, 0.42), '2010': (0.030, 0.55), '2016': (0.006, 0.72), '2025': (0.004, 0.72)}
+
+
+def screen_window(year, pad=0.006):
+    zc, k = SCREENS[year]
+    hw = 0.12 * k + pad
+    return (-hw, hw, zc - 0.070 * k - pad, zc + 0.084 * k + pad)
 
 
 def rounded_rect(y0, y1, z0, z1, r, n=3):
@@ -220,78 +230,150 @@ def glove(K, name, y, z, s):
     K.cyl(name + 'Trim', (-0.050, y + s * 0.011, z - 0.024), (-0.062, y + s * 0.014, z - 0.031), 0.037, 'glovetrim', sides=8)
 
 
+def bezel(K, year):
+    """the frame round the screen window, standing 2 mm proud of the plate"""
+    y0, y1, z0, z1 = screen_window(year)
+    K.slab('Bezel', rounded_rect(y0, y1, z0, z1, 0.006), -0.010, -0.007, 'carbonlite')
+
+
+def grip(K, name, pts, rs, mat='alcantara'):
+    K.tube(name, pts, 0.02, mat, sides=8, rs=rs)
+
+
+def wheel_1998(K):
+    """late-90s: a closed rim, nearly round with flattened top and bottom, suede on the sides where the
+    hands go; a small carbon hub with a little LCD at the top, a handful of round buttons and two
+    knobs, slim spokes out to the rim; the gear paddles behind"""
+    A, B, zo = 0.135, 0.100, -0.004
+    def rim_pt(deg):
+        t = math.radians(deg)
+        c, s_ = math.cos(t), math.sin(t)
+        y = A * math.copysign(abs(c) ** 0.75, c)
+        z = zo + B * math.copysign(abs(s_) ** 0.85, s_)
+        return (0.004, y, max(z, -0.088))
+    # the grips (sides, suede) and the carbon top and bottom of the rim
+    for sgn, a0 in ((1, -48), (-1, 132)):
+        grip(K, 'Grip%d' % sgn, [rim_pt(a0 + k * 12) for k in range(9)], [0.017, 0.019, 0.020, 0.021, 0.021, 0.021, 0.020, 0.019, 0.017])
+    K.tube('RimTop', [rim_pt(48 + k * 12) for k in range(8)], 0.013, 'carbon', sides=6)
+    K.tube('RimBottom', [rim_pt(228 + k * 12) for k in range(8)], 0.013, 'carbon', sides=6)
+    # the hub plate: a rounded trapezoid
+    plate = [(-0.060, -0.066), (0.060, -0.066), (0.074, 0.040), (0.068, 0.092), (-0.068, 0.092), (-0.074, 0.040)]
+    K.slab('Plate', plate, -0.008, 0.016, 'carbon', bevel=0.004)
+    bezel(K, '1998')
+    for sgn in (-1, 1):
+        K.tube('Spoke%d' % sgn, [(0.006, sgn * 0.066, 0.004), (0.006, sgn * 0.110, 0.000)], 0.012, 'carbon', sides=6)
+        K.tube('SpokeLow%d' % sgn, [(0.006, sgn * 0.050, -0.060), (0.006, sgn * 0.075, -0.085)], 0.010, 'carbon', sides=6)
+        # two round buttons a side and a knob below
+        button(K, 'BtnA%d' % sgn, sgn * 0.050, -0.004, 'yellow' if sgn > 0 else 'blue', r=0.0085)
+        button(K, 'BtnB%d' % sgn, sgn * 0.050, -0.030, 'red' if sgn > 0 else 'white', r=0.0085)
+        rotary(K, 'Knob%d' % sgn, sgn * 0.020, -0.048, r=0.011)
+        # the gear paddles behind the rim
+        K.slab('Paddle%d' % sgn, [(sgn * 0.060, 0.030), (sgn * 0.128, 0.040), (sgn * 0.132, 0.004), (sgn * 0.064, -0.006)],
+               0.022, 0.028, 'paddle', bevel=0.002)
+    return A
+
+
+def wheel_2010(K):
+    """2010 (V8): a rectangular wheel, grips on each side, a small screen in the upper middle (its shift
+    lights along the top), two columns of square buttons a side, a row of rotaries below and
+    the thumb buttons at the top corners"""
+    w, top, bot = 0.118, 0.084, -0.074
+    plate = [(-w, top - 0.010), (-w + 0.012, top), (w - 0.012, top), (w, top - 0.010),
+             (w, bot + 0.016), (w - 0.020, bot), (-w + 0.020, bot), (-w, bot + 0.016)]
+    K.slab('Plate', plate, -0.008, 0.018, 'carbon', bevel=0.003)
+    bezel(K, '2010')
+    gy = w + 0.016
+    for sgn in (-1, 1):
+        grip(K, 'Grip%d' % sgn, [(0.002, sgn * (w - 0.004), 0.054), (0.002, sgn * gy, 0.030), (0.002, sgn * (gy + 0.002), -0.012),
+                                 (0.002, sgn * gy, -0.050), (0.002, sgn * (w - 0.008), -0.072)], [0.016, 0.020, 0.022, 0.020, 0.016])
+        # square buttons in two columns beside the screen, labelled by colour
+        cols = ('green', 'white', 'blue', 'red', 'yellow', 'white')
+        for k in range(6):
+            y = sgn * (0.081 + (k % 2) * 0.020); z = 0.050 - (k // 2) * 0.024
+            button(K, 'Btn%d_%d' % (sgn, k), y, z, cols[k], r=0.0072, round_=False)
+        button(K, 'Thumb%d' % sgn, sgn * 0.100, 0.072, 'yellow' if sgn > 0 else 'red', r=0.009)
+        # the rotaries: two a side along the bottom
+        for k, y in enumerate((0.026, 0.068)):
+            rotary(K, 'Rot%d_%d' % (sgn, k), sgn * y, -0.048, r=0.011)
+        K.slab('Paddle%d' % sgn, [(sgn * 0.050, 0.040), (sgn * (w + 0.012), 0.048), (sgn * (w + 0.016), 0.010), (sgn * 0.055, 0.000)],
+               0.026, 0.032, 'paddle', bevel=0.002)
+        K.slab('Clutch%d' % sgn, [(sgn * 0.050, -0.012), (sgn * w, -0.010), (sgn * (w - 0.004), -0.044), (sgn * 0.055, -0.040)],
+               0.034, 0.040, 'carbonlite', bevel=0.002)
+    return gy
+
+
+def wheel_2016(K):
+    """2016 (hybrid): bigger, the large colour screen in the middle, shift lights in a strip across the
+    top, a rotary each side of the screen and four along the bottom, buttons all round in team
+    colours, thumb wheels at the lower corners and a notch in the bottom edge"""
+    w, top, bot = 0.135, 0.074, -0.092
+    plate = [(-w, top - 0.012), (-w + 0.010, top), (-0.060, top + 0.004), (0.060, top + 0.004), (w - 0.010, top), (w, top - 0.012),
+             (w, bot + 0.022), (w - 0.026, bot), (0.030, bot), (0.020, bot + 0.012), (-0.020, bot + 0.012), (-0.030, bot),
+             (-w + 0.026, bot), (-w, bot + 0.022)]
+    K.slab('Plate', plate, -0.008, 0.018, 'carbon', bevel=0.003)
+    bezel(K, '2016')
+    gy = w + 0.016
+    for sgn in (-1, 1):
+        grip(K, 'Grip%d' % sgn, [(0.002, sgn * (w - 0.004), 0.062), (0.002, sgn * gy, 0.034), (0.002, sgn * (gy + 0.004), -0.012),
+                                 (0.002, sgn * gy, -0.056), (0.002, sgn * (w - 0.010), -0.088)], [0.017, 0.021, 0.024, 0.021, 0.017])
+        rotary(K, 'RotSide%d' % sgn, sgn * 0.110, -0.030, r=0.011, ring='orange')
+        for k, y in enumerate((0.026, 0.066)):
+            rotary(K, 'Rot%d_%d' % (sgn, k), sgn * y, -0.064, r=0.0105, ring=('blue', 'green')[k])
+        for k, (y, z, col) in enumerate(((0.104, 0.058, 'yellow'), (0.122, 0.046, 'purple'), (0.104, 0.034, 'white'),
+                                         (0.122, 0.020, 'green'), (0.108, 0.006, 'red'))):
+            button(K, 'Btn%d_%d' % (sgn, k), sgn * y, z, col, r=0.0070)
+        K.cyl('Thumbwheel%d' % sgn, (-0.016, sgn * 0.112, -0.074), (-0.016, sgn * 0.100, -0.074), 0.012, 'alu', sides=10, smooth=True)
+        K.slab('Paddle%d' % sgn, [(sgn * 0.050, 0.040), (sgn * (w + 0.012), 0.052), (sgn * (w + 0.018), 0.010), (sgn * 0.055, 0.000)],
+               0.026, 0.032, 'paddle', bevel=0.002)
+        K.slab('Clutch%d' % sgn, [(sgn * 0.040, -0.014), (sgn * w, -0.012), (sgn * (w - 0.004), -0.050), (sgn * 0.045, -0.046)],
+               0.034, 0.040, 'carbonlite', bevel=0.002)
+    return gy
+
+
+def wheel_2025(K):
+    """2025 (ground effect): the widest; the screen sunk in a raised surround with the shift lights
+    round its top, the top edge swept up into horns over the grips, a deep U cut out of the bottom
+    between two lobes that carry the big rotaries, chunky moulded grips with finger ridges"""
+    w, top, bot = 0.140, 0.062, -0.098
+    plate = [(-w, top + 0.012), (-w + 0.022, top + 0.020), (-0.080, top), (0.080, top), (w - 0.022, top + 0.020), (w, top + 0.012),
+             (w, -0.040), (w - 0.020, bot), (0.050, bot), (0.034, -0.066), (-0.034, -0.066), (-0.050, bot),
+             (-w + 0.020, bot), (-w, -0.040)]
+    K.slab('Plate', plate, -0.008, 0.020, 'carbon', bevel=0.003)
+    # the raised surround of the screen, its top edge carrying the shift lights
+    y0, y1, z0, z1 = screen_window('2025', pad=0.010)
+    K.slab('Surround', rounded_rect(y0, y1, z0, z1, 0.010), -0.014, -0.007, 'carbonlite')
+    bezel(K, '2025')
+    gy = w + 0.014
+    for sgn in (-1, 1):
+        pts = [(0.000, sgn * (w - 0.006), 0.074), (0.000, sgn * gy, 0.046), (0.000, sgn * (gy + 0.006), 0.004),
+               (0.000, sgn * (gy + 0.004), -0.040), (0.000, sgn * (w - 0.004), -0.082)]
+        grip(K, 'Grip%d' % sgn, pts, [0.016, 0.024, 0.027, 0.025, 0.017], mat='rubber' if 'rubber' in PALETTE else 'alcantara')
+        for k, z in enumerate((0.026, 0.006, -0.014)):       # finger ridges on the front of the grip
+            K.cyl('Ridge%d_%d' % (sgn, k), (-0.022, sgn * (gy + 0.004), z), (-0.026, sgn * (gy + 0.004), z), 0.010, 'alcantara', sides=6)
+        # the big rotaries on the lower lobes, smaller ones above them
+        rotary(K, 'BigRot%d' % sgn, sgn * 0.092, -0.082, r=0.015, ring='orange')
+        rotary(K, 'Rot%d' % sgn, sgn * 0.058, -0.076, r=0.010, ring='blue')
+        rotary(K, 'RotUp%d' % sgn, sgn * 0.114, -0.036, r=0.010, ring='green')
+        for k, (y, z, col) in enumerate(((0.105, 0.058, 'red'), (0.125, 0.046, 'yellow'), (0.105, 0.034, 'white'),
+                                         (0.125, 0.020, 'purple'), (0.105, 0.010, 'green'), (0.110, -0.010, 'blue'))):
+            button(K, 'Btn%d_%d' % (sgn, k), sgn * y, z, col, r=0.0068)
+        # the thumb rollers on top of the grips
+        K.cyl('Thumbwheel%d' % sgn, (-0.012, sgn * (w - 0.010), 0.066), (-0.012, sgn * (w - 0.024), 0.066), 0.011, 'alu', sides=10, smooth=True)
+        K.slab('Paddle%d' % sgn, [(sgn * 0.050, 0.040), (sgn * (w + 0.012), 0.050), (sgn * (w + 0.018), 0.008), (sgn * 0.055, -0.002)],
+               0.028, 0.034, 'paddle', bevel=0.002)
+        K.slab('Clutch%d' % sgn, [(sgn * 0.040, -0.016), (sgn * w, -0.014), (sgn * (w - 0.004), -0.054), (sgn * 0.045, -0.050)],
+               0.036, 0.042, 'carbonlite', bevel=0.002)
+    return gy + 0.004
+
+
 def steering_wheel(year, K):
-    if year == '1998':
-        # small and nearly round: a narrow carbon plate, the rim a flat-topped oval with suede grips,
-        # a handful of buttons and two knobs, the gear paddles behind
-        w = 0.130
-        plate = rounded_rect(-0.088, 0.088, -0.070, 0.064, 0.022)
-        K.slab('Plate', plate, -0.008, 0.016, 'carbon', bevel=0.003)
-        top = [(0.004, w * math.sin(math.radians(a)), 0.095 * math.cos(math.radians(a)) - 0.005) for a in range(-95, 96, 19)]
-        K.tube('RimTop', top, 0.014, 'carbon', sides=6)
-        for s in (-1, 1):
-            K.tube('Grip%d' % s, [(0.004, s * w, 0.030), (0.004, s * (w + 0.006), -0.010), (0.004, s * (w - 0.006), -0.055),
-                                  (0.004, s * (w - 0.030), -0.080)], 0.019, 'alcantara', sides=8)
-            K.tube('Spoke%d' % s, [(0.006, s * 0.085, -0.040), (0.006, s * (w - 0.004), -0.030)], 0.011, 'carbon', sides=6)
-            button(K, 'BtnA%d' % s, s * 0.060, -0.058, 'red' if s > 0 else 'yellow')
-            rotary(K, 'Knob%d' % s, s * 0.035, -0.058, r=0.010)
-            K.slab('Paddle%d' % s, [(s * 0.040, 0.020), (s * 0.105, 0.030), (s * 0.112, -0.010), (s * 0.045, -0.020)],
-                   0.024, 0.030, 'paddle')
-        K.box('Lcd', (-0.010, -0.040, 0.040), (-0.008, 0.040, 0.056), 'led')
-        grips = w
-    else:
-        # the butterfly wheels: a wide face plate with the screen, grips on each side, the top edge
-        # carrying the shift lights; each era a little bigger, with more knobs
-        big = {'2010': 0, '2016': 1, '2025': 2}[year]
-        w = (0.142, 0.150, 0.152)[big]
-        top, bot = (0.072, 0.078, 0.082)[big], (-0.088, -0.092, -0.095)[big]
-        plate = [(-w + 0.020, top), (-0.060, top + 0.006), (0.060, top + 0.006), (w - 0.020, top),
-                 (w - 0.006, 0.040), (w - 0.006, -0.050), (w - 0.035, bot), (0.050, bot - 0.004),
-                 (-0.050, bot - 0.004), (-w + 0.035, bot), (-w + 0.006, -0.050), (-w + 0.006, 0.040)]
-        plate = [(-y, z) for (y, z) in reversed(plate)]
-        K.slab('Plate', plate, -0.008, 0.018, 'carbon', bevel=0.003)
-        # the screen bezel (the game draws the screen in this window)
-        # (a frame round the window, standing 2 mm proud; the window itself is the plate, under the game's screen)
-        K.slab('Bezel', rounded_rect(SCREEN[0] - 0.006, SCREEN[1] + 0.006, SCREEN[2] - 0.006, SCREEN[3] + 0.006, 0.008),
-               -0.010, -0.007, 'carbonlite')
-        if year == '2025':      # the top cut away in the middle: the curved top edge of the 2020s wheels
-            K.tube('TopArc', [(0.0, -0.11, top - 0.004), (0.0, -0.05, top + 0.016), (0.0, 0.05, top + 0.016),
-                              (0.0, 0.11, top - 0.004)], 0.010, 'carbon', sides=6)
-        for s in (-1, 1):
-            # grips: suede-covered, raked out at the bottom
-            gy = s * (w + 0.010)
-            K.tube('Grip%d' % s, [(0.002, s * (w - 0.004), 0.058), (0.002, gy, 0.030), (0.002, gy + s * 0.004, -0.010),
-                                  (0.002, gy, -0.050), (0.002, s * (w - 0.012), -0.080)], 0.021, 'alcantara', sides=8,
-                   rs=[0.017, 0.021, 0.023, 0.021, 0.017])
-            # buttons beside the screen: two columns, coloured like the real ones
-            cols = [('green', 'red', 'blue', 'white'), ('yellow', 'orange', 'white', 'blue'), ('purple', 'green', 'yellow', 'red')][big]
-            for k in range(3 if big == 0 else 4):
-                y = s * (0.094 + (k % 2) * 0.020); z = 0.040 - (k // 2) * 0.028
-                button(K, 'Btn%d_%d' % (s, k), y, z, cols[k], r=0.0075, round_=(big != 1))
-            # big buttons at the thumbs: pit limiter / radio / drink / neutral
-            button(K, 'Thumb%d' % s, s * 0.120, 0.052, 'yellow' if s > 0 else 'red', r=0.009)
-            # the rotaries below the screen (more of them each era)
-            n_rot = (1, 2, 2)[big]
-            for k in range(n_rot):
-                rotary(K, 'Rot%d_%d' % (s, k), s * (0.030 + 0.040 * k), -0.066, r=0.011 if big else 0.012,
-                       ring=('blue', 'orange', 'green')[k % 3] if big else None)
-            if big >= 1:        # thumb wheels at the bottom corners
-                K.cyl('Thumbwheel%d' % s, (-0.016, s * 0.105, -0.072), (-0.016, s * 0.105 - s * 0.012, -0.072), 0.012,
-                      'alu', sides=10, smooth=True)
-            # paddles behind: gears on top, clutch below
-            K.slab('Paddle%d' % s, [(s * 0.050, 0.040), (s * (w + 0.010), 0.050), (s * (w + 0.016), 0.010),
-                                    (s * 0.055, 0.000)], 0.026, 0.032, 'paddle', bevel=0.002)
-            K.slab('Clutch%d' % s, [(s * 0.050, -0.012), (s * (w + 0.000), -0.010), (s * (w - 0.004), -0.045),
-                                    (s * 0.055, -0.040)], 0.034, 0.040, 'carbonlite', bevel=0.002)
-        # shift-light strip along the top edge (lit by the game's screen; the strip is the housing)
-        K.box('LedBar', (-0.011, -0.070, top - 0.012), (-0.006, 0.070, top - 0.004), 'led')
-        grips = w + 0.010
+    grips = {'1998': wheel_1998, '2010': wheel_2010, '2016': wheel_2016, '2025': wheel_2025}[year](K)
     # quick release hub and the column
     K.cyl('Hub', (0.018, 0, 0), (0.050, 0, 0), 0.030, 'alu', sides=10, smooth=True)
     K.cyl('Column', (0.050, 0, 0), (0.300, 0, -0.030), 0.020, 'carbonlite', sides=8, smooth=True)
     # the driver's gloves on the grips
-    for s in (-1, 1):
-        glove(K, 'Glove%d' % s, s * grips, -0.004, s)
+    for sgn in (-1, 1):
+        glove(K, 'Glove%d' % sgn, sgn * grips, -0.004, sgn)
 
 
 # ---- the driver ----------------------------------------------------------------------------------

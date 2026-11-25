@@ -737,7 +737,11 @@ void Renderer::drawCockpit(const Race& r, const Camera& cam) {
     // ---- on the wheel: gear, speed, rev bar, shift lights
     if (!newDash && !cfg.hideWheel) {
         bool hy = cls == CLASS_HYPER;
-        Display d{*this, wheelM * M4::translate(V3(hy ? -0.013f : -0.015f, 0, hy ? 0.008f : 0.005f)) * FACE};
+        // each era's wheel has its own screen (tools/blender/cockpit_parts.py SCREENS): 1998 a small LCD
+        // at the top of the hub, 2010 a small screen, 2016 and 2025 the big screen
+        static const float WS_Z[ERA_COUNT] = {0.046f, 0.030f, 0.006f, 0.004f}, WS_K[ERA_COUNT] = {0.42f, 0.55f, 0.72f, 0.72f};
+        int we = c.def->era % ERA_COUNT;
+        Display d{*this, wheelM * M4::translate(V3(-0.013f, 0, WS_Z[we])) * FACE * M4::scale(WS_K[we], WS_K[we], WS_K[we])};
         float w = hy ? 0.12f : 0.07f, h = hy ? 0.07f : 0.05f;
         d.box(-w, -h, w, h, black);
         snprintf(b, sizeof b, "%d", c.gear);
