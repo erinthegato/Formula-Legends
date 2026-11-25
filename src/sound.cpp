@@ -30,6 +30,9 @@ struct Voice {
     volatile float vol = 0, pan = 0;
     volatile bool muffled = false;
     float pos = 0, curVol = 0, lp = 0;
+    volatile int clipOff = -1;    // the off-throttle (overrun) loop, if the car has one
+    volatile float offMix = 0;    // 0 on the throttle .. 1 off it
+    float posOff = 0, curOff = 0;
 };
 Voice voices[4];
 volatile float master = 0.9f;
@@ -201,6 +204,19 @@ void mix(int16_t* out, int frames) {
             int a = (int)v.pos; float t = v.pos - a;
             int b = a + 1; if (b >= c.len) b = 0;
             float s = (c.data[a] * (1 - t) + c.data[b] * t) * (1.0f / 32768.0f);
+            int co = v.clipOff;
+            if (co >= 0 && co < clipCount) {
+                // the overrun layer, crossfaded in as the throttle closes (equal power)
+                v.curOff += (v.offMix - v.curOff) * 0.0015f;
+                const Clip& o = clips[co];
+                int a2 = (int)v.posOff; float t2 = v.posOff - a2;
+                int b2 = a2 + 1; if (b2 >= o.len) b2 = 0;
+                float s2 = (o.data[a2] * (1 - t2) + o.data[b2] * t2) * (1.0f / 32768.0f);
+                float m = v.curOff;
+                s = s * sqrtf(1 - m) + s2 * sqrtf(m);
+                v.posOff += rate;
+                if (v.posOff >= o.len) v.posOff -= o.len;
+            }
             // a muffled engine (heard from inside the cockpit / far away) loses its fizz
             if (muff) { v.lp += (s - v.lp) * 0.25f; s = v.lp; }
             s *= v.curVol * eng;
@@ -304,12 +320,25 @@ void shutdown() {
     for (int i = 0; i < sfxCount; i++) sys::freeFile(sfx[i].data);
     sfxCount = 0;
 }
-void setVoice(int i, const CarDef* car, float rpm, float volume, float pan, bool muffled) {
+void setVoice(int i, const CarDef* car, float rpm, float volume, float pan, bool muffled, float throttle) {
     if (i < 0 || i > 3) return;
     Voice& v = voices[i];
     if (!car) { v.vol = 0; return; }
     int c = clipFor(car->sound);
     if (c != v.clip) { v.pos = 0; v.clip = c; }
+    // "<sound>_off": the overrun loop (kept names: the clip table holds the pointer)
+    {
+        static char offNames[8][40]; static const char* offOf[8]; static int nOff = 0;
+        const char* key = nullptr;
+        for (int k = 0; k < nOff; k++) if (offOf[k] == car->sound) key = offNames[k];
+        if (!key && nOff < 8) { offOf[nOff] = car->sound; snprintf(offNames[nOff], 40, "%s_off", car->sound); key = offNames[nOff++]; }
+        static const char* missing[8]; static int nMiss = 0;
+        bool known = false; for (int k = 0; k < nMiss; k++) if (missing[k] == key) known = true;
+        int co = -1;
+        if (key && !known) { co = clipFor(key); if (co < 0 && nMiss < 8) missing[nMiss++] = key; }
+        if (co != v.clipOff) { v.posOff = 0; v.clipOff = co; }
+        v.offMix = clampf(1 - throttle * 1.6f, 0, 1);
+    }
     float ref = car->idleRpm + (car->maxRpm - car->idleRpm) * 0.72f;
     v.rate = clampf(rpm / ref, 0.3f, 1.6f) * (22050.0f / 44100.0f);
     v.vol = volume; v.pan = clampf(pan, -1, 1); v.muffled = muffled;

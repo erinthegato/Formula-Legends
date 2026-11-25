@@ -284,7 +284,7 @@ void Game::raceAudio() {
     if (race.countdown > 0) vol = 0.5f;
     if (manage) vol *= 0.4f;
     if (!me.engineOn) vol = 0;
-    sound::setVoice(0, me.def, me.rpm, quiet ? 0 : vol, 0, false);
+    sound::setVoice(0, me.def, me.rpm, quiet ? 0 : vol, 0, false, race.countdown > 0 ? 1.0f : me.throttle);
     // the three nearest opponents
     int best[3] = {-1, -1, -1}; float bd[3] = {1e9f, 1e9f, 1e9f};
     for (int i = 0; i < (int)race.cars.size(); i++) {
@@ -301,7 +301,7 @@ void Game::raceAudio() {
         V3 rel = o.pos - me.pos;
         float pan = dot(norm(rel), me.left * -1.0f) * 0.8f;
         float v = o.engineOn ? 0.55f / (1 + bd[k] / 10.0f) : 0;
-        sound::setVoice(k + 1, o.def, o.rpm, v, pan, bd[k] > 50);
+        sound::setVoice(k + 1, o.def, o.rpm, v, pan, bd[k] > 50, o.throttle);
     }
     // rain on the car (quieter inside the cockpit)
     float rv = race.rain * (cam == CAM_COCKPIT ? 0.4f : 0.65f);

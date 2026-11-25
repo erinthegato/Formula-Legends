@@ -41,22 +41,22 @@ CarDef CARS[] = {
     {"m16_hinwil", "Hinwil", "C35", "Hinwil Sauberwerk", {9, 12}, CLASS_HYPER, ERA_HYBRID, "1.6 V6 turbo hybrid", "f1_hybrid", 4000, 15000, 702, 593, 0.000f, 1.013f, 0.992f, 5.25f, C(0.10f, 0.30f, 0.75f), false},
     {"m16_kannapolis", "Kannapolis", "K16", "Kannapolis Racing", {8, 21}, CLASS_HYPER, ERA_HYBRID, "1.6 V6 turbo hybrid", "f1_hybrid", 4000, 15000, 702, 590, 0.000f, 1.009f, 0.987f, 5.25f, C(0.42f, 0.44f, 0.46f), false},
 
-    {"m25_papaya", "Woking", "WK-39", "Papaya Woking", {4, 81}, CLASS_HYPER, ERA_GE, "1.6 V6 turbo hybrid", "f1_ge0", 4000, 13000, 800, 609, 0.000f, 0.996f, 1.012f, 5.62f, C(1.00f, 0.50f, 0.05f), false},
-    {"m25_taurus", "Taurus", "TR21", "Taurus Energy Racing", {1, 22}, CLASS_HYPER, ERA_GE, "1.6 V6 turbo hybrid", "f1_ge1", 4000, 13000, 800, 607, 0.000f, 0.999f, 1.004f, 5.62f, C(0.08f, 0.10f, 0.30f), false},
-    {"m25_marchetti", "Marchetti", "SF25", "Scuderia Rosso Marchetti", {16, 44}, CLASS_HYPER, ERA_GE, "1.6 V6 turbo hybrid", "f1_ge2", 4000, 13000, 800, 604, 0.000f, 0.999f, 1.005f, 5.62f, C(0.86f, 0.03f, 0.03f), false},
-    {"m25_sterne", "Sterne", "S16", "Sterne Grand Prix", {63, 12}, CLASS_HYPER, ERA_GE, "1.6 V6 turbo hybrid", "f1_ge3", 4000, 13000, 800, 601, 0.000f, 0.994f, 1.002f, 5.62f, C(0.10f, 0.10f, 0.11f), false},
-    {"m25_banbury", "Banbury", "B25", "Banbury Green Racing", {14, 18}, CLASS_HYPER, ERA_GE, "1.6 V6 turbo hybrid", "f1_ge4", 4000, 13000, 800, 603, 0.000f, 1.007f, 1.004f, 5.62f, C(0.02f, 0.32f, 0.22f), false},
-    {"m25_enstone", "Enstone", "A525", "Enstone Alpine", {10, 43}, CLASS_HYPER, ERA_GE, "1.6 V6 turbo hybrid", "f1_ge5", 4000, 13000, 800, 596, 0.000f, 0.992f, 0.999f, 5.62f, C(0.10f, 0.30f, 0.80f), false},
-    {"m25_kannapolis", "Kannapolis", "K25", "Kannapolis Racing", {31, 87}, CLASS_HYPER, ERA_GE, "1.6 V6 turbo hybrid", "f1_ge6", 4000, 13000, 800, 594, 0.000f, 0.992f, 0.997f, 5.62f, C(0.95f, 0.95f, 0.96f), false},
-    {"m25_faenza", "Faenza", "VR02", "Faenza Racing", {6, 30}, CLASS_HYPER, ERA_GE, "1.6 V6 turbo hybrid", "f1_ge7", 4000, 13000, 800, 592, 0.000f, 0.997f, 0.991f, 5.62f, C(0.95f, 0.95f, 0.97f), false},
-    {"m25_hinwil", "Hinwil", "C45", "Hinwil Kick", {27, 5}, CLASS_HYPER, ERA_GE, "1.6 V6 turbo hybrid", "f1_ge8", 4000, 13000, 800, 591, 0.000f, 1.012f, 0.991f, 5.62f, C(0.10f, 0.10f, 0.10f), false},
-    {"m25_wexford", "Wexford", "W47", "Wexford Grand Prix", {23, 55}, CLASS_HYPER, ERA_GE, "1.6 V6 turbo hybrid", "f1_ge9", 4000, 13000, 800, 590, 0.000f, 1.012f, 0.993f, 5.62f, C(0.05f, 0.18f, 0.55f), false},
+    {"m25_papaya", "Woking", "WK-39", "Papaya Woking", {4, 81}, CLASS_HYPER, ERA_GE, "1.6 V6 turbo hybrid", "f1_ge", 4000, 13000, 800, 609, 0.000f, 0.996f, 1.012f, 5.62f, C(1.00f, 0.50f, 0.05f), false},
+    {"m25_taurus", "Taurus", "TR21", "Taurus Energy Racing", {1, 22}, CLASS_HYPER, ERA_GE, "1.6 V6 turbo hybrid", "f1_ge", 4000, 13000, 800, 607, 0.000f, 0.999f, 1.004f, 5.62f, C(0.08f, 0.10f, 0.30f), false},
+    {"m25_marchetti", "Marchetti", "SF25", "Scuderia Rosso Marchetti", {16, 44}, CLASS_HYPER, ERA_GE, "1.6 V6 turbo hybrid", "f1_ge", 4000, 13000, 800, 604, 0.000f, 0.999f, 1.005f, 5.62f, C(0.86f, 0.03f, 0.03f), false},
+    {"m25_sterne", "Sterne", "S16", "Sterne Grand Prix", {63, 12}, CLASS_HYPER, ERA_GE, "1.6 V6 turbo hybrid", "f1_ge", 4000, 13000, 800, 601, 0.000f, 0.994f, 1.002f, 5.62f, C(0.10f, 0.10f, 0.11f), false},
+    {"m25_banbury", "Banbury", "B25", "Banbury Green Racing", {14, 18}, CLASS_HYPER, ERA_GE, "1.6 V6 turbo hybrid", "f1_ge", 4000, 13000, 800, 603, 0.000f, 1.007f, 1.004f, 5.62f, C(0.02f, 0.32f, 0.22f), false},
+    {"m25_enstone", "Enstone", "A525", "Enstone Alpine", {10, 43}, CLASS_HYPER, ERA_GE, "1.6 V6 turbo hybrid", "f1_ge", 4000, 13000, 800, 596, 0.000f, 0.992f, 0.999f, 5.62f, C(0.10f, 0.30f, 0.80f), false},
+    {"m25_kannapolis", "Kannapolis", "K25", "Kannapolis Racing", {31, 87}, CLASS_HYPER, ERA_GE, "1.6 V6 turbo hybrid", "f1_ge", 4000, 13000, 800, 594, 0.000f, 0.992f, 0.997f, 5.62f, C(0.95f, 0.95f, 0.96f), false},
+    {"m25_faenza", "Faenza", "VR02", "Faenza Racing", {6, 30}, CLASS_HYPER, ERA_GE, "1.6 V6 turbo hybrid", "f1_ge", 4000, 13000, 800, 592, 0.000f, 0.997f, 0.991f, 5.62f, C(0.95f, 0.95f, 0.97f), false},
+    {"m25_hinwil", "Hinwil", "C45", "Hinwil Kick", {27, 5}, CLASS_HYPER, ERA_GE, "1.6 V6 turbo hybrid", "f1_ge", 4000, 13000, 800, 591, 0.000f, 1.012f, 0.991f, 5.62f, C(0.10f, 0.10f, 0.10f), false},
+    {"m25_wexford", "Wexford", "W47", "Wexford Grand Prix", {23, 55}, CLASS_HYPER, ERA_GE, "1.6 V6 turbo hybrid", "f1_ge", 4000, 13000, 800, 590, 0.000f, 1.012f, 0.993f, 5.62f, C(0.05f, 0.18f, 0.55f), false},
 
     // career mode: your own team's car, one per era (name, number, livery and upgrades set by the career)
     {"career_90s", "Your", "Grand Prix car", "Your Team", {0, 0}, CLASS_HYPER, ERA_90S, "3.0 V8 naturally aspirated", "f1_80s", 3200, 11000, 649, 356, 0.000f, 1.000f, 0.995f, 4.30f, C(0.90f, 0.45f, 0.05f), false, 1.0f, true},
     {"career_v8", "Your", "Grand Prix car", "Your Team", {0, 0}, CLASS_HYPER, ERA_V8, "2.4 V8 naturally aspirated", "f1_v8", 4500, 18000, 624, 554, 0.000f, 1.000f, 0.995f, 4.95f, C(0.90f, 0.45f, 0.05f), false, 1.0f, true},
     {"career_hybrid", "Your", "Grand Prix car", "Your Team", {0, 0}, CLASS_HYPER, ERA_HYBRID, "1.6 V6 turbo hybrid", "f1_hybrid", 4000, 15000, 706, 594, 0.000f, 1.000f, 0.995f, 5.25f, C(0.90f, 0.45f, 0.05f), false, 1.0f, true},
-    {"career_ge", "Your", "Grand Prix car", "Your Team", {0, 0}, CLASS_HYPER, ERA_GE, "1.6 V6 turbo hybrid", "f1_ge0", 4000, 13000, 804, 594, 0.000f, 1.000f, 0.995f, 5.62f, C(0.90f, 0.45f, 0.05f), false, 1.0f, true},
+    {"career_ge", "Your", "Grand Prix car", "Your Team", {0, 0}, CLASS_HYPER, ERA_GE, "1.6 V6 turbo hybrid", "f1_ge", 4000, 13000, 804, 594, 0.000f, 1.000f, 0.995f, 5.62f, C(0.90f, 0.45f, 0.05f), false, 1.0f, true},
 };
 const int CAR_COUNT = sizeof(CARS) / sizeof(CARS[0]);
 const int CAR_PICK = CAR_COUNT - ERA_COUNT;

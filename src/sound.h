@@ -7,7 +7,7 @@ namespace sound {
 void init();
 void shutdown();
 // voice 0 = the player's car, 1..3 = the nearest opponents
-void setVoice(int voice, const CarDef* car, float rpm, float volume, float pan, bool muffled);
+void setVoice(int voice, const CarDef* car, float rpm, float volume, float pan, bool muffled, float throttle = 1);   // engines with a "<sound>_off" loop blend it in off the throttle
 void silence();
 void setMaster(float v);
 void setVolumes(float music, float engine, float sfx, float radio);   // each 0..1
