@@ -51,7 +51,7 @@ vita_create_self(eboot.bin ${PROJECT_NAME} UNSAFE)
 find_package(Python3 REQUIRED COMPONENTS Interpreter)
 separate_arguments(SFO_FLAGS UNIX_COMMAND "${VITA_MKSFOEX_FLAGS}")
 add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/param.sfo
-  COMMAND vita-mksfoex ${SFO_FLAGS} -s TITLE_ID=${VITA_TITLEID} -s APP_VER=${VITA_VERSION}
+  COMMAND ${VITA_MKSFOEX} ${SFO_FLAGS} -s TITLE_ID=${VITA_TITLEID} -s APP_VER=${VITA_VERSION}
           "${VITA_APP_NAME}" ${CMAKE_CURRENT_BINARY_DIR}/param.sfo
   VERBATIM)
 set(VPK_PAIRS
@@ -63,9 +63,9 @@ if(EXISTS ${ROOT}/HD)
 endif()
 add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}.vpk
   COMMAND ${Python3_EXECUTABLE} ${ROOT}/tools/make_vpk.py ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}.vpk
-          ${CMAKE_CURRENT_BINARY_DIR}/eboot.bin ${CMAKE_CURRENT_BINARY_DIR}/param.sfo ${VPK_PAIRS}
+          ${CMAKE_CURRENT_BINARY_DIR}/eboot.bin.out ${CMAKE_CURRENT_BINARY_DIR}/param.sfo ${VPK_PAIRS}
           --skip "DATA/music/*.emu" --keep "DATA/music/intro.emu"
-  DEPENDS eboot.bin ${CMAKE_CURRENT_BINARY_DIR}/param.sfo ${ROOT}/tools/make_vpk.py
+  DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/eboot.bin.out ${CMAKE_CURRENT_BINARY_DIR}/param.sfo ${ROOT}/tools/make_vpk.py
   VERBATIM)
 add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}-music.zip
   COMMAND ${Python3_EXECUTABLE} ${ROOT}/tools/make_music_pack.py ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}-music.zip ${ROOT}/DATA/music
@@ -73,3 +73,9 @@ add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}-music.zip
   VERBATIM)
 add_custom_target(${PROJECT_NAME}.vpk-target ALL
   DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}.vpk ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}-music.zip)
+# (eboot.bin.out is made by vita_create_self's target: eboot.bin-self, or eboot.bin before CMake 3.20)
+foreach(t eboot.bin-self eboot.bin)
+  if(TARGET ${t})
+    add_dependencies(${PROJECT_NAME}.vpk-target ${t})
+  endif()
+endforeach()
