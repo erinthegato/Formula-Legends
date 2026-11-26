@@ -356,9 +356,20 @@ void Game::drawMenus(float dt) {
 
 // music: what's playing and the L / R skip (flat, in the corner)
 void Game::nowPlayingBar() {
+    if (screen == SCR_TITLE && input::hasTouch()) {
+        // touch: the screen's top corners skip songs (previous on the left, next on the right)
+        gfx::setDepthTest(false); gfx::setBlend(true);
+        gfx::drawFill2D(4, 4, 40, 22, RGBA(0, 0, 0, 150));
+        gfx::drawFill2D(SCREEN_W - 44, 4, 40, 22, RGBA(0, 0, 0, 150));
+        R.font.drawCentre(24, 8, "|<<", WHITE, 0.7f);
+        R.font.drawCentre(SCREEN_W - 24, 8, ">>|", WHITE, 0.7f);
+        gfx::setBlend(false); gfx::setDepthTest(true);
+    }
     const char* np = sound::nowPlaying();
     if (!np[0] || sound::trackTime() > 6.0f) return;
-    char b[96]; snprintf(b, sizeof b, "%s   rear pad: skip", np);
+    char b[96];
+    if (screen == SCR_TITLE && input::hasTouch()) snprintf(b, sizeof b, "%s   tap a top corner: skip", np);
+    else snprintf(b, sizeof b, "%s", np);
     float w = R.font.width(b, 0.66f) + 14;
     gfx::setDepthTest(false); gfx::setBlend(true);
     gfx::drawFill2D(SCREEN_W - w - 4, SCREEN_H - 20, w, 16, RGBA(0, 0, 0, 160));
@@ -877,6 +888,7 @@ void Game::screenHelp(Panel& P) {
         {"", ""},
         {"Intro music", "Take On The World - All Good Folks (Uppbeat)"},
         {"Attract music", "Nocturn Tonebox (made with ElevenLabs)"},
+        {"Headquarters music", "Apex Pursuit"},
         {"1980 era music", "Originals, Epidemic Sound, Uppbeat"},
         {"2016 era music", "Uppbeat, Epidemic Sound"},
         {"2025 era music", "Uppbeat (uppbeat.io)"},
@@ -974,7 +986,7 @@ void Game::screenOptions(Panel& P) {
             P.text(52, y, OPT_CAT_NAME[i], on ? INK : WHITE, 0.9f);
             if (SUB[i][0]) P.text(52, y + 14, SUB[i], on ? INK : DIM, 0.6f);
         }
-        P.textC(240, 255, "X open     O back     Rear touch pad: next / previous song", DIM, 0.7f);
+        P.textC(240, 255, "X open     O back", DIM, 0.7f);
         return;
     }
     int ids[12]; int n = optRows(ids);

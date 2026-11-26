@@ -65,6 +65,10 @@ jobs:
         env:
           ASAN_OPTIONS: detect_leaks=0
         run: ./fl_test_asan eralock x 2>/dev/null | grep -E "^era"
+      - name: Main menu touch skip, headquarters theme
+        env:
+          ASAN_OPTIONS: detect_leaks=0
+        run: ./fl_test_asan touchskip x 2>/dev/null | grep -vE "^track"
       - name: No overlaps (barriers, terrain and trackside objects at every circuit)
         env:
           ASAN_OPTIONS: detect_leaks=0

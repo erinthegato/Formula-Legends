@@ -351,6 +351,38 @@ int main(int argc, char** argv) {
         fprintf(stderr, "bench done %d after %.0f s\n", (int)g.benchDone, simT);
         return 0;
     }
+    if (mode == "touchskip") {   // main menu: top corners skip songs; headquarters plays only its own theme
+        int bad = 0;
+        auto settle = [&](int n) { for (int i = 0; i < n; i++) { Pad q{}; g.frame(1.0f / 30, q); } };
+        auto tap = [&](float x, float y) { Pad q{}; q.touches = 1; q.tx[0] = x; q.ty[0] = y; g.frame(1.0f / 30, q); settle(3); };
+        g.screen = SCR_HQ; g.t = 1;
+        for (int e = 0; e < ERA_COUNT; e++) {
+            g.hqSel = e; settle(10);
+            printf("headquarters, %s looked at: playing '%s'\n", ERA_SHORT[e], sound::musicForced());
+            if (strncmp(sound::musicForced(), "hq_", 3)) bad++;
+        }
+        // no skipping the era themes at headquarters: corner taps and musicSkip change nothing
+        {
+            std::string before = sound::musicForced(); float t0 = sound::trackTime();
+            Pad q{}; q.touches = 1; q.tx[0] = 470; q.ty[0] = 10; g.frame(1.0f / 30, q); settle(3);
+            q.tx[0] = 10; g.frame(1.0f / 30, q); settle(3);
+            sound::musicSkip(1); sound::musicSkip(-1); settle(3);
+            bool same = before == sound::musicForced() && sound::trackTime() >= t0;
+            printf("headquarters, after taps and skips: '%s' %s\n", sound::musicForced(), same ? "(still playing)" : "(CHANGED)");
+            if (!same) bad++;
+        }
+        g.chooseEra(3); g.screen = SCR_TITLE; g.sel = 0; g.t = 1; settle(10);
+        printf("main menu: playing '%s' (playlist), now playing '%s'\n", sound::musicForced(), sound::nowPlaying());
+        if (sound::musicForced()[0]) bad++;
+        std::string a = sound::nowPlaying();
+        tap(470, 10); std::string b = sound::nowPlaying();
+        tap(10, 10);  std::string c = sound::nowPlaying();
+        tap(240, 150); std::string d = sound::nowPlaying();      // the middle of the screen: no skip
+        printf("top-right: '%s' -> '%s'\ntop-left:  -> '%s'\nmiddle:    -> '%s'\n", a.c_str(), b.c_str(), c.c_str(), d.c_str());
+        if (b == a || c != a || d != c) bad++;
+        printf("%s\n", bad ? "TOUCH SKIP FAILED" : "touch skip ok");
+        return bad ? 1 : 0;
+    }
     if (mode == "eralock") {   // each era from headquarters: its circuits, its teams, its own career and championship
         int bad = 0;
         auto settle = [&](int n = 10) { for (int i = 0; i < n; i++) { Pad q{}; g.frame(1.0f / 30, q); } };

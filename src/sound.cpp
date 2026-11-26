@@ -52,6 +52,8 @@ float hpX = 0, hpY = 0, lpY = 0;     // speaker tone filters
 struct Tap { volatile float gain = 0, pan = 0, delay = 0.01f, dull = 0; float g = 0, d = 0.01f, p = 0, lp = 0; };
 Tap taps[4];
 std::vector<std::string> mFiles, mNames;
+std::vector<int> mHist;                 // the songs played, latest last (for "previous song")
+int mBackTo = -1;                       // the song to go back to next
 std::vector<int> mEra;                  // per track: the era it belongs to (-1: every era)
 int mCurEra = -1;                       // the era picked in the menus (-1: not known yet)
 std::vector<int> mOrder; int mPos = -1, mLast = -1;
@@ -132,6 +134,9 @@ void openNext() {
         if (mFile) { mFrames = h[3]; mCh = (int)h[2]; mDone = 0; mStart = sys::timeSec(); }
         return;
     }
+    int k;
+    if (mBackTo >= 0 && mBackTo < n) { k = mBackTo; mBackTo = -1; }
+    else {
     if (mOrder.empty() || mPos + 1 >= (int)mOrder.size()) {
         // the songs for every era, plus those of the era picked in the menus
         mOrder.clear();
@@ -142,7 +147,10 @@ void openNext() {
         if (m > 1 && mOrder[0] == mLast) { int t = mOrder[0]; mOrder[0] = mOrder[1]; mOrder[1] = t; }
         mPos = 0;
     } else mPos++;
-    int k = mOrder[mPos];
+    k = mOrder[mPos];
+    }
+    mHist.push_back(k);
+    if (mHist.size() > 40) mHist.erase(mHist.begin());
     mLast = k;
     std::string path = "DATA/music/" + mFiles[k];
     mFile = fopen(path.c_str(), "rb");
@@ -412,8 +420,9 @@ void update() {
     }
 }
 
+const char* musicForced() { return mForce.c_str(); }
 const char* nowPlaying() {
-    if (!mFile) return "";                // (nothing playing: the music pack isn't installed, or between songs)
+    if (!mFile || !mForce.empty()) return "";   // (nothing playing, or a fixed piece: intro, headquarters, podium)
     return mLast >= 0 && mLast < (int)mNames.size() ? mNames[mLast].c_str() : "";
 }
 float trackTime() { return (float)(sys::timeSec() - mStart); }
@@ -495,9 +504,13 @@ void musicEra(int era) {
     mOrder.clear(); mPos = -1;          // a new shuffle with this era's songs from the next song on
 }
 void musicSkip(int dir) {
-    if (!mOn || mFiles.empty() || !mForce.empty()) return;
-    if (dir < 0) mPos = mPos >= 2 ? mPos - 2 : -1;     // back one (openNext steps forward again)
-    if (dir < 0 && mPos < 0) { mPos = (int)mOrder.size() - 2; if (mPos < -1) mPos = -1; }
+    if (!mOn || mFiles.empty() || !mForce.empty()) return;     // never a fixed piece: intro, headquarters themes, podium
+    if (dir < 0) {
+        // back: the song played before this one (or this one from the start, if it was the first)
+        if (!mHist.empty()) mHist.pop_back();
+        if (!mHist.empty()) { mBackTo = mHist.back(); mHist.pop_back(); }
+        else mBackTo = mLast;
+    }
     ringW = ringR;
     openNext();
 }

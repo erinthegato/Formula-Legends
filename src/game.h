@@ -1,6 +1,7 @@
 // Screens and flow: title -> track -> car -> race settings -> race -> results -> podium,
 // plus the championship hub, the team screen at pit stops, save slots and the highlights reel.
 #pragma once
+#include <string>
 #include "trophies.h"
 #include "render.h"
 #include "sound.h"
@@ -143,6 +144,8 @@ struct Game {
     void screenRealism(Panel& P);
     void updateRealism(int dx, int dy, bool ok, bool back);     // the rows the Controls page shows (CR_* ids), in order
     void chooseEra(int e);
+    std::string hqTheme;                 // the headquarters theme playing ("" none)
+    static constexpr float TOUCH_SKIP_W = 64, TOUCH_SKIP_H = 40;   // main menu: the top corners skip songs
     int hqSel = 3; bool hqChosen = false; float hqLook = 3;   // (headquarters: the era looked at, picked yet)
 private:
     void update(float dt, const Pad& pad);

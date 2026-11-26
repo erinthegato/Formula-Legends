@@ -423,8 +423,6 @@ void poll(Pad& p) {
         for (int i = 0; i < (int)t.reportNum && p.touches < 2; i++) {
             p.tx[p.touches] = t.report[i].x / 4.0f; p.ty[p.touches] = t.report[i].y / 4.0f; p.touches++;
         }
-    p.backTouch = sceTouchPeek(SCE_TOUCH_PORT_BACK, &t, 1) > 0 && t.reportNum > 0;
-    p.backX = p.backTouch ? t.report[0].x / 4.0f : 0;
     p.hasTilt = true; p.tilt = tiltRoll();
 }
 }
@@ -534,7 +532,7 @@ bool init() {
     scePowerSetGpuXbarClockFrequency(166);
     sceCtrlSetSamplingMode(SCE_CTRL_MODE_ANALOG_WIDE);
     sceTouchSetSamplingState(SCE_TOUCH_PORT_FRONT, SCE_TOUCH_SAMPLING_STATE_START);
-    sceTouchSetSamplingState(SCE_TOUCH_PORT_BACK, SCE_TOUCH_SAMPLING_STATE_START);
+    sceTouchSetSamplingState(SCE_TOUCH_PORT_BACK, SCE_TOUCH_SAMPLING_STATE_STOP);     // the rear pad isn't used
     sceMotionStartSampling();
     sceIoMkdir("ux0:data", 0777);
     sceIoMkdir(SAVE_DIR, 0777);

@@ -5,11 +5,11 @@
 Extract the zip at the root of ux0: (VitaShell: open it, select all, copy, paste in ux0:). It puts the
 music in ux0:data/FormulaLegends/DATA/music/, where the game looks for any data file the app itself
 doesn't carry. Install it once: game updates (the VPK) then stay small, and the music stays where it is.
-The intro music stays in the VPK, so the game is never silent at the start.
+The intro and headquarters music stay in the VPK, so the game is never silent at the start.
 """
 import os, sys, zipfile
 
-IN_VPK = {'intro.emu'}
+IN_VPK = {'intro.emu', 'hq_1980.emu', 'hq_2010.emu', 'hq_2016.emu', 'hq_2025.emu'}
 
 out, src = sys.argv[1], sys.argv[2]
 n = size = 0

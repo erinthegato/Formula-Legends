@@ -166,8 +166,28 @@ void Game::frame(float dt, const Pad& pad) {
     else sound::paddockSpeakers();
     sound::musicEra(set.car >= 0 && set.car < CAR_COUNT ? CARS[set.car].era % ERA_COUNT : -1);   // the era's own songs join the menu music
     bool menu = (!raceLoaded || screen == SCR_RESULTS || screen == SCR_PODIUM) && screen != SCR_INTRO;
-    // a tap on the rear touch pad skips songs in the menus: right half next, left half the one before
-    if (menu && screen != SCR_PODIUM && rebinding < 0 && pad.backTouch && !prev.backTouch) sound::musicSkip(pad.backX < 240 ? -1 : 1);
+    (void)menu;
+    // main menu: a tap in the top-right corner of the screen skips to the next song, top-left the one before
+    if (screen == SCR_TITLE && pad.touches > 0 && prev.touches == 0 && pad.ty[0] < TOUCH_SKIP_H) {
+        if (pad.tx[0] < TOUCH_SKIP_W) sound::musicSkip(-1);
+        else if (pad.tx[0] >= SCREEN_W - TOUCH_SKIP_W) sound::musicSkip(1);
+    }
+    // headquarters has a theme for each era (hq_1980.emu ... hq_2025.emu, on a loop) for the era looked
+    // at, and only there; everywhere else the era's songs
+    {
+        const char* want = "";
+        static char f[32];
+        if (screen == SCR_HQ) {
+            snprintf(f, sizeof f, "hq_%s.emu", ERA_SHORT[(hqSel % ERA_COUNT + ERA_COUNT) % ERA_COUNT]);
+            FILE* t = fopen((std::string("DATA/music/") + f).c_str(), "rb");
+            if (t) fclose(t); else snprintf(f, sizeof f, "hq_2025.emu");      // (a theme not made yet)
+            want = f;
+        }
+        if (hqTheme != want) {
+            hqTheme = want;
+            if (screen != SCR_INTRO) sound::musicFile(want[0] ? want : nullptr, false);   // (the intro / attract reel has its own)
+        }
+    }
     sound::update();
     prev = pad;
     draw();
