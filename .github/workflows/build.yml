@@ -61,6 +61,10 @@ jobs:
         env:
           ASAN_OPTIONS: detect_leaks=0
         run: ./fl_test_asan hq shots 2>&1 | grep -E "picked|after"
+      - name: Eras stay apart (circuits, teams, careers per era)
+        env:
+          ASAN_OPTIONS: detect_leaks=0
+        run: ./fl_test_asan eralock x 2>/dev/null | grep -E "^era"
       - name: No overlaps (barriers, terrain and trackside objects at every circuit)
         env:
           ASAN_OPTIONS: detect_leaks=0

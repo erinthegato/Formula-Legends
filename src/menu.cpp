@@ -431,7 +431,7 @@ void Game::screenSetupTablet(Panel& P) {
     char v[15][48], len_[24];
     fmtLength(len_, set);
     snprintf(v[0], 48, "Length:  < %s >", len_);
-    snprintf(v[1], 48, "Era:  < %s >", ERA_NAME[CARS[set.car].era]);
+    snprintf(v[1], 48, "Team:  < %s >", CARS[set.car].team);
     snprintf(v[2], 48, "Opponents:  < %d >", set.opponents);
     snprintf(v[3], 48, "AI:  < %s >", DIFF[set.difficulty]);
     snprintf(v[4], 48, "Grid:  < %s >", STARTP[set.startPos]);
@@ -743,13 +743,8 @@ void Game::screenTitle(Panel& P) {
 
 void Game::screenTrack(Panel& P) {
     char b[96];
-    header(P, "SELECT CIRCUIT");
-    // era tabs
-    for (int e = 0; e < ERA_COUNT; e++) {
-        float x = 8 + e * 50;
-        P.fill(x, 26, 47, 14, e == era ? ACC : RGBA(0, 0, 0, 140));
-        P.textC(x + 23.5f, 27, ERA_SHORT[e], e == era ? INK : DIM, 0.66f);
-    }
+    snprintf(b, sizeof b, "SELECT CIRCUIT  %s", ERA_SHORT[era]);
+    header(P, b);
     for (int i = 0; i < ERA_ROUNDS; i++) {
         int ti = eraTrack(era, i);
         float y = 46 + i * 19.5f;
@@ -774,7 +769,7 @@ void Game::screenTrack(Panel& P) {
     P.text(224, 190, b, WHITE, 0.72f);
     P.text(224, 208, "Real layout and heights, today's track", DIM, 0.66f);
     P.text(224, 222, "Outline: bacinger/f1-circuits  Heights: EU-DEM/SRTM", DIM, 0.58f);
-    P.textC(240, 254, "L/R  era     X  choose     O  back", DIM, 0.8f);
+    P.textC(240, 254, "X  choose     O  back", DIM, 0.8f);
 }
 
 void Game::screenCar(Panel& P, Panel& I) {
@@ -792,7 +787,7 @@ void Game::screenCar(Panel& P, Panel& I) {
         snprintf(b, sizeof b, "%s", CARS[i].team);
         P.text(22, y, b, i == sel ? INK : WHITE, 0.72f);
     }
-    P.textC(P.vw / 2, 249, champMode ? "L/R era  X choose  O back" : "X choose   O back", DIM, 0.62f);
+    P.textC(P.vw / 2, 249, "X choose   O back", DIM, 0.62f);
     const CarDef& d = CARS[sel % CAR_PICK];
     snprintf(b, sizeof b, "%s %s  (%s)", d.make, d.model, ERA_SHORT[d.era]);
     I.text(8, 3, b, WHITE, 0.9f);
@@ -1223,7 +1218,7 @@ void Game::screenCareerNew(Panel& P) {
     static const char* DIFFN[3] = {"Easy", "Normal", "Hard"};
     char v[6][64];
     snprintf(v[0], 64, "Team:  < %s >", TEAM_NAMES[newName]);
-    snprintf(v[1], 64, "Era:  < %s >", ERA_NAME[newCls % ERA_COUNT]);
+    snprintf(v[1], 64, "Era:  %s", ERA_NAME[era]);
     snprintf(v[2], 64, "Opponents:  < %s >", DIFFN[newDiff]);
     snprintf(v[3], 64, "Race length:  < %d laps >", newMin);
     snprintf(v[4], 64, "START THE TEAM");
@@ -1232,7 +1227,7 @@ void Game::screenCareerNew(Panel& P) {
     for (int i = 0; i < 6; i++) {
         float y = 52 + i * 30;
         if (i == sel) P.fill(12, y - 3, 242, 21, RGBA(255, 150, 40, 230));
-        P.text(20, y, v[i], i == sel ? INK : (i == 4 ? GOLD : WHITE), 0.78f);
+        P.text(20, y, v[i], i == sel ? INK : (i == 4 ? GOLD : i == 1 ? DIM : WHITE), 0.78f);
     }
     P.fill(266, 42, 206, 206, RGBA(0, 0, 0, 120));
     float y = 50;
@@ -1648,7 +1643,7 @@ void Game::drawHQ(float dt) {
     P.textC(SCREEN_W / 2, SCREEN_H - 70, b, ACC, 1.15f);
     P.textC(SCREEN_W / 2, SCREEN_H - 46, HQ_LINE1[hqSel], WHITE, 0.72f);
     P.textC(SCREEN_W / 2, SCREEN_H - 32, HQ_LINE2[hqSel], DIM, 0.72f);
-    P.text(10, SCREEN_H - 16, hqChosen ? "LEFT / RIGHT  era     X  choose     O  back" : "LEFT / RIGHT  era     X  choose", DIM, 0.64f);
+    P.text(10, SCREEN_H - 16, "LEFT / RIGHT  era     X  choose", DIM, 0.64f);
     for (int e = 0; e < ERA_COUNT; e++) P.fill(SCREEN_W / 2 - 30 + e * 16, SCREEN_H - 82, 12, 4, e == hqSel ? ACC : RGBA(255, 255, 255, 90));
     gfx::setBlend(false); gfx::setDepthTest(true);
     nowPlayingBar();

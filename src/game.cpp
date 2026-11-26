@@ -22,6 +22,26 @@ static u32 WHITE = RGBA(255, 255, 255), DIM = RGBA(175, 185, 200), ACC = RGBA(25
 
 static void slotPath(char* out, int slot, const char* ext) { snprintf(out, 32, "save%d.%s", slot + 1, ext); }
 
+// one championship and one career per era (the era picked at headquarters): champ_2016.sav, career_1980.sav...
+const char* eraSave(const char* kind, int e) {
+    static char b[4][32]; static int k = 0; k = (k + 1) & 3;
+    snprintf(b[k], sizeof b[k], "%s_%s.sav", kind, ERA_SHORT[(e % ERA_COUNT + ERA_COUNT) % ERA_COUNT]);
+    return b[k];
+}
+
+// saves from before the eras were kept apart (champ.sav, career.sav) move to their era's file
+static void migrateSaves() {
+    auto exists = [](const char* p) { FILE* f = fopen(p, "rb"); if (f) fclose(f); return f != nullptr; };
+    if (exists("career.sav")) {
+        Career c;
+        if (c.load("career.sav") && !exists(eraSave("career", c.cls)) && c.save(eraSave("career", c.cls))) remove("career.sav");
+    }
+    if (exists("champ.sav")) {
+        Champ c;
+        if (c.load("champ.sav") && !exists(eraSave("champ", c.era())) && c.save(eraSave("champ", c.era()))) remove("champ.sav");
+    }
+}
+
 bool Game::init() {
     bool ok = R.loadCommon();
     { FILE* f = fopen("bench.txt", "r"); if (f) { fclose(f); bench = true; remove("perf.log"); } }
@@ -29,6 +49,7 @@ bool Game::init() {
     cfg.load(); cfg.apply();
     trophies.load();
     setups.load();
+    migrateSaves();
     set.car = 1; set.track = 1;
     // the intro: Code 4 Studios, then the eras' highlight reel, cut to its music (intro.cpp)
     if (!bench) introBegin();
@@ -117,7 +138,7 @@ bool Game::loadSlot(int slot) {
     set = race.set;
     slotPath(p, slot, "chp");
     champMode = champ.load(p);
-    careerMode = race.set.career && career.load("career.sav");
+    careerMode = race.set.career && career.load(eraSave("career", CARS[race.set.car % CAR_COUNT].era));
     if (careerMode) { champMode = false; career.apply(); careerLivery(); }
     afterLoad();
     screen = SCR_RACE;
@@ -557,11 +578,11 @@ void Game::finishRace() {
     sound::silence(); sound::stopEffects(); sound::loop(0, nullptr, 0);
     if (race.session == SES_RACE && careerMode && career.active) {
         career.afterRace(race, set.weekend ? qualiGrid : std::vector<int>());
-        career.save("career.sav");
+        career.save(eraSave("career", career.cls));
     }
     if (race.session == SES_RACE && champMode && champ.active) {
         champ.award(race, set.weekend ? qualiGrid : std::vector<int>());   // pole point only after a qualifying session
-        champ.save("champ.sav");
+        champ.save(eraSave("champ", champ.era()));
         if (champ.over()) {
             int order[48]; int n = champ.standings(race.player().def->cls, order, 48);
             if (n > 0 && champ.e[order[0]].number == race.player().number) trophies.award(TR_CHAMPION);
@@ -600,15 +621,18 @@ void Game::update(float dt, const Pad& p) {
         if (ok || pressed(p, &Pad::start)) {
             t = 0;
             ttMode = sel == 6;
-            if (sel == 0 || sel == 6) { champMode = false; careerMode = false; screen = SCR_TRACK; sel = set.track; }
+            if (sel == 0 || sel == 6) {
+                champMode = false; careerMode = false; screen = SCR_TRACK;
+                sel = 0; for (int k2 = 0; k2 < ERA_ROUNDS; k2++) if (eraTrack(era, k2) == set.track) sel = k2;
+            }
             else if (sel == 1) {
                 champMode = true;
-                if (champ.load("champ.sav")) { screen = SCR_CHAMP; sel = 0; }
-                else { champ.active = false; screen = SCR_CAR; sel = set.car; }
+                if (champ.load(eraSave("champ", era))) { screen = SCR_CHAMP; sel = 0; }
+                else { champ.active = false; screen = SCR_CAR; sel = CARS[set.car].era == era ? set.car : eraFirstCar(era); }
             } else if (sel == 2) {
                 champMode = false; careerMode = true; careerPage = 0;
-                if (career.load("career.sav")) { career.apply(); careerLivery(); screen = SCR_CAREER; sel = 0; }
-                else { screen = SCR_CAREER_NEW; sel = 0; }
+                if (career.load(eraSave("career", era))) { career.apply(); careerLivery(); screen = SCR_CAREER; sel = 0; }
+                else { career.active = false; newCls = era; screen = SCR_CAREER_NEW; sel = 0; }
             } else if (sel == 3) { screen = SCR_LOAD; sel = 0; }
             else if (sel == 4) { screen = SCR_OPTIONS; optionsFrom = SCR_TITLE; sel = 0; optCat = -1; }
             else if (sel == 5) screen = SCR_HELP;
@@ -624,8 +648,7 @@ void Game::update(float dt, const Pad& p) {
         // team headquarters: the four eras' cars on the desk
         if (dx) hqSel = (hqSel + dx + ERA_COUNT) % ERA_COUNT;
         if (idle > cfg.attract && !aiDrivesPlayer) { idle = 0; introBegin(1); break; }
-        if ((ok || pressed(p, &Pad::start)) && t > 0.3f) { chooseEra(hqSel); screen = SCR_TITLE; sel = 0; t = 0; }
-        else if (back && hqChosen) { screen = SCR_TITLE; sel = 0; t = 0; }
+        if ((ok || pressed(p, &Pad::start)) && t > 0.3f) { chooseEra(hqSel); screen = SCR_TITLE; sel = 0; t = 0; }   // (no back: X picks)
         break;
     case SCR_SHOWROOM: {
         // left / right: the era's teams; L / R: the era; the sticks walk the camera round; up / down: closer
@@ -693,8 +716,7 @@ void Game::update(float dt, const Pad& p) {
         updateCareer(dx, dy, ok, back, pressed(p, &Pad::square));
         break;
     case SCR_TRACK:
-        // the era's own ten circuits; L / R or left / right changes the era
-        if (dx || pressed(p, &Pad::l) || pressed(p, &Pad::r)) { int d = dx ? dx : (pressed(p, &Pad::l) ? -1 : 1); era = (era + d + ERA_COUNT) % ERA_COUNT; t = 0; }
+        // the ten circuits of the era picked at headquarters
         sel = (sel + dy + ERA_ROUNDS) % ERA_ROUNDS;
         if (ok) {
             set.track = eraTrack(era, sel);
@@ -704,9 +726,8 @@ void Game::update(float dt, const Pad& p) {
         if (back) { screen = SCR_TITLE; sel = ttMode ? 6 : 0; t = 0; }
         break;
     case SCR_CAR: {
-        // the era's ten teams (sel is the CARS index); in a championship left / right changes the era
-        int e = CARS[sel % CAR_PICK].era, k = sel % TEAMS_PER_ERA;
-        if (champMode && (dx || pressed(p, &Pad::l) || pressed(p, &Pad::r))) { int d = dx ? dx : (pressed(p, &Pad::l) ? -1 : 1); e = (e + d + ERA_COUNT) % ERA_COUNT; t = 0; }
+        // the ten teams of the era picked at headquarters (sel is the CARS index)
+        int e = era, k = sel % TEAMS_PER_ERA;
         k = (k + dy + TEAMS_PER_ERA) % TEAMS_PER_ERA;
         sel = eraFirstCar(e) + k; era = e;
         if (dy) t = 0;
@@ -738,7 +759,7 @@ void Game::update(float dt, const Pad& p) {
         for (int i = 0; i < 9; i++) if (EVENTH[i] == set.eventHours) ei = i;
         if (dx) {
             if (sel == 0) { int v = LENGTHS[cyc(li, LENGTH_N)]; if (v > 0) { set.laps = v; set.raceMin = 0; } else set.raceMin = -v; }
-            if (sel == 1) { int e = (CARS[set.car].era + dx + ERA_COUNT) % ERA_COUNT; set.car = eraFirstCar(e) + (set.car % TEAMS_PER_ERA); era = e; }
+            if (sel == 1) set.car = eraFirstCar(CARS[set.car].era) + cyc(set.car % TEAMS_PER_ERA, TEAMS_PER_ERA);   // team (the era is set at headquarters)
             if (sel == 2) set.opponents = OPP[cyc(oi, 4)];
             if (sel == 3) set.difficulty = cyc(set.difficulty, 3);
             if (sel == 4) set.startPos = cyc(set.startPos, 3);
@@ -754,7 +775,7 @@ void Game::update(float dt, const Pad& p) {
             if (champMode && !champ.active) {
                 // a new season with these settings (lap races)
                 set.raceMin = 0;
-                champ.begin(set); champ.save("champ.sav");
+                champ.begin(set); champ.save(eraSave("champ", champ.era()));
                 screen = SCR_CHAMP; sel = 0; t = 0;
             } else startRace();
         }
@@ -1239,12 +1260,13 @@ void Game::careerLivery() {
 
 void Game::updateCareer(int dx, int dy, bool ok, bool back, bool square) {
     auto cyc = [&](int v, int n) { return (v + dx + n) % n; };
-    auto saveIt = [&]() { career.save("career.sav"); };
+    auto saveIt = [&]() { career.save(eraSave("career", career.cls)); };
     if (screen == SCR_CAREER_NEW) {
+        newCls = era;                                    // the era picked at headquarters
         sel = (sel + dy + 6) % 6;
+        if (sel == 1) sel = dy < 0 ? 0 : 2;              // (the era row is only shown)
         if (dx) {
             if (sel == 0) newName = cyc(newName, TEAM_NAME_COUNT);
-            if (sel == 1) newCls = (newCls + (dx ? dx : 1) + ERA_COUNT) % ERA_COUNT;
             if (sel == 2) newDiff = cyc(newDiff, 3);
             if (sel == 3) { static const int M[4] = {3, 5, 10, 20}; int mi = 0; for (int i = 0; i < 4; i++) if (M[i] == newMin) mi = i; newMin = M[cyc(mi, 4)]; }
         }
@@ -1286,7 +1308,7 @@ void Game::updateCareer(int dx, int dy, bool ok, bool back, bool square) {
         if (back || (ok && sel == 6)) { saveIt(); screen = SCR_TITLE; sel = 2; t = 0; return; }
         if (!ok) return;
         if (sel == 0) {
-            if (career.broke()) { remove("career.sav"); career.active = false; screen = SCR_CAREER_NEW; sel = 0; return; }
+            if (career.broke()) { remove(eraSave("career", career.cls)); career.active = false; screen = SCR_CAREER_NEW; sel = 0; return; }
             if (career.champ.over()) { career.newSeason(); saveIt(); snprintf(note, sizeof note, "Season %d: new contracts on offer", career.season); noteT = 3; return; }
             career.apply();
             set = career.roundSettings();

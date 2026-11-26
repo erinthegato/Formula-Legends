@@ -351,9 +351,43 @@ int main(int argc, char** argv) {
         fprintf(stderr, "bench done %d after %.0f s\n", (int)g.benchDone, simT);
         return 0;
     }
+    if (mode == "eralock") {   // each era from headquarters: its circuits, its teams, its own career and championship
+        int bad = 0;
+        auto settle = [&](int n = 10) { for (int i = 0; i < n; i++) { Pad q{}; g.frame(1.0f / 30, q); } };
+        for (int e = 0; e < ERA_COUNT; e++) { remove(eraSave("career", e)); remove(eraSave("champ", e)); }
+        for (int e = 0; e < ERA_COUNT; e++) {
+            g.chooseEra(e); g.screen = SCR_TITLE; g.t = 1; settle();
+            // quick race: the circuit list, left / right / L / R do nothing to the era
+            g.sel = 0; press(g, &Pad::cross); settle();
+            press(g, &Pad::right); press(g, &Pad::l); press(g, &Pad::r); press(g, &Pad::left);
+            if (g.screen != SCR_TRACK || g.era != e) { printf("era %d: circuit screen era %d\n", e, g.era); bad++; }
+            for (int k = 0; k < ERA_ROUNDS; k++) { g.sel = k; settle(1); if (!trackInEra(eraTrack(g.era, k), e)) bad++; }
+            press(g, &Pad::cross); settle();
+            press(g, &Pad::l); press(g, &Pad::r);
+            if (g.screen != SCR_CAR || CARS[g.sel].era != e) { printf("era %d: team screen car era %d\n", e, CARS[g.sel].era); bad++; }
+            press(g, &Pad::circle); press(g, &Pad::circle); settle();
+            // a new career here: it is this era's, in its own file
+            g.screen = SCR_TITLE; g.sel = 2; press(g, &Pad::cross); settle();
+            if (g.screen != SCR_CAREER_NEW) { printf("era %d: no new-career screen (%d)\n", e, g.screen); bad++; }
+            g.sel = 4; press(g, &Pad::cross); settle();
+            if (g.career.cls != e) { printf("era %d: career era %d\n", e, g.career.cls); bad++; }
+            FILE* f = fopen(eraSave("career", e), "rb"); if (f) fclose(f); else { printf("era %d: no %s\n", e, eraSave("career", e)); bad++; }
+            g.screen = SCR_TITLE; g.careerMode = false;
+            printf("era %s: circuits, teams and career ok so far (%d problems)\n", ERA_SHORT[e], bad);
+        }
+        // and each era's career comes back as its own
+        for (int e = 0; e < ERA_COUNT; e++) {
+            g.chooseEra(e); g.screen = SCR_TITLE; g.sel = 2; press(g, &Pad::cross); settle();
+            if (g.screen != SCR_CAREER || g.career.cls != e) { printf("era %d: reloaded career era %d screen %d\n", e, g.career.cls, g.screen); bad++; }
+            g.screen = SCR_TITLE; g.careerMode = false;
+        }
+        for (int e = 0; e < ERA_COUNT; e++) remove(eraSave("career", e));
+        printf("%s\n", bad ? "ERA LOCK FAILED" : "era lock ok");
+        return bad ? 1 : 0;
+    }
     if (mode == "career") {     // a new team: setup, livery, the team screens, one race, the report
         std::string out = argv[2];
-        remove("career.sav");
+        remove(eraSave("career", g.era));
         auto settle = [&](int n = 50) { for (int i = 0; i < n; i++) { Pad q{}; g.frame(1.0f / 30, q); } };
         settle(30);
         g.sel = 2; press(g, &Pad::cross); settle(40); shot(g, out + "/c_new.ppm");
@@ -399,7 +433,7 @@ int main(int argc, char** argv) {
         press(g, &Pad::cross); settle(40); press(g, &Pad::cross); settle(40);
         fprintf(stderr, "back at screen %d, round %d\n", (int)g.screen, g.career.champ.round);
         shot(g, out + "/c_report.ppm");
-        Career c2; bool okLoad = c2.load("career.sav"); fprintf(stderr, "saved career loads: %d round %d\n", (int)okLoad, c2.champ.round);
+        Career c2; bool okLoad = c2.load(eraSave("career", c2.cls = g.career.cls)); fprintf(stderr, "saved career loads: %d round %d\n", (int)okLoad, c2.champ.round);
         return 0;
     }
     if (mode == "timetrial") {   // timetrial <track> <car> <laps> <outdir>: AI laps against its own ghost, saved and reloaded
@@ -726,7 +760,7 @@ int main(int argc, char** argv) {
         auto run = [&](float secs, const Pad& p) { int n = (int)(secs * 30); for (int i = 0; i < n; i++) { Pad q = p; g.frame(1.0f / 30, q); Pad z{}; (void)z; } };
         Pad none{};
         g.t = 2.5f; shot(g, out + "/s_title.ppm");
-        remove("champ.sav");
+        remove(eraSave("champ", g.era));
         press(g, &Pad::down); press(g, &Pad::cross);                     // championship
         fprintf(stderr, "screen %d\n", (int)g.screen);
         if (g.screen == SCR_CHAMP) { press(g, &Pad::down); press(g, &Pad::cross); }   // new season
