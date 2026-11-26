@@ -11,7 +11,7 @@
 struct Panel;
 
 // title menu: item ids (0 quick race .. 5 credits, 6 time trial) in the order they are shown
-enum { CR_HELP = 100, CR_TILT, CR_TILTDIR, CR_RESET, CR_BACK };   // Controls page rows (0..ACT_COUNT-1: buttons)
+enum { CR_HELP = 100, CR_PADSTEER, CR_TILT, CR_TILTDIR, CR_RESET, CR_BACK };   // Controls page rows (0..ACT_COUNT-1: buttons)
 // settings categories
 enum { OC_SOUND = 0, OC_DISPLAY, OC_CAMERA, OC_CONTROLS, OC_REALISM, OC_BACK, OPT_CATS };
 static const char* const OPT_CAT_NAME[OPT_CATS] = {"Sound", "Display and performance", "Camera and cockpit", "Controls", "Car realism", "Back"};
@@ -78,7 +78,7 @@ struct Game {
     int era = ERA_GE;             // the era being picked on the circuit / team screens
     float t = 0;                  // time on this screen
     float idle = 0;               // time without a button press (title -> highlights reel)
-    int padDir = 0; float padHeld = 0;   // the d-pad steering: which way, held how long
+    int padDir = 0; float padHeld = 0; bool padLast = false;   // the d-pad steering: which way, held how long
     float steer = 0;
     Pad prev;
     float tiltBase = 0; bool tiltCal = false;          // PS Vita tilt steering: the console's angle when driving began

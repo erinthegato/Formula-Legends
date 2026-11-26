@@ -960,6 +960,21 @@ int main(int argc, char** argv) {
         }
         return 0;
     }
+    if (mode == "padsteer") {   // padsteer <setting 0-2>: on a straight at speed, hold right 1 s, let go 1 s: the wheel angle
+        int ps = atoi(argv[2]);
+        g.set.track = 0; g.set.car = 3; g.set.laps = 3; g.set.opponents = 0;
+        cfg.padSteer = ps;
+        g.aiDrivesPlayer = true; g.startRace();
+        for (float simT = 0; simT < 12; simT += 1.0f / 60) { Pad z{}; g.step(1.0f / 60, z); }
+        g.aiDrivesPlayer = false;
+        float simT = 0;
+        for (int f = 0; f < 120; f++, simT += 1.0f / 60) {
+            Pad pp{}; pp.right = f < 60; pp.r = true;
+            g.step(1.0f / 60, pp);
+            if (f % 6 == 5) printf("%.2f %.3f\n", simT + 1.0f / 60, g.steer);
+        }
+        return 0;
+    }
     if (mode == "steer") {      // steer <track> <help 0-2>: AI drives 30 s, then full throttle + full stick lock for 3 s
         std::string tid = argv[2]; int help = atoi(argv[3]);
         for (int i = 0; i < TRACK_COUNT; i++) if (tid == TRACKS[i].id) g.set.track = i;

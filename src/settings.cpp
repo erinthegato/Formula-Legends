@@ -61,6 +61,7 @@ void Config::save() const {
             preset, (int)vsync, fps, distance, (int)scenery, (int)effects3d, (int)showFps, attract, pitCam, (int)autoQuality);
     for (int a = 0; a < ACT_COUNT; a++) fprintf(f, " %d", bind[a]);
     fprintf(f, "\ndrive %d\nvita %d %d %d %d\ncockpit %d %d\nsteering %d %d %d\n", (int)spins, tilt, (int)tiltInvert, (int)mirror, (int)rearLook, (int)hideWheel, (int)cockpitHud, 1, steerHelp, 1);
+    fprintf(f, "buttons %d\n", padSteer);
     fprintf(f, "realism %d %d %d %d %d %d %d %d %d %d", (int)real.full, (int)real.opponents, (int)real.tyres, (int)real.brakes,
             (int)real.cooling, (int)real.slipstream, (int)real.blowTyre, (int)real.ground, (int)real.fuel, real.damagePct);
     for (bool m : real.mech) fprintf(f, " %d", (int)m);
@@ -89,6 +90,8 @@ void Config::load() {
     int scv = -1, shp = -1, hdl = 1;
     if (ok && fscanf(f, "\nsteering %d %d %d", &scv, &shp, &hdl) >= 2) {
         (void)scv; (void)hdl; c.steerHelp = shp < -1 ? -1 : (shp > 2 ? 2 : shp); }   // (optional line)
+    int ps = 0;
+    if (ok && fscanf(f, "\nbuttons %d", &ps) == 1) c.padSteer = ps < 0 ? 0 : (ps > 2 ? 2 : ps);   // (optional line)
     {   // (optional line) car realism
         int r[10 + MF_COUNT];
         if (ok && fscanf(f, "\nrealism %d %d %d %d %d %d %d %d %d %d", &r[0], &r[1], &r[2], &r[3], &r[4], &r[5], &r[6], &r[7], &r[8], &r[9]) == 10) {

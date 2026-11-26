@@ -451,7 +451,10 @@ void Game::updateRace(float dt, const Pad& p) {
             float lat = race.playerLatMax > 0 ? race.playerLatMax : 30.0f;
             reach = fmaxf(race.steerFor(me.v, lat * (cfg.help() == 0 ? 1.12f : 1.0f)), 0.12f);
         }
-        float wind = clampf(0.35f + padHeld * 1.6f, 0, 1);              // 35 % at once, all of it after 0.4 s
+        // Button steering setting: how much lock a tap gives, and how fast holding it winds on
+        // (quick: all of it after 0.4 s; smooth: after 0.9 s; extra smooth: after 1.5 s)
+        static const float START[3] = {0.35f, 0.18f, 0.10f}, WIND[3] = {1.6f, 0.9f, 0.6f};
+        float wind = clampf(START[cfg.padSteer] + padHeld * WIND[cfg.padSteer], 0, 1);
         target = dir * reach * wind;
         digital = true;
     }
@@ -467,7 +470,15 @@ void Game::updateRace(float dt, const Pad& p) {
     // at 300 km/h needs only a touch of lock), always quicker back to the centre
     float vk = raceLoaded ? clampf(race.player().v / 85.0f, 0, 1) : 0;
     float rate = (fabsf(target) > fabsf(steer) && target * steer >= 0) ? 4.2f - 2.0f * vk : 6.5f - 2.0f * vk;
-    if (digital && fabsf(target) > fabsf(steer) && target * steer >= 0) rate = 3.0f - 1.6f * vk;    // the d-pad winds on more slowly
+    if (digital && fabsf(target) > fabsf(steer) && target * steer >= 0) {     // the d-pad winds on more slowly
+        static const float ON[3] = {3.0f, 2.1f, 1.5f}, ONV[3] = {1.6f, 1.1f, 0.8f};
+        rate = ON[cfg.padSteer] - ONV[cfg.padSteer] * vk;
+    } else if ((digital || (padLast && target == 0)) && cfg.padSteer) {
+        // letting go of (or swapping) the d-pad: the wheel unwinds gently instead of snapping straight
+        static const float OFF[3] = {6.5f, 1.8f, 1.1f};
+        rate = OFF[cfg.padSteer] - 0.6f * vk;
+    }
+    if (digital) padLast = true; else if (target != 0 || fabsf(steer) < 0.01f) padLast = false;
     steer += clampf(target - steer, -rate * dt, rate * dt);
     // R accelerates and L brakes as well as the bound buttons (only while driving)
     float thr = held(p, ACT_ACCEL) || p.r ? 1.0f : (p.stickY < -0.4f ? -p.stickY : 0);
@@ -1157,6 +1168,7 @@ void Game::updateOptions(const Pad& p, int dx, int dy, bool ok, bool back) {
         if (ok && id < ACT_COUNT) { rebinding = id; rebindArmed = false; }
         else if (pressed(p, &Pad::square) && id < ACT_COUNT) { clearBind(id); cfg.save(); }
         else if (id == CR_HELP && (ok || dx)) { cfg.steerHelp = (cfg.help() + (dx ? dx : 1) + 3) % 3; cfg.save(); }
+        else if (id == CR_PADSTEER && (ok || dx)) { cfg.padSteer = (cfg.padSteer + (dx ? dx : 1) + 3) % 3; cfg.save(); }
         else if (id == CR_TILT && (ok || dx)) { cfg.tilt = (cfg.tilt + (dx ? dx : 1) + 4) % 4; cfg.save(); }
         else if (id == CR_TILTDIR && (ok || dx)) { cfg.tiltInvert = !cfg.tiltInvert; cfg.save(); }
         else if (ok && id == CR_RESET) { cfg.resetBinds(); cfg.save(); }
@@ -1457,6 +1469,7 @@ int Game::controlRows(int* ids) const {
     int n = 0;
     for (int i = 0; i < ACT_COUNT; i++) ids[n++] = i;
     ids[n++] = CR_HELP;
+    ids[n++] = CR_PADSTEER;
     if (input::hasTouch()) {
         ids[n++] = CR_TILT;
         if (cfg.tilt) ids[n++] = CR_TILTDIR;

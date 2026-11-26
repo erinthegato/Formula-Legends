@@ -996,6 +996,7 @@ void Game::screenControls(Panel& P) {
     int ids[24]; int n = controlRows(ids);
     static const char* TILT[4] = {"Off", "Gentle", "Normal", "Strong"};
     static const char* HELP[3] = {"Off", "Light", "Strong"};
+    static const char* PADS[3] = {"Quick", "Smooth", "Extra smooth"};
     // two columns: the buttons on the left, the driving options (then reset / back) on the right
     P.fill(14, 40, 222, 178, RGBA(0, 0, 0, 120));
     P.fill(244, 40, 222, 178, RGBA(0, 0, 0, 120));
@@ -1019,6 +1020,9 @@ void Game::screenControls(Panel& P) {
         } else if (id == CR_HELP) {
             snprintf(b, sizeof b, "< %s >", HELP[cfg.help()]);
             P.text(x + 6, y, "Steering help", col, 0.78f); P.textR(x + 208, y, b, val, 0.78f);
+        } else if (id == CR_PADSTEER) {
+            snprintf(b, sizeof b, "< %s >", PADS[cfg.padSteer]);
+            P.text(x + 6, y, "Button steering", col, 0.78f); P.textR(x + 208, y, b, val, 0.78f);
         } else if (id == CR_TILT) {
             snprintf(b, sizeof b, "< %s >", TILT[cfg.tilt]);
             P.text(x + 6, y, "Tilt steering", col, 0.78f); P.textR(x + 208, y, b, val, 0.78f);
@@ -1030,6 +1034,7 @@ void Game::screenControls(Panel& P) {
     int id = ids[sel];
     const char* tip = id < ACT_COUNT ? "X: press a new button     SQUARE: no button" :
         id == CR_HELP ? "Light: no spins from steering. Strong: no slides at all" :
+        id == CR_PADSTEER ? "D-pad: smooth turns in and out gently, so taps make small corrections" :
         id == CR_TILT ? "Turn the Vita like a wheel (the stick still works)" :
         id == CR_TILTDIR ? "Reversed if turning right steers left" :
         "";
