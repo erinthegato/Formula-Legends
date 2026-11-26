@@ -879,6 +879,7 @@ void Game::screenHelp(Panel& P) {
         {"Engine", "Endurance Motor Racing 3D"},
         {"", ""},
         {"Intro music", "Take On The World - All Good Folks (Uppbeat)"},
+        {"Attract music", "Nocturn Tonebox (made with ElevenLabs)"},
         {"1980 era music", "Originals, Epidemic Sound, Uppbeat"},
         {"2016 era music", "Uppbeat, Epidemic Sound"},
         {"2025 era music", "Uppbeat (uppbeat.io)"},

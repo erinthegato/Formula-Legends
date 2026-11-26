@@ -57,8 +57,8 @@ engine (physics, circuits, trackside scenery, pit crews and their animations). N
 * **The attract movie**: leave headquarters or the main menu alone (Options: "Attract screen after",
   10 s by default) and a second movie plays a whole song from `DATA/music/attract.emu`, cut on the bar
   lines with one era per section, looping until a button is pressed (script: `ATTRACT_SHOTS` in
-  `src/intro.cpp`, beat grid in `attract.txt`). The song is being replaced by an original
-  (ElevenLabs) track; with no `attract.emu` the game simply skips the attract movie.
+  `src/intro.cpp`, beat grid in `attract.txt`). The song is "Nocturn" (Tonebox), an original made for
+  the game with ElevenLabs: 100 BPM, bar 0 at 0.292 s.
 * PS Vita: `cmake -S vita -B build-vita && cmake --build build-vita` with VitaSDK + vitaGL
   (GitHub Actions builds the VPK on every push).
 * PC test build: `make -f Makefile.pc`, then from this folder e.g.

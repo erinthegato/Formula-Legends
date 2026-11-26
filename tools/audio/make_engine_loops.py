@@ -67,6 +67,8 @@ def make_loop(seg, target_rms):
 
 def main(folder):
     for year, era in ERAS.items():
+        if not glob.glob(os.path.join(folder, 'engine_%s_*.mp3' % year)):
+            continue                                        # no takes for this era: its loop stays
         out = os.path.join(AUDIO, 'f1_%s.raw' % era)
         old = np.fromfile(out, '<i2').astype(np.float32)
         target = np.sqrt((old ** 2).mean())

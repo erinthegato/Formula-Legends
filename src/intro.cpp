@@ -33,10 +33,11 @@ const Shot INTRO_SHOTS[] = {
     {27, 3, SH_FINAL},
 };
 
-// ---- the attract movie (DATA/music/attract.emu, the whole
-// song, 110 BPM). Its sections: quiet intro bars 0-7, the beat drops at 8, a break in bar 23, chorus
-// 24-39, second verse 40-47, chorus 48-63, the third verse 64-79, bridge 80-87, outro from 88.
-// One era per section; the era cards land one bar before each section so the cut hits the downbeat.
+// ---- the attract movie: "Nocturn" (Tonebox, an original made for the game with ElevenLabs;
+// DATA/music/attract.emu, the whole song, 171.7 s, 100 BPM, bar 0 at 0.292 s, bars of 2.4 s). Its
+// sections: a quiet first bar, the band comes in at bar 1, the breakdown at 18, the build from 26, the
+// big drop at 33, a new section at 50, the outro from 66. One era per section; the cards sit on the
+// bar before so the next circuit loads while the music turns.
 const Block ATTRACT_BLOCKS[] = {
     {ERA_90S, "imola", WX_DRY, 14.0f},
     {ERA_V8, "singapore", WX_DRY, 20.5f},        // the first night race
@@ -46,32 +47,29 @@ const Block ATTRACT_BLOCKS[] = {
     {ERA_GE, "zandvoort", WX_DRY, 15.0f},
 };
 const Shot ATTRACT_SHOTS[] = {
-    // quiet intro: the studio, empty circuit, the four eras
-    {0, 0, SH_TEXT, "CODE 4 STUDIOS", "PRESENTS"}, {2, 0, SH_EMPTY}, {4, 0, SH_TEXT, "FOUR ERAS", "ONE GRID"}, {5, 0, SH_EMPTY},
-    {7, 0, SH_CARD},
-    // the drop: 1980, lights out on the first big beat
-    {8, 0, SH_START}, {10, 0, SH_OVERTAKE}, {12, 0, SH_PIT}, {14, 0, SH_EMPTY}, {15, 0, SH_OVERTAKE}, {17, 0, SH_CRASH},
-    {19, 0, SH_EMPTY}, {20, 0, SH_OVERTAKE}, {22, 0, SH_EMPTY},
-    // chorus: 2010 under the lights, a cut every bar or two
-    {23, 1, SH_CARD},
-    {24, 1, SH_OVERTAKE}, {26, 1, SH_PIT}, {27, 1, SH_CRASH}, {29, 1, SH_EMPTY}, {30, 1, SH_OVERTAKE}, {32, 1, SH_PIT},
-    {34, 1, SH_OVERTAKE}, {35, 1, SH_CRASH}, {37, 1, SH_OVERTAKE},
-    // second verse: 2016, DRS
-    {39, 2, SH_CARD},
-    {40, 2, SH_EMPTY}, {42, 2, SH_DRS}, {44, 2, SH_PIT}, {46, 2, SH_DRS},
-    // chorus: 2016 in the rain
-    {47, 3, SH_CARD},
-    {48, 3, SH_START}, {50, 3, SH_STORM}, {52, 3, SH_OVERTAKE}, {54, 3, SH_CRASH}, {56, 3, SH_STORM}, {58, 3, SH_OVERTAKE},
-    {60, 3, SH_PIT}, {62, 3, SH_STORM},
-    // the third verse: 2025 on the Strip at night
-    {63, 4, SH_CARD},
-    {64, 4, SH_EMPTY}, {66, 4, SH_DRS}, {68, 4, SH_OVERTAKE}, {70, 4, SH_PIT}, {72, 4, SH_DRS}, {74, 4, SH_CRASH},
-    {76, 4, SH_OVERTAKE}, {78, 4, SH_EMPTY},
-    // bridge: 2025 by the sea
-    {79, 5, SH_CARD},
-    {80, 5, SH_START}, {82, 5, SH_DRS}, {84, 5, SH_OVERTAKE}, {85, 5, SH_PIT}, {87, 5, SH_EMPTY},
-    // outro: the title until the song ends, then it all starts again
-    {88, 5, SH_FINAL},
+    // the quiet first bar: the studio
+    {0, 0, SH_TEXT, "CODE 4 STUDIOS", "PRESENTS"},
+    // the band comes in: 1980 at Imola, lights out on the first beat
+    {1, 0, SH_START}, {3, 0, SH_OVERTAKE}, {5, 0, SH_PIT}, {7, 0, SH_CRASH},
+    // 2010 under the Singapore lights
+    {9, 1, SH_CARD},
+    {10, 1, SH_OVERTAKE}, {12, 1, SH_PIT}, {14, 1, SH_CRASH}, {15, 1, SH_OVERTAKE}, {17, 1, SH_EMPTY},
+    // the breakdown: 2016 at Silverstone, slow crane shots and DRS
+    {18, 2, SH_CARD},
+    {19, 2, SH_EMPTY}, {21, 2, SH_DRS}, {23, 2, SH_EMPTY}, {24, 2, SH_TEXT, "FOUR ERAS", "ONE GRID"},
+    // the build: 2016 in the rain at Interlagos
+    {26, 3, SH_CARD},
+    {27, 3, SH_STORM}, {29, 3, SH_OVERTAKE}, {31, 3, SH_STORM},
+    // the big drop: 2025 on the Las Vegas Strip, lights out on the hit
+    {32, 4, SH_CARD},
+    {33, 4, SH_START}, {35, 4, SH_DRS}, {37, 4, SH_OVERTAKE}, {39, 4, SH_PIT}, {41, 4, SH_CRASH}, {43, 4, SH_DRS},
+    {45, 4, SH_OVERTAKE}, {47, 4, SH_EMPTY},
+    // the next section: 2025 by the sea at Zandvoort
+    {49, 5, SH_CARD},
+    {50, 5, SH_OVERTAKE}, {52, 5, SH_PIT}, {54, 5, SH_DRS}, {56, 5, SH_CRASH}, {58, 5, SH_OVERTAKE}, {60, 5, SH_DRS},
+    {62, 5, SH_PIT}, {64, 5, SH_EMPTY},
+    // the outro: the title until the song ends, then it all starts again
+    {66, 5, SH_FINAL},
 };
 
 struct Script { const Block* blocks; const Shot* shots; int nshots; const char* music; const char* txt; bool logo; bool loop; };
