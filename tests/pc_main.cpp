@@ -146,6 +146,38 @@ int main(int argc, char** argv) {
         printf("voice alone %.0f\n", voiceOnly);
         return 0;
     }
+    if (mode == "tour") {
+        // tour <track id> <outdir> [n]: n frames round the lap (no cars), each from 14 m up and 30 m back
+        // looking along the road, plus a high oblique one every 4th, to find gaps, overlaps and clipping
+        std::string tid = argv[2], out = argv[3]; int n = argc > 4 ? atoi(argv[4]) : 24;
+        float s0 = argc > 5 ? atof(argv[5]) : 0, s1 = argc > 6 ? atof(argv[6]) : -1;   // (a stretch only)
+        int tr = 0; for (int i = 0; i < TRACK_COUNT; i++) if (tid == TRACKS[i].id) tr = i;
+        g.set.track = tr; g.set.car = eraFirstCar(ERA_GE); g.set.weather = WX_DRY; g.ttMode = true;
+        g.startSession(SES_PRACTICE);
+        Race& r = g.race; for (auto& c : r.cars) c.pos = V3(0, 0, -500);
+        const Track& T = r.track;
+        for (int k = 0; k < n; k++) {
+            for (int high = 0; high < 2; high++) {
+                if (high && k % 4) continue;
+                float s = s1 > s0 ? s0 + (s1 - s0) * k / n : T.length * k / n;
+                V3 p, t, l; float hw; T.frame(s, p, t, l, hw);
+                V3 p2, t2, l2; float hw2; T.frame(T.wrap(s + 60), p2, t2, l2, hw2);
+                Camera c;
+                if (!high) {
+                    float back = getenv("FL_TOUR_LOW") ? 12 : 30, up = getenv("FL_TOUR_LOW") ? 3.0f : 14;
+                    c.eye = p - t * back + V3(0, 0, up); c.fwd = norm(p2 - c.eye);
+                }
+                else { c.eye = p - t * 120 + l * 120 + V3(0, 0, 110); c.fwd = norm(p - c.eye); }
+                c.up = V3(0, 0, 1); c.fov = 60;
+                gfx::beginFrame(g.R.skyColour(r));
+                g.R.drawScene(r, c, false);
+                gfx::endFrame();
+                char b[96]; snprintf(b, sizeof b, "/%s_%02d%s_%05.0fm.ppm", tid.c_str(), k, high ? "air" : "", s);
+                pc::saveShot((out + b).c_str());
+            }
+        }
+        return 0;
+    }
     if (mode == "physlap") {
         // physlap <track id> <era 0-3> <laps>: the AI drives the era's first car alone (time trial
         // rules, dry), no drawing; lap times and how often the car went light / left the ground
@@ -203,6 +235,15 @@ int main(int argc, char** argv) {
                 // quad (x,y) (x,y+1) (x+1,y+1) (x+1,y): split along (x,y+1)-(x+1,y)
                 return u + v <= 1 ? a + (b - a) * u + (c - a) * v : d + (c - d) * (1 - u) + (b - d) * (1 - v);
             };
+            if (getenv("FL_TERRAIN_DUMP")) {
+                // the mesh heights, the elevation model under them, and the centre line, for a picture
+                FILE* f = fopen(getenv("FL_TERRAIN_DUMP"), "w");
+                fprintf(f, "%d %d %f %f %f\n", t.gtnx, t.gtny, t.gx0, t.gy0, t.gsub);
+                for (int y = 0; y < t.gtny; y++) for (int x = 0; x < t.gtnx; x++)
+                    fprintf(f, "%.2f %.2f\n", t.groundTz[y * t.gtnx + x], t.terrainZ(t.gx0 + x * t.gsub, t.gy0 + y * t.gsub));
+                for (int i = 0; i < t.n; i++) fprintf(f, "P %.1f %.1f %.2f\n", t.pts[i].p.x, t.pts[i].p.y, t.pts[i].p.z);
+                fclose(f);
+            }
             int bad = 0; float worst = 0; float worstS = 0;
             for (int i = 0; i < t.n; i++) {
                 const TrackPoint& q = t.pts[i];

@@ -135,7 +135,7 @@ bool Track::load(const TrackDef* d, bool scenery) {
                     float along = dx * q.t.x + dy * q.t.y;
                     if (fabsf(along) > 12.0f) continue;
                     float gap = fabsf(side) - q.hw - pts[j].hw;     // grass between the two roads
-                    float lim = fmaxf(1.5f, gap * 0.5f - 0.5f);
+                    float lim = fmaxf(0.6f, gap * 0.5f - 0.3f);
                     if (side > 0) limL[i] = fminf(limL[i], lim); else limR[i] = fminf(limR[i], lim);
                 }
             }
@@ -156,6 +156,33 @@ bool Track::load(const TrackDef* d, bool scenery) {
         }
         closeRunoff = clamped;
     }
+    // on the inside of a tight bend the barrier line, offset from the centre line, can fold back on
+    // itself (the offset is bigger than the bend's radius): the wall then zig-zags through itself and
+    // into the road. Pull the run-off in there until the line runs forwards everywhere.
+    for (int side = 0; side < 2; side++) {
+        for (int pass = 0; pass < 24; pass++) {
+            int folds = 0;
+            std::vector<float> cut(n, 1e9f);
+            for (int i = 0; i < n; i++) {
+                const TrackPoint& a = pts[i]; const TrackPoint& b = pts[(i + 1) % n];
+                float sg = side == 0 ? 1.0f : -1.0f;
+                float wa = side == 0 ? a.outL : a.outR, wb = side == 0 ? b.outL : b.outR;
+                V3 pa = a.p + a.n * (sg * (a.hw + wa)), pb = b.p + b.n * (sg * (b.hw + wb));
+                float fwd = (pb.x - pa.x) * a.t.x + (pb.y - pa.y) * a.t.y;
+                if (fwd < step * 0.25f) {
+                    folds++;
+                    for (int k = -3; k <= 4; k++) { int j = (i + k + n) % n; cut[j] = fminf(cut[j], (side == 0 ? pts[j].outL : pts[j].outR) * 0.7f); }
+                }
+            }
+            if (!folds) break;
+            for (int i = 0; i < n; i++) {
+                if (cut[i] > 1e8f) continue;
+                float& w = side == 0 ? pts[i].outL : pts[i].outR;
+                w = fmaxf(0.3f, cut[i]);
+                (side == 0 ? pts[i].gravelL : pts[i].gravelR) = false;
+            }
+        }
+    }
     desert = !strcmp(d->id, "bahrain") || !strcmp(d->id, "abudhabi") || !strcmp(d->id, "lusail") || !strcmp(d->id, "jeddah") || !strcmp(d->id, "lasvegas");
     street = d->street;
     grassTint = desert ? RGBA(235, 205, 160) : RGBA(255, 255, 255);
@@ -174,7 +201,7 @@ bool Track::load(const TrackDef* d, bool scenery) {
     placeSpeakers();
     groupProps();
     gfx::flushCache(verts.data(), (int)(verts.size() * sizeof(WorldVertex)));
-    sys::log("track %s: %d points, %.0f m, %d chunks, %d verts, %d props, %d distance boards, %d run-offs cut short\n", d->id, n, length, (int)chunks.size(), (int)verts.size(), (int)props.size(), (int)boards.size(), closeRunoff);
+    sys::log("track %s: %d points, %.0f m, %d chunks, %d verts, %d props (%d left out), %d distance boards, %d run-offs cut short\n", d->id, n, length, (int)chunks.size(), (int)verts.size(), (int)props.size(), propsDropped, (int)boards.size(), closeRunoff);
     return true;
 }
 
@@ -246,6 +273,15 @@ V3 Track::world(float s, float d, float lift) const {
     return p + l * d + V3(0, 0, lift);
 }
 
+// height of the terrain mesh as drawn (the two triangles of each cell, as buildMesh splits them)
+float Track::meshZ(float x, float y) const {
+    if (groundTz.empty()) return terrainZ(x, y);
+    float fx = clampf((x - gx0) / gsub, 0, gtnx - 1.001f), fy = clampf((y - gy0) / gsub, 0, gtny - 1.001f);
+    int ix = (int)fx, iy = (int)fy; float u = fx - ix, v = fy - iy;
+    float a = groundTz[iy * gtnx + ix], b = groundTz[iy * gtnx + ix + 1], c = groundTz[(iy + 1) * gtnx + ix], d = groundTz[(iy + 1) * gtnx + ix + 1];
+    return u + v <= 1 ? a + (b - a) * u + (c - a) * v : d + (c - d) * (1 - u) + (b - d) * (1 - v);
+}
+
 float Track::terrainZ(float x, float y) const {
     if (gnx < 2 || gny < 2) return 0;
     float fx = (x - gx0) / gstep, fy = (y - gy0) / gstep;
@@ -311,6 +347,18 @@ static void quadsToStrip(const std::vector<WorldVertex>& q, std::vector<WorldVer
 }
 
 // street circuits: city blocks behind the walls, one every ~40 m each side where there is room
+// two oriented boxes on the ground overlap (separating axes)
+static bool overlaps(const Track::Footprint& a, const Track::Footprint& b) {
+    float dx = b.x - a.x, dy = b.y - a.y;
+    const float ax[4][2] = {{a.ax, a.ay}, {-a.ay, a.ax}, {b.ax, b.ay}, {-b.ay, b.ax}};
+    for (auto& u : ax) {
+        float ra = a.hx * fabsf(a.ax * u[0] + a.ay * u[1]) + a.hy * fabsf(-a.ay * u[0] + a.ax * u[1]);
+        float rb = b.hx * fabsf(b.ax * u[0] + b.ay * u[1]) + b.hy * fabsf(-b.ay * u[0] + b.ax * u[1]);
+        if (fabsf(dx * u[0] + dy * u[1]) > ra + rb) return false;
+    }
+    return true;
+}
+
 void Track::addBuildings(Chunk& ch, int c0, int c1, std::vector<WorldVertex>* bins) {
     uint32_t sd = 7771u + (uint32_t)c0 * 131u + (uint32_t)(length);
     auto rr = [&]() { sd = sd * 1664525u + 1013904223u; return (sd >> 8) * (1.0f / 16777216.0f); };
@@ -337,6 +385,13 @@ void Track::addBuildings(Chunk& ch, int c0, int c1, std::vector<WorldVertex>* bi
                 if (dx * dx + dy * dy < need * need) clear = false;
             }
             if (!clear) continue;
+            // ...and of the city blocks already standing (both sides of a hairpin, the next chunk)
+            Footprint fp{c.x, c.y, q.t.x, q.t.y, along * 0.5f + 1.5f, depth * 0.5f + 1.5f};
+            { float l = sqrtf(fp.ax * fp.ax + fp.ay * fp.ay); fp.ax /= l; fp.ay /= l; }
+            bool hit = false;
+            for (const Footprint& b : blocks) if (overlaps(fp, b)) { hit = true; break; }
+            if (hit) continue;
+            blocks.push_back(fp);
             float z0 = q.p.z - 0.6f;
             V3 ax = q.t * (along * 0.5f), ay = q.n * (depth * 0.5f);
             ax.z = 0; ay.z = 0;
@@ -360,6 +415,7 @@ void Track::addBuildings(Chunk& ch, int c0, int c1, std::vector<WorldVertex>* bi
 }
 
 void Track::buildMesh() {
+    blocks.clear();
     verts.clear(); chunks.clear();
     // where the verge meets the land
     auto edgeZ = [&](const V3& base, const V3& outer) {
@@ -453,7 +509,9 @@ void Track::buildMesh() {
     }
 
     // ---------------- terrain: the elevation grid, 4x finer, lowered under the circuit
-    const int SUB = 4;
+    // 6x finer than the elevation grid (33 m cells at Interlagos): fine enough that the hills beside the
+    // circuit keep their shape instead of being planed off by cells that also hold a bit of road
+    const int SUB = 6;
     float sub = gstep / SUB;
     // nearest track point lookup through a coarse bucket grid
     const float B = 60.0f;
@@ -478,8 +536,8 @@ void Track::buildMesh() {
         if (bi < 0) return dem;
         float d = sqrtf(best);
         float under = pts[bi].p.z - 1.2f;
-        if (d < 45) return fminf(dem, under) * 0.0f + under;
-        float t = clampf((d - 45) / 90.0f, 0, 1);
+        if (d < GROUND_FLAT) return under;
+        float t = clampf((d - GROUND_FLAT) / GROUND_BLEND, 0, 1);
         return lerpf(under, dem, t * t * (3 - 2 * t));
     };
     int tnx = (gnx - 1) * SUB + 1, tny = (gny - 1) * SUB + 1;
@@ -517,13 +575,13 @@ void Track::buildMesh() {
             }
         }
     }
-    if (keepGround) { groundTz = tz; gtnx = tnx; gtny = tny; gsub = sub; }
+    groundTz = tz; gtnx = tnx; gtny = tny; gsub = sub;     // kept: the trees stand on it
     // light per terrain corner from the slope (neighbouring cells share corners -> strips)
     auto tcol = [&](int x, int y) {
         int x0 = x > 0 ? x - 1 : x, x1 = x < tnx - 1 ? x + 1 : x, y0 = y > 0 ? y - 1 : y, y1 = y < tny - 1 ? y + 1 : y;
         V3 dx((x1 - x0) * sub, 0, tz[y * tnx + x1] - tz[y * tnx + x0]), dy(0, (y1 - y0) * sub, tz[y1 * tnx + x] - tz[y0 * tnx + x]);
         V3 nrm = norm(cross(dx, dy));
-        float k = 0.78f + 0.22f * clampf(dot(nrm, norm(V3(0.4f, 0.3f, 0.85f))), 0, 1);
+        float k = 0.50f + 0.58f * clampf(dot(nrm, norm(V3(0.55f, 0.35f, 0.75f))), 0, 1);   // slopes facing away from the sun darker: hills read
         return shade(terrainTint, k);
     };
     std::vector<WorldVertex> quads, strip;
@@ -740,7 +798,7 @@ void Track::addTrackside(std::vector<V3>& keepClear) {
 }
 
 void Track::buildProps() {
-    props.clear();
+    props.clear(); propsDropped = 0;
     rngState = 12345;
     for (const char* c = def->id; *c; c++) rngState = rngState * 31 + (u8)*c;
     // grandstands along the start/finish straight, on the outside, facing the track
@@ -850,18 +908,100 @@ void Track::buildProps() {
                 if (dx * dx + dy * dy < need * need) clear = false;
             }
             for (const V3& b : keepClear) { float dx = b.x - at.x, dy = b.y - at.y; if (dx * dx + dy * dy < 22.0f * 22.0f) clear = false; }
+            Footprint tf{at.x, at.y, 1, 0, 3, 3};
+            for (const Footprint& b : blocks) if (clear && overlaps(tf, b)) clear = false;
             if (!clear) continue;
-            float dz = 0;
-            {
-                // same ground height the terrain mesh uses near the track
-                float dem = terrainZ(at.x, at.y);
-                float d = dist;
-                float under = q.p.z - 1.2f;
-                float t = clampf((d - 45) / 90.0f, 0, 1);
-                dz = d < 45 ? under : lerpf(under, dem, t * t * (3 - 2 * t));
-            }
-            at.z = dz;
+            at.z = meshZ(at.x, at.y) - 0.3f;     // on the terrain mesh itself (sunk a little: no floating roots)
             props.push_back({rnd() < 0.55f ? PROP_TREE_ROUND : PROP_TREE_PINE, at, rnd() * 6.28f, 0.75f + rnd() * 0.6f});
         }
     }
+    tidyProps();
+}
+
+// Each object's footprint (from its Blender / Unity model, +X towards the track): no part of it may be on
+// any road; none may stand inside another part of the lap's run-off (circuits fold back on themselves:
+// an object placed for one corner can land beside the next); and none may stand in another object or
+// a city block. Big ones are kept first.
+bool Track::onAnyRoad(const Footprint& f, int own, bool allowOwnRunoff) const {
+    float r = sqrtf(f.hx * f.hx + f.hy * f.hy);
+    for (int j = 0; j < n; j++) {
+        const TrackPoint& q = pts[j];
+        float dx = q.p.x - f.x, dy = q.p.y - f.y;
+        float reach = q.hw + fmaxf(q.outL, q.outR) + r + 2;
+        if (dx * dx + dy * dy > reach * reach) continue;
+        int dij = abs(j - own); dij = dij > n / 2 ? n - dij : dij;
+        bool mine = dij * step < 60.0f;
+        // the road (plus half a metre), and for other parts of the lap their run-off up to the barrier
+        for (int side = 0; side < 2; side++) {
+            float sg = side ? -1.0f : 1.0f;
+            float w = mine && allowOwnRunoff ? 0.5f : (mine ? 0.5f : (side ? q.outR : q.outL));
+            if (mine && !allowOwnRunoff) w = side ? q.outR : q.outL;
+            // a strip from the centre line out to the edge (or the barrier) on this side, 5 m long
+            Footprint road{q.p.x + q.n.x * sg * (q.hw + w) * 0.5f, q.p.y + q.n.y * sg * (q.hw + w) * 0.5f,
+                           q.t.x, q.t.y, step * 0.55f, (q.hw + w) * 0.5f};
+            float l = sqrtf(road.ax * road.ax + road.ay * road.ay); road.ax /= l; road.ay /= l;
+            if (overlaps(f, road)) return true;
+        }
+    }
+    return false;
+}
+
+void Track::tidyProps() {
+    // footprint of each kind: centre along the model's +X, half depth (X), half width (Y)
+    struct FP { float cx, hx, hy; int rank; bool inRunoff; };
+    auto fpOf = [](int m) -> FP {
+        switch (m) {
+        case PROP_CONTROL:     return {0, 7, 7, 0, false};
+        case PROP_HOSPITALITY: return {0, 6, 7.5f, 1, false};
+        case PROP_GRANDSTAND:  return {0.5f, 5, 15.5f, 2, false};
+        case PROP_BLEACHER:    return {-2.3f, 2.4f, 5, 3, false};
+        case PROP_TENT:        return {0, 2.2f, 2.2f, 4, false};
+        case PROP_TVTOWER:     return {0, 1.5f, 1.5f, 5, false};
+        case PROP_CRANE:       return {-0.4f, 2.8f, 1.3f, 6, false};
+        case PROP_MARSHAL:     return {0, 1.6f, 1.6f, 7, false};
+        case PROP_BILLBOARD:   return {0, 2.0f, 2.0f, 8, false};
+        case PROP_FLAGPANEL:   return {0, 0.3f, 0.4f, 9, false};
+        case PROP_TECPRO:      return {0, 0.6f, 3.0f, 10, true};
+        case PROP_TYRES:       return {0, 0.7f, 0.7f, 11, true};
+        default:               return {0, 2.0f, 2.0f, 12, false};      // trees
+        }
+    };
+    std::vector<int> order;
+    for (int i = 0; i < (int)props.size(); i++) order.push_back(i);
+    std::stable_sort(order.begin(), order.end(), [&](int a, int b) { return fpOf(props[a].model).rank < fpOf(props[b].model).rank; });
+    std::vector<Footprint> kept;
+    std::vector<char> keep(props.size(), 1);
+    for (int i : order) {
+        const PropInst& pr = props[i];
+        if (pr.model == PROP_GANTRY || pr.model == PROP_BRIDGE) continue;     // they span the road
+        FP f = fpOf(pr.model);
+        float k = (pr.model == PROP_TREE_PINE || pr.model == PROP_TREE_ROUND) ? pr.scale : 1.0f;
+        float ax = cosf(pr.yaw), ay = sinf(pr.yaw);
+        Footprint fp{pr.p.x + ax * f.cx, pr.p.y + ay * f.cx, ax, ay, f.hx * k, f.hy * k};
+        // the lap point it was put beside: the nearest one
+        int own = 0; float best = 1e18f;
+        for (int j = 0; j < n; j += 2) { float dx = pts[j].p.x - fp.x, dy = pts[j].p.y - fp.y, d = dx * dx + dy * dy; if (d < best) { best = d; own = j; } }
+        bool bad = onAnyRoad(fp, own, f.inRunoff);
+        // off the verge, on the terrain: stand on the mesh (its lowest point under the footprint, so no
+        // corner floats over a slope)
+        if (!bad && pr.model != PROP_TREE_PINE && pr.model != PROP_TREE_ROUND) {
+            const TrackPoint& q = pts[own];
+            if (sqrtf(best) > q.hw + fmaxf(q.outL, q.outR) + 3) {
+                float lo = meshZ(fp.x, fp.y);
+                for (int k = 0; k < 4; k++) {
+                    float sx = (k & 1) ? 1.0f : -1.0f, sy = (k & 2) ? 1.0f : -1.0f;
+                    lo = fminf(lo, meshZ(fp.x + fp.ax * fp.hx * sx - fp.ay * fp.hy * sy, fp.y + fp.ay * fp.hx * sx + fp.ax * fp.hy * sy));
+                }
+                props[i].p.z = lo;
+            }
+        }
+        for (const Footprint& b : blocks) if (!bad && overlaps(fp, b)) bad = true;
+        // the tyre stacks and TecPro blocks touch their neighbours by design: only test them against the rest
+        for (const Footprint& o : kept) if (!bad && overlaps(fp, o)) bad = true;
+        if (bad) { keep[i] = 0; propsDropped++; continue; }
+        if (!f.inRunoff) kept.push_back(fp);
+    }
+    std::vector<PropInst> out;
+    for (int i = 0; i < (int)props.size(); i++) if (keep[i]) out.push_back(props[i]);
+    props.swap(out);
 }

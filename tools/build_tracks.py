@@ -65,6 +65,57 @@ FLAT = {'mexico': 2232.0}
 # metres to move the start line along the traced lap (Monaco's outline starts at Casino Square)
 START_SHIFT = {'monaco': 2395.0}
 ENVELOPE = {'singapore': 3, 'lasvegas': 2, 'jeddah': 2, 'miami': 2}
+# narrower stretches (metres round the final lap, half width): Baku's old-town castle section is 7.6 m wide
+NARROW = {'baku': [(2040.0, 2420.0, 3.9), (2080.0, 2300.0, 3.5)]}   # the castle chicane 7 m
+# two parts of a lap must keep this much between their road edges (walls, a little run-off): where
+# the traced outline brings them closer (Baku's castle section beside the run back down), they are
+# eased apart
+LEG_GAP = 7.0
+
+
+def half_widths(tid, hw, n, L):
+    w = np.full(n, float(hw))
+    s = np.arange(n) * L / n
+    for a, b, h in NARROW.get(tid, []):
+        k = np.clip(np.minimum(s - a, b - s) / 40.0, 0, 1)       # 40 m blend at each end
+        w = np.minimum(w, hw + (h - hw) * (k * k * (3 - 2 * k)))
+    return w
+
+
+def separate_legs(line, w, L, z):
+    """push apart the parts of the lap (more than 150 m apart along it) whose roads come closer than
+    LEG_GAP edge to edge; the push is spread smoothly along both legs so the shapes stay the same"""
+    from scipy.spatial import cKDTree
+    P = np.array(line, float); n = len(P)
+    T = np.roll(P, -1, 0) - np.roll(P, 1, 0); T /= np.hypot(*T.T)[:, None]
+    skip = int(150.0 / (L / n))
+    sig = 10.0                                                    # points (~50 m)
+    kern = np.exp(-0.5 * (np.arange(-30, 31) / sig) ** 2); kern /= kern.max()
+    moved = 0.0
+    for it in range(60):
+        tree = cKDTree(P)
+        D = np.zeros_like(P); worst = 0.0
+        for i, j in tree.query_pairs(2 * w.max() + LEG_GAP):
+            dij = abs(i - j); dij = min(dij, n - dij)
+            # (a crossing on a bridge -- Suzuka -- meets at an angle or passes well above: left alone)
+            if dij < skip or abs(z[i] - z[j]) > 5.5 or abs(T[i] @ T[j]) < 0.7:
+                continue
+            v = P[i] - P[j]; d = np.hypot(*v)
+            need = w[i] + w[j] + LEG_GAP
+            if d < need and d > 1e-6:
+                push = (need - d) * 0.5 * v / d
+                D[i] += push; D[j] -= push; worst = max(worst, need - d)
+        if worst < 0.05:
+            break
+        # spread each push along the lap (both directions), never less than the push itself
+        S = np.zeros_like(P)
+        for k, kv in zip(range(-30, 31), kern):
+            S += np.roll(D, k, axis=0) * kv
+        P += S * 0.35
+        moved = max(moved, worst)
+    if moved > 0:
+        print(f'   legs eased apart (closest pass was {moved:.1f} m short)')
+    return [tuple(p) for p in P]
 
 
 def read_emt(path):
@@ -156,6 +207,7 @@ def build_one(tid, out):
     xs = cx + (xs - cx) * k; ys = cy + (ys - cy) * k
     line = list(zip(xs.tolist(), ys.tolist()))
     L = length(line)
+    w = half_widths(tid, hw, len(line), L)
     # heights
     if emr:
         e = read_emt(os.path.join(HERE, 'tracks', 'emr', emr + '.emt'))
@@ -167,15 +219,21 @@ def build_one(tid, out):
         pz = profile(tid, street, 2000)
         z = np.interp(fr * 2000, np.arange(2001), np.concatenate([pz, pz[:1]]))
         gx0, gy0, gs, gnx, gny, grid = synth_grid(line, z)
+    # ease apart legs that come too close (not where one crosses over the other on a bridge)
+    sep = separate_legs(line, w, L, z)
+    if sep != line:
+        P = np.array(sep); c = P.mean(0); k2 = L / length(sep)     # back to the official length
+        line = [tuple(c + (p - c) * k2) for p in P]
+    L = length(line)
     sh = START_SHIFT.get(tid, 0.0)
     if sh:
         k = int(round(sh / (L / len(line)))) % len(line)
-        line = line[k:] + line[:k]; z = np.concatenate([z[k:], z[:k]])
+        line = line[k:] + line[:k]; z = np.concatenate([z[k:], z[:k]]); w = np.concatenate([w[k:], w[:k]])
     zmin = float(z.min())
     with open(os.path.join(out, tid + '.emt'), 'wb') as f:
         f.write(b'EMT1'); f.write(struct.pack('<Iff', len(line), L / len(line), L))
-        for (x, y), h in zip(line, z):
-            f.write(struct.pack('<4f', x, y, h - zmin, hw))
+        for (x, y), h, hwi in zip(line, z, w):
+            f.write(struct.pack('<4f', x, y, h - zmin, float(hwi)))
         f.write(struct.pack('<3f2I', gx0, gy0, gs, gnx, gny))
         f.write(struct.pack(f'<{len(grid)}f', *[float(g) - zmin for g in grid]))
         f.write(struct.pack('<2f', zmin, float(z.max())))

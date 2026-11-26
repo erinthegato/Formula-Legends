@@ -59,6 +59,11 @@ struct Track {
     std::vector<WorldVertex> verts;
     std::vector<Chunk> chunks;
     std::vector<PropInst> props;
+    // footprints on the ground (an oriented box: centre, unit axis along its length, half sizes): the
+    // city blocks, so nothing else is put inside them
+    struct Footprint { float x, y, ax, ay, hx, hy; };
+    std::vector<Footprint> blocks;
+    int propsDropped = 0;                // (log) trackside objects left out: on a road or inside another one
     std::vector<PropCell> propCells;
     std::vector<BrakeBoard> boards;
     std::vector<V3> speakers;       // trackside PA speakers (on grandstands and poles round the lap)
@@ -97,6 +102,10 @@ private:
     void addBuildings(Chunk& ch, int c0, int c1, std::vector<WorldVertex>* bins);
     void buildProps();
     void addTrackside(std::vector<V3>& keepClear);
+    void tidyProps();
+    float meshZ(float x, float y) const;      // the terrain mesh's own height
+    static constexpr float GROUND_FLAT = 25.0f, GROUND_BLEND = 50.0f;   // ground flat under the circuit, then back to the hills                    // drop objects that stand on a road, in another's run-off or in each other
+    bool onAnyRoad(const Footprint& f, int ownIndex, bool allowOwnRunoff) const;
     void groupProps();
     void placeSpeakers();
     void addQuad(Chunk& c, int mat, const V3& a, const V3& b, const V3& cc, const V3& d,
