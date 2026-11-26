@@ -1,0 +1,21 @@
+name: Fetch terrain grids
+# Run by hand (Actions > Fetch terrain grids > Run workflow): downloads fine elevation grids for the
+# named circuits and uploads them as the "dem" artifact (copy into tools/tracks/dem/, then run
+# tools/build_tracks.py and tools/pack_files.py DATA/tracks/*.emt)
+on:
+  workflow_dispatch:
+    inputs:
+      tracks:
+        description: circuit ids, space separated
+        default: interlagos spa redbullring
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: pip install numpy scipy
+      - run: python3 tools/tracks/fetch_dem.py ${{ github.event.inputs.tracks }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dem
+          path: tools/tracks/dem/

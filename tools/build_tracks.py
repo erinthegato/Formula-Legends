@@ -179,7 +179,9 @@ def synth_grid(xy, z, margin=700.0, gs=200.0):
     return (float(lo[0]), float(lo[1]), gs, gnx, gny, g)
 
 
-def build_one(tid, out):
+def layout(tid):
+    """the lap as the game lays it out (before the heights): line, lap fractions, and how the local
+    metres map back to latitude / longitude (origin, centre, scale)"""
     fn, hw, street, emr = CIRCUITS[tid]
     gj = json.load(open(os.path.join(HERE, 'tracks', 'circuits', fn + '.geojson')))['features'][0]
     official = float(gj['properties']['length'])
@@ -206,8 +208,44 @@ def build_one(tid, out):
     cx, cy = xs.mean(), ys.mean()
     xs = cx + (xs - cx) * k; ys = cy + (ys - cy) * k
     line = list(zip(xs.tolist(), ys.tolist()))
+    return dict(line=line, fr=fr, origin=ll[0], centre=(cx, cy), scale=k, official=official)
+
+
+def game_to_latlon(lay, pts):
+    """game x, y (metres) -> latitude, longitude"""
+    cx, cy = lay['centre']; k = lay['scale']
+    return to_latlon([(cx + (x - cx) / k, cy + (y - cy) / k) for x, y in pts], lay['origin'])
+
+
+def load_dem(tid):
+    """a fine terrain grid fetched by tools/tracks/fetch_dem.py (tools/tracks/dem/<id>.json), or None"""
+    fp = os.path.join(HERE, 'tracks', 'dem', tid + '.json')
+    if not os.path.exists(fp):
+        return None
+    d = json.load(open(fp))
+    g = np.array([np.nan if v is None else v for v in d['z']], float)
+    if np.isnan(g).any():                           # holes (no data): nearest neighbour fill
+        idx = np.where(~np.isnan(g))[0]
+        for i in np.where(np.isnan(g))[0]:
+            g[i] = g[idx[np.argmin(np.abs(idx - i))]]
+    return (d['gx0'], d['gy0'], d['gs'], d['gnx'], d['gny'], g)
+
+
+def grid_at(grid, x, y):
+    gx0, gy0, gs, gnx, gny, g = grid
+    g = np.asarray(g).reshape(gny, gnx)
+    fx = np.clip((np.asarray(x) - gx0) / gs, 0, gnx - 1.001); fy = np.clip((np.asarray(y) - gy0) / gs, 0, gny - 1.001)
+    ix = fx.astype(int); iy = fy.astype(int); u = fx - ix; v = fy - iy
+    return (g[iy, ix] * (1 - u) * (1 - v) + g[iy, ix + 1] * u * (1 - v) + g[iy + 1, ix] * (1 - u) * v + g[iy + 1, ix + 1] * u * v)
+
+
+def build_one(tid, out):
+    fn, hw, street, emr = CIRCUITS[tid]
+    lay = layout(tid)
+    line, fr, official = lay['line'], lay['fr'], lay['official']
     L = length(line)
     w = half_widths(tid, hw, len(line), L)
+    dem = load_dem(tid)
     # heights
     if emr:
         e = read_emt(os.path.join(HERE, 'tracks', 'emr', emr + '.emt'))
@@ -219,6 +257,16 @@ def build_one(tid, out):
         pz = profile(tid, street, 2000)
         z = np.interp(fr * 2000, np.arange(2001), np.concatenate([pz, pz[:1]]))
         gx0, gy0, gs, gnx, gny, grid = synth_grid(line, z)
+    if dem is not None:
+        # the fine grid (50 m) for the terrain; where the lap's own profile is only 40 samples, the
+        # heights along the lap come from it too (smoothed over 120 m: a car-width of noise is not a hill)
+        gx0, gy0, gs, gnx, gny, grid = dem
+        grid = np.asarray(grid, float)
+        if not emr:
+            P = np.array(line)
+            zz = grid_at(dem, P[:, 0], P[:, 1])
+            z = np.array(smooth_values_closed(list(zz), max(3, int(120 / STEP) | 1)))
+        print(f'   fine terrain grid {gnx}x{gny} at {gs:.0f} m')
     # ease apart legs that come too close (not where one crosses over the other on a bridge)
     sep = separate_legs(line, w, L, z)
     if sep != line:
@@ -240,7 +288,7 @@ def build_one(tid, out):
     n = len(z); w = int(100 / STEP)
     grades = [(z[(i + w) % n] - z[i]) / 100.0 for i in range(n)]
     return dict(length=L, official=official, zmin=zmin, zmax=float(z.max()), rise=float(z.max() - zmin),
-                maxClimb=max(grades) * 100, maxDrop=-min(grades) * 100, cw=signed_area(line) < 0, street=street)
+                maxClimb=max(grades) * 100, maxDrop=-min(grades) * 100, cw=bool(signed_area(line) < 0), street=bool(street))
 
 
 def main():
