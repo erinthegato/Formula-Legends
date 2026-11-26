@@ -26,7 +26,6 @@ struct Config {
     // PS Vita: steer by turning the console (0 off, 1 gentle, 2 normal, 3 strong); reversed if it turns the wrong way
     int tilt = 0; bool tiltInvert = false;
     bool mirror = true;      // PS Vita: rear-view mirror at the top of the screen
-    bool rearLook = false;
     // cockpit: hide the steering wheel (and its screen); with it hidden, the normal HUD can be shown in the cockpit
     bool hideWheel = false, cockpitHud = false;
     // steering help: 0 off, 1 light (default; -1 = not set yet), 2 strong (no slides or spins)
