@@ -3,6 +3,10 @@ name: Build Vita + PC test
 on:
   push:
   workflow_dispatch:
+    inputs:
+      release:
+        description: publish a release with this version tag (e.g. v1.0); empty for a plain build
+        default: ""
 
 jobs:
   vita:
@@ -105,10 +109,10 @@ jobs:
           name: pc-test-shots
           path: shots
 
-  # a version tag (v1.0, v1.1...) publishes a release with the game and the music pack, once
-  # the Vita build and every test have passed
+  # a release (Actions > build > Run workflow, release: v1.1), or a pushed v* tag, publishes the game
+  # and the music pack, once the Vita build and every test have passed
   release:
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.release != '')
     needs: [vita, pc-test]
     runs-on: ubuntu-latest
     permissions:
@@ -125,7 +129,9 @@ jobs:
           path: out
       - uses: softprops/action-gh-release@v2
         with:
-          name: Formula Legends ${{ github.ref_name }}
+          tag_name: ${{ inputs.release || github.ref_name }}
+          target_commitish: ${{ github.sha }}
+          name: Formula Legends ${{ inputs.release || github.ref_name }}
           body_path: RELEASE_NOTES.md
           files: |
             out/FormulaLegends.vpk
