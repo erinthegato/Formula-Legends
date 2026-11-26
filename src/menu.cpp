@@ -888,7 +888,7 @@ void Game::screenHelp(Panel& P) {
         {"", ""},
         {"Intro music", "Take On The World - All Good Folks (Uppbeat)"},
         {"Attract music", "Nocturn Tonebox (made with ElevenLabs)"},
-        {"Headquarters music", "Apex Pursuit"},
+        {"Headquarters music", "Era themes: ElevenLabs; 2025: Apex Pursuit"},
         {"1980 era music", "Originals, Epidemic Sound, Uppbeat"},
         {"2016 era music", "Uppbeat, Epidemic Sound"},
         {"2025 era music", "Uppbeat (uppbeat.io)"},
