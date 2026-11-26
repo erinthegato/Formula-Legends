@@ -186,10 +186,16 @@ int clipFor(const char* name) {
     return clipCount++;
 }
 
+// the race engineer ducks the rest: while a radio call plays, engines, effects and music drop to
+// DUCK_LEVEL (about -9 dB), coming down in ~60 ms and back up over ~0.4 s after the call
+const float DUCK_LEVEL = 0.35f;
+float duckG = 1;
+
 void mix(int16_t* out, int frames) {
-    static float buf[2048 * 2];
+    static float buf[2048 * 2], rbuf[2048 * 2];
     if (frames > 2048) frames = 2048;
     memset(buf, 0, frames * 2 * sizeof(float));
+    memset(rbuf, 0, frames * 2 * sizeof(float));
     for (auto& v : voices) {
         int ci = v.clip;
         if (ci < 0 || ci >= clipCount) continue;
@@ -250,7 +256,8 @@ void mix(int16_t* out, int frames) {
                 smp = sh.cur;
             } else smp = c.ulaw ? ULAW[c.ulaw[a]] : c.data[a];
             float x = smp * (1.0f / 32768.0f) * sh.g * shotVol;
-            buf[i * 2] += x * gl; buf[i * 2 + 1] += x * gr;
+            float* dst = si == 4 ? rbuf : buf;            // (the radio is mixed apart: it isn't ducked)
+            dst[i * 2] += x * gl; dst[i * 2 + 1] += x * gr;
             sh.pos += c.step;
         }
     }
@@ -302,8 +309,11 @@ void mix(int16_t* out, int frames) {
     }
     mixBusy = 0;
     float m = master;
+    bool talking = shots[4].clip >= 0 && shots[4].vol > 0 && volRadio > 0;
+    float duckTo = talking ? DUCK_LEVEL : 1.0f;
     for (int i = 0; i < frames * 2; i++) {
-        float x = buf[i] * m;
+        if ((i & 1) == 0) duckG += (duckTo - duckG) * (duckTo < duckG ? 0.00038f : 0.000057f);   // 44.1 kHz frames
+        float x = (buf[i] * duckG + rbuf[i]) * m;
         // soft limiter
         x = x / (1 + fabsf(x) * 0.6f);
         out[i] = (int16_t)(clampf(x, -1, 1) * 32000);

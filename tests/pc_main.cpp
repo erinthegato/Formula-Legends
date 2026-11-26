@@ -122,6 +122,30 @@ int main(int argc, char** argv) {
         fprintf(stderr, "after O, O: screen %d (hq %d)\n", (int)g.screen, (int)SCR_HQ);
         return 0;
     }
+    if (mode == "duck") {
+        // duck: an engine at steady revs, then a radio call; the engine's level before, during and after
+        sound::musicFile(nullptr);
+        sound::setVoice(0, &CARS[eraFirstCar(ERA_V8)], 12000, 0.8f, 0, false, 1);
+        std::vector<int16_t> b(735 * 2);
+        auto level = [&](int frames60) {
+            double e = 0; int n = 0;
+            for (int f = 0; f < frames60; f++) { pc::mixFn(b.data(), 735); for (int16_t v : b) { e += (double)v * v; n++; } }
+            return sqrt(e / n);
+        };
+        double before = level(60);
+        sound::radio("10_box");
+        double start = level(3);
+        double during = level(40);
+        while (sound::radioBusy()) level(1);
+        double just = level(6);
+        double after = level(90);
+        printf("engine level: before %.0f, first 50 ms of the call %.0f, during the call %.0f (engine+voice), just after %.0f, 1.5 s after %.0f\n", before, start, during, just, after);
+        sound::radio("10_box"); level(5);
+        sound::setVoice(0, nullptr, 0, 0, 0, false);
+        double voiceOnly = level(30);
+        printf("voice alone %.0f\n", voiceOnly);
+        return 0;
+    }
     if (mode == "physlap") {
         // physlap <track id> <era 0-3> <laps>: the AI drives the era's first car alone (time trial
         // rules, dry), no drawing; lap times and how often the car went light / left the ground
