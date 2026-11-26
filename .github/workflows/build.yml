@@ -8,8 +8,37 @@ on:
         description: publish a release with this version tag (e.g. v1.0); empty for a plain build
         default: ""
 
+# builds on main run one at a time, so each release gets the next version number
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
+  # the version this build would be released as: the latest release plus one (v1.0 -> v1.1), or the
+  # one typed in Run workflow; the Vita app version (param.sfo) follows it: v1.1 -> 01.01
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.v.outputs.tag }}
+      app: ${{ steps.v.outputs.app }}
+    steps:
+      - id: v
+        env:
+          GH_TOKEN: ${{ github.token }}
+          WANT: ${{ inputs.release }}
+        run: |
+          last=$(gh api repos/${{ github.repository }}/releases/latest -q .tag_name 2>/dev/null || echo v1.0)
+          if [ -n "$WANT" ]; then tag="$WANT"; else
+            maj=$(echo "${last#v}" | cut -d. -f1); min=$(echo "${last#v}" | cut -d. -f2)
+            tag="v$maj.$((min + 1))"
+          fi
+          maj=$(echo "${tag#v}" | cut -d. -f1); min=$(echo "${tag#v}" | cut -d. -f2)
+          app=$(printf "%02d.%02d" "$maj" "${min:-0}")
+          echo "last release $last, this build $tag (app $app)"
+          echo "tag=$tag" >> $GITHUB_OUTPUT; echo "app=$app" >> $GITHUB_OUTPUT
+
   vita:
+    needs: version
     runs-on: ubuntu-latest
     container: vitasdk/vitasdk:latest
     steps:
@@ -31,7 +60,7 @@ jobs:
           fi
       - name: Build VPK
         run: |
-          cmake -S vita -B build-vita -DCMAKE_BUILD_TYPE=Release
+          cmake -S vita -B build-vita -DCMAKE_BUILD_TYPE=Release -DFL_APP_VER=${{ needs.version.outputs.app }}
           cmake --build build-vita -j4
           ls -la build-vita/*.vpk build-vita/*.zip
       - uses: actions/upload-artifact@v4
@@ -109,16 +138,35 @@ jobs:
           name: pc-test-shots
           path: shots
 
-  # a release (Actions > build > Run workflow, release: v1.1), or a pushed v* tag, publishes the game
-  # and the music pack, once the Vita build and every test have passed
+  # every push to main is released as the next version (or Run workflow with a release tag), with
+  # the game and the music pack, once the Vita build and every test have passed
   release:
-    if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.release != '')
-    needs: [vita, pc-test]
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || inputs.release != '')
+    needs: [version, vita, pc-test]
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Release notes (the changes since the last release, then how to install)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          last=$(gh api repos/${{ github.repository }}/releases/latest -q .tag_name 2>/dev/null || true)
+          {
+            echo "## Formula Legends ${{ needs.version.outputs.tag }}"; echo
+            echo "### Changes"
+            if [ -n "$last" ] && git rev-parse -q --verify "refs/tags/$last" >/dev/null; then
+              git log --no-merges --format='- %s' "$last..HEAD"
+            else
+              git log --no-merges --format='- %s' -1
+            fi
+            echo
+            sed -n '/^### Install/,/^### In this version/p' RELEASE_NOTES.md | sed '$d'
+          } > notes.md
+          cat notes.md
       - uses: actions/download-artifact@v4
         with:
           name: FormulaLegends-Vita
@@ -129,10 +177,11 @@ jobs:
           path: out
       - uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ inputs.release || github.ref_name }}
+          tag_name: ${{ needs.version.outputs.tag }}
           target_commitish: ${{ github.sha }}
-          name: Formula Legends ${{ inputs.release || github.ref_name }}
-          body_path: RELEASE_NOTES.md
+          name: Formula Legends ${{ needs.version.outputs.tag }}
+          body_path: notes.md
+          make_latest: true
           files: |
             out/FormulaLegends.vpk
             out/FormulaLegends-music.zip
