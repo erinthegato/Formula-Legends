@@ -60,7 +60,14 @@ engine (physics, circuits, trackside scenery, pit crews and their animations). N
   `src/intro.cpp`, beat grid in `attract.txt`). The song is "Nocturn" (Tonebox), an original made for
   the game with ElevenLabs: 100 BPM, bar 0 at 0.292 s.
 * PS Vita: `cmake -S vita -B build-vita && cmake --build build-vita` with VitaSDK + vitaGL
-  (GitHub Actions builds the VPK on every push).
+  (GitHub Actions builds the VPK on every push). It makes two files:
+  * `FormulaLegends.vpk` (~9 MB): the game. Install it with VitaShell; updates install in seconds.
+  * `FormulaLegends-music.zip` (~78 MB): the race, attract and podium music. Install it **once**:
+    copy the zip to the Vita, open it in VitaShell, select all, copy, and paste at the root of `ux0:`
+    (it unpacks to `ux0:data/FormulaLegends/DATA/music/`). Only needed again when the music changes.
+    Without it the game runs with the intro music only, and the main menu says so.
+  Data the app doesn't carry is read from `ux0:data/FormulaLegends/DATA/`; already-compressed data goes
+  into the VPK unzipped (`tools/make_vpk.py`), so the Vita doesn't spend the install unzipping it.
 * PC test build: `make -f Makefile.pc`, then from this folder e.g.
   `./fl_test race monza 0 3 9 shots 20 60` (car 0 = the 1980 Marchetti; AI drives your car,
   screenshots at 20 s and 60 s), `./fl_test intro shots` (frames of the intro), `./fl_test menus shots`.

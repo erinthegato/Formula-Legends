@@ -11,7 +11,7 @@ jobs:
     steps:
       - name: Tools
         run: |
-          (apk add --no-cache git cmake make bash 2>/dev/null || (apt-get update && apt-get install -y git cmake make)) || true
+          (apk add --no-cache git cmake make bash python3 2>/dev/null || (apt-get update && apt-get install -y git cmake make python3)) || true
           ls $VITASDK/arm-vita-eabi/lib | grep -i -E "vitagl|vitashark|mathneon|ShaccCgExt" || echo "vitaGL not preinstalled"
       - uses: actions/checkout@v4
       - name: vitaGL (if the image lacks it)
@@ -29,11 +29,17 @@ jobs:
         run: |
           cmake -S vita -B build-vita -DCMAKE_BUILD_TYPE=Release
           cmake --build build-vita -j4
-          ls -la build-vita/*.vpk
+          ls -la build-vita/*.vpk build-vita/*.zip
       - uses: actions/upload-artifact@v4
         with:
           name: FormulaLegends-Vita
           path: build-vita/FormulaLegends.vpk
+          compression-level: 0
+      - uses: actions/upload-artifact@v4
+        with:
+          name: FormulaLegends-music
+          path: build-vita/FormulaLegends-music.zip
+          compression-level: 0
 
   pc-test:
     runs-on: ubuntu-latest

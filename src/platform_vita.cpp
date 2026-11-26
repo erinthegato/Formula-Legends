@@ -73,6 +73,12 @@ extern "C" FILE* __wrap_fopen(const char* path, const char* mode) {
     if (reading && !strncmp(path, "DATA/", 5)) {
         mapPath(path, p, sizeof p, true);
         if (FILE* f = __real_fopen(p, mode)) return f;
+        mapPath(path, p, sizeof p, false);
+        if (FILE* f = __real_fopen(p, mode)) return f;
+        // not in the app: the data packs installed beside the saves (the music pack puts the
+        // race music in ux0:data/FormulaLegends/DATA/music/, so the VPK stays small)
+        snprintf(p, sizeof p, SAVE_DIR "/%s", path);
+        return __real_fopen(p, mode);
     }
     mapPath(path, p, sizeof p, false);
     return __real_fopen(p, mode);

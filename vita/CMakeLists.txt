@@ -43,17 +43,33 @@ target_link_libraries(${PROJECT_NAME}
 
 vita_create_self(eboot.bin ${PROJECT_NAME} UNSAFE)
 
-# app0:DATA holds the PSP data (shared); app0:HD holds the Vita's higher-detail replacements
-set(VPK_FILES
-  FILE ${CMAKE_CURRENT_SOURCE_DIR}/sce_sys/icon0.png sce_sys/icon0.png
-  FILE ${CMAKE_CURRENT_SOURCE_DIR}/sce_sys/livearea/contents/bg.png sce_sys/livearea/contents/bg.png
-  FILE ${CMAKE_CURRENT_SOURCE_DIR}/sce_sys/livearea/contents/startup.png sce_sys/livearea/contents/startup.png
-  FILE ${CMAKE_CURRENT_SOURCE_DIR}/sce_sys/livearea/contents/template.xml sce_sys/livearea/contents/template.xml
-  FILE ${ROOT}/DATA DATA)
+# app0:DATA holds the PSP data (shared); app0:HD holds the Vita's higher-detail replacements.
+# Packed by tools/make_vpk.py rather than vita_create_vpk: data that is already compressed goes in
+# as it is (no unzipping while installing), and the music is left out. It comes in its own pack,
+# FormulaLegends-music.zip (tools/make_music_pack.py), installed once to ux0:data/FormulaLegends/,
+# so a game update installs in seconds.
+find_package(Python3 REQUIRED COMPONENTS Interpreter)
+separate_arguments(SFO_FLAGS UNIX_COMMAND "${VITA_MKSFOEX_FLAGS}")
+add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/param.sfo
+  COMMAND vita-mksfoex ${SFO_FLAGS} -s TITLE_ID=${VITA_TITLEID} -s APP_VER=${VITA_VERSION}
+          "${VITA_APP_NAME}" ${CMAKE_CURRENT_BINARY_DIR}/param.sfo
+  VERBATIM)
+set(VPK_PAIRS
+  ${CMAKE_CURRENT_SOURCE_DIR}/sce_sys/icon0.png=sce_sys/icon0.png
+  ${CMAKE_CURRENT_SOURCE_DIR}/sce_sys/livearea=sce_sys/livearea
+  ${ROOT}/DATA=DATA)
 if(EXISTS ${ROOT}/HD)
-  list(APPEND VPK_FILES FILE ${ROOT}/HD HD)
+  list(APPEND VPK_PAIRS ${ROOT}/HD=HD)
 endif()
-vita_create_vpk(${PROJECT_NAME}.vpk ${VITA_TITLEID} eboot.bin
-  VERSION ${VITA_VERSION}
-  NAME ${VITA_APP_NAME}
-  ${VPK_FILES})
+add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}.vpk
+  COMMAND ${Python3_EXECUTABLE} ${ROOT}/tools/make_vpk.py ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}.vpk
+          ${CMAKE_CURRENT_BINARY_DIR}/eboot.bin ${CMAKE_CURRENT_BINARY_DIR}/param.sfo ${VPK_PAIRS}
+          --skip "DATA/music/*.emu" --keep "DATA/music/intro.emu"
+  DEPENDS eboot.bin ${CMAKE_CURRENT_BINARY_DIR}/param.sfo ${ROOT}/tools/make_vpk.py
+  VERBATIM)
+add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}-music.zip
+  COMMAND ${Python3_EXECUTABLE} ${ROOT}/tools/make_music_pack.py ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}-music.zip ${ROOT}/DATA/music
+  DEPENDS ${ROOT}/tools/make_music_pack.py
+  VERBATIM)
+add_custom_target(${PROJECT_NAME}.vpk-target ALL
+  DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}.vpk ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}-music.zip)

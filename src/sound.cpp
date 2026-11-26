@@ -322,6 +322,21 @@ void mix(int16_t* out, int frames) {
 }
 
 namespace sound {
+
+// the race music comes in its own pack on the Vita (FormulaLegends-music.zip): is it there?
+bool musicPackMissing() {
+    static int state = -1;
+    if (state < 0) {
+        if (!mLoaded) loadPlaylist();
+        state = 0;
+        if (!mFiles.empty()) {
+            FILE* f = fopen(("DATA/music/" + mFiles[0]).c_str(), "rb");
+            if (f) fclose(f); else state = 1;
+        }
+    }
+    return state == 1;
+}
+
 void init() { audio::start(mix); }
 void shutdown() {
     audio::stop();
@@ -398,7 +413,7 @@ void update() {
 }
 
 const char* nowPlaying() {
-    if (!mFile && mLast < 0) return "";
+    if (!mFile) return "";                // (nothing playing: the music pack isn't installed, or between songs)
     return mLast >= 0 && mLast < (int)mNames.size() ? mNames[mLast].c_str() : "";
 }
 float trackTime() { return (float)(sys::timeSec() - mStart); }

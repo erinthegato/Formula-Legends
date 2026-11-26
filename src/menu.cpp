@@ -737,6 +737,8 @@ void Game::screenTitle(Panel& P) {
         P.textC(P.vw / 2, y, items[id], id == sel ? INK : WHITE, 0.74f);
     }
     P.textC(P.vw / 2, 158, "O  headquarters (change era)", DIM, 0.58f);
+    if (sound::musicPackMissing())
+        P.textC(P.vw / 2, 168, "Music pack not installed (see README)", ACC, 0.56f);
 }
 
 void Game::screenTrack(Panel& P) {
