@@ -23,6 +23,10 @@ import numpy as np
 
 SR, L, X = 22050, int(2.5 * 22050), int(0.15 * 22050)       # loop length, crossfade
 ERAS = {'1998': '90s', '2010': 'v8', '2016': 'hybrid', '2025': 'ge'}
+# louder than the loop they replace (rms x, the peaks soft-limited): the 2010 V8 +4 dB, the 2025 hybrid +5 dB
+BOOST = {'v8': 1.6, 'ge': 1.8}
+# only these eras (the others keep their loops): FL_ENGINE_ERAS=2010,2025
+ONLY = [e for e in os.environ.get('FL_ENGINE_ERAS', '').split(',') if e]
 HERE = os.path.dirname(os.path.abspath(__file__))
 AUDIO = os.path.join(HERE, '..', '..', 'DATA', 'audio')
 
@@ -67,9 +71,11 @@ def make_loop(seg, target_rms):
 
 def main(folder):
     for year, era in ERAS.items():
+        if ONLY and year not in ONLY:
+            continue
         out = os.path.join(AUDIO, 'f1_%s.raw' % era)
         old = np.fromfile(out, '<i2').astype(np.float32)
-        target = np.sqrt((old ** 2).mean())
+        target = np.sqrt((old ** 2).mean()) * BOOST.get(era, 1.0)
         picks = []
         for p in sorted(glob.glob(os.path.join(folder, 'engine_%s_*.mp3' % year))):
             x = decode(p)
