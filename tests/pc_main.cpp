@@ -220,6 +220,48 @@ int main(int argc, char** argv) {
         }
         fclose(f); return 0;
     }
+    if (mode == "overlaps") {   // fl_test overlaps all -- CI: every circuit -- barriers folded or on another road, terrain through the road,
+                                // trackside objects on a road. Prints one line per circuit; exit 1 if anything is wrong
+        int fails = 0;
+        if (getenv("FL_NOCUT")) Track::noRunoffCut = true;      // (to see the test catch something)
+        for (int k = 0; k < TRACK_COUNT; k++) {
+            Track t; t.load(&TRACKS[k]);
+            int folds = 0, wallOnRoad = 0, ground = 0, propsOnRoad = 0;
+            // barrier lines
+            for (int side = 0; side < 2; side++) {
+                float sg = side ? -1.0f : 1.0f;
+                for (int i = 0; i < t.n; i++) {
+                    const TrackPoint& a = t.pts[i]; const TrackPoint& b = t.pts[(i + 1) % t.n];
+                    V3 pa = a.p + a.n * (sg * (a.hw + (side ? a.outR : a.outL))), pb = b.p + b.n * (sg * (b.hw + (side ? b.outR : b.outL)));
+                    if ((pb.x - pa.x) * a.t.x + (pb.y - pa.y) * a.t.y < 0) folds++;
+                    for (int j = 0; j < t.n; j++) {
+                        int dij = abs(i - j); dij = dij > t.n / 2 ? t.n - dij : dij;
+                        if (dij * t.step < 30 || fabsf(t.pts[j].p.z - a.p.z) > 4) continue;   // (bridges pass over)
+                        float dx = pa.x - t.pts[j].p.x, dy = pa.y - t.pts[j].p.y, r = t.pts[j].hw - 0.3f;
+                        if (dx * dx + dy * dy < r * r) { wallOnRoad++; break; }
+                    }
+                }
+            }
+            // terrain mesh against the road and verges
+            for (int i = 0; i < t.n; i++) {
+                const TrackPoint& q = t.pts[i];
+                for (float f = -1; f <= 1.001f; f += 0.25f) { V3 p = q.p + q.n * (f * (q.hw + 2)); if (t.meshZ(p.x, p.y) > p.z) ground++; }
+            }
+            // objects (not the gantries and bridges, which span the road)
+            for (const PropInst& pr : t.props) {
+                if (pr.model == PROP_GANTRY || pr.model == PROP_BRIDGE) continue;
+                for (int j = 0; j < t.n; j++) {
+                    float dx = pr.p.x - t.pts[j].p.x, dy = pr.p.y - t.pts[j].p.y, r = t.pts[j].hw + 0.3f;
+                    if (fabsf(pr.p.z - t.pts[j].p.z) < 6 && dx * dx + dy * dy < r * r) { propsOnRoad++; break; }
+                }
+            }
+            bool ok = !folds && !wallOnRoad && !ground && !propsOnRoad;
+            if (!ok) fails++;
+            printf("%-12s %s  barrier folds %d, barrier on a road %d, terrain through the road %d, objects on a road %d\n",
+                   TRACKS[k].id, ok ? "ok  " : "FAIL", folds, wallOnRoad, ground, propsOnRoad);
+        }
+        return fails ? 1 : 0;
+    }
     if (mode == "terrain") {    // where the terrain mesh comes up through the road or the verges: fl_test terrain <track|all>
         std::string tid = argv[2];
         Track::keepGround = true;

@@ -154,6 +154,35 @@ bool Track::load(const TrackDef* d, bool scenery) {
             if (pts[i].outL > limL[i]) { pts[i].outL = limL[i]; pts[i].gravelL = false; clamped++; }
             if (pts[i].outR > limR[i]) { pts[i].outR = limR[i]; pts[i].gravelR = false; clamped++; }
         }
+        // last check, whatever the angle the other road comes in at (the test above only looks straight
+        // across): no barrier point may stand on another part of the lap's road. Pull it in until clear
+        // (not where the other road passes over or under on a bridge).
+        for (int i = 0; i < n && !noRunoffCut; i++) {
+            for (int side = 0; side < 2; side++) {
+                float sg = side == 0 ? 1.0f : -1.0f;
+                float& w = side == 0 ? pts[i].outL : pts[i].outR;
+                for (int tries = 0; tries < 40 && w > 0.3f; tries++) {
+                    V3 b = pts[i].p + pts[i].n * (sg * (pts[i].hw + w));
+                    int cx = (int)((b.x - minx) / CELL), cy = (int)((b.y - miny) / CELL);
+                    bool hit = false;
+                    for (int gy = cy - 1; gy <= cy + 1 && !hit; gy++) for (int gx = cx - 1; gx <= cx + 1 && !hit; gx++) {
+                        if (gx < 0 || gy < 0 || gx >= cw || gy >= ch) continue;
+                        for (int j0 : grid[gy * cw + gx]) {
+                            for (int j = j0; j <= j0 + 1 && j < n; j++) {
+                                int dij = abs(i - j); if (dij > n / 2) dij = n - dij;
+                                if (dij * step < 30.0f || fabsf(pts[j].p.z - pts[i].p.z) > 4.0f) continue;   // (hairpins: the other side counts)
+                                float dx = b.x - pts[j].p.x, dy = b.y - pts[j].p.y, r = pts[j].hw + 0.6f;
+                                if (dx * dx + dy * dy < r * r) { hit = true; break; }
+                            }
+                            if (hit) break;
+                        }
+                    }
+                    if (!hit) break;
+                    w = fmaxf(0.3f, w - 0.4f); (side == 0 ? pts[i].gravelL : pts[i].gravelR) = false;
+                    if (tries == 0) clamped++;
+                }
+            }
+        }
         closeRunoff = clamped;
     }
     // on the inside of a tight bend the barrier line, offset from the centre line, can fold back on
@@ -272,6 +301,8 @@ V3 Track::world(float s, float d, float lift) const {
     frame(s, p, t, l, hw);
     return p + l * d + V3(0, 0, lift);
 }
+
+float Track::terrainCell = 33.0f;
 
 // height of the terrain mesh as drawn (the two triangles of each cell, as buildMesh splits them)
 float Track::meshZ(float x, float y) const {
@@ -511,7 +542,9 @@ void Track::buildMesh() {
     // ---------------- terrain: the elevation grid, 4x finer, lowered under the circuit
     // 6x finer than the elevation grid (33 m cells at Interlagos): fine enough that the hills beside the
     // circuit keep their shape instead of being planed off by cells that also hold a bit of road
-    const int SUB = 6;
+    // terrain cells about terrainCell metres across, whatever the elevation grid's spacing (200 m, or
+    // 50 m where a fine grid was fetched)
+    const int SUB = gstep / terrainCell + 0.5f < 1 ? 1 : (int)(gstep / terrainCell + 0.5f);
     float sub = gstep / SUB;
     // nearest track point lookup through a coarse bucket grid
     const float B = 60.0f;
@@ -585,9 +618,11 @@ void Track::buildMesh() {
         return shade(terrainTint, k);
     };
     std::vector<WorldVertex> quads, strip;
-    for (int cy = 0; cy < gny - 1; cy++) for (int cx = 0; cx < gnx - 1; cx++) {
+    // drawn in chunks about 200 m across (culling by chunk)
+    const int CC = (int)(200.0f / sub + 0.5f) < 1 ? 1 : (int)(200.0f / sub + 0.5f);
+    for (int cy = 0; cy * CC < tny - 1; cy++) for (int cx = 0; cx * CC < tnx - 1; cx++) {
         Chunk ch;
-        ch.origin = V3(gx0 + cx * gstep, gy0 + cy * gstep, tz[(cy * SUB) * tnx + cx * SUB]);
+        ch.origin = V3(gx0 + cx * CC * sub, gy0 + cy * CC * sub, tz[(cy * CC) * tnx + cx * CC]);
         for (int m = 0; m < MAT_COUNT; m++) { ch.first[m] = (int)verts.size(); ch.count[m] = 0; }
         float zmin = 1e9f, zmax = -1e9f;
         quads.clear();
@@ -598,8 +633,9 @@ void Track::buildMesh() {
             zmin = fminf(zmin, p.z); zmax = fmaxf(zmax, p.z);
             return WorldVertex{p.x * s, p.y * s, tcol(x, y), p.x - o.x, p.y - o.y, p.z - o.z};
         };
-        for (int sy = 0; sy < SUB; sy++) for (int sx = 0; sx < SUB; sx++) {
-            int x = cx * SUB + sx, y = cy * SUB + sy;
+        for (int sy = 0; sy < CC; sy++) for (int sx = 0; sx < CC; sx++) {
+            int x = cx * CC + sx, y = cy * CC + sy;
+            if (x >= tnx - 1 || y >= tny - 1) continue;
             // near edge (x, y)-(x, y+1), far edge (x+1, y)-(x+1, y+1): cells in a row chain into one strip
             quads.push_back(vert(x, y)); quads.push_back(vert(x, y + 1));
             quads.push_back(vert(x + 1, y + 1)); quads.push_back(vert(x + 1, y));
@@ -607,8 +643,9 @@ void Track::buildMesh() {
         quadsToStrip(quads, strip);
         ch.first[MAT_TERRAIN] = (int)verts.size(); ch.count[MAT_TERRAIN] = (int)strip.size();
         verts.insert(verts.end(), strip.begin(), strip.end());
-        ch.centre = V3(ch.origin.x + gstep * 0.5f, ch.origin.y + gstep * 0.5f, (zmin + zmax) * 0.5f);
-        ch.radius = gstep * 0.75f + (zmax - zmin) * 0.5f;
+        float span = CC * sub;
+        ch.centre = V3(ch.origin.x + span * 0.5f, ch.origin.y + span * 0.5f, (zmin + zmax) * 0.5f);
+        ch.radius = span * 0.75f + (zmax - zmin) * 0.5f;
         chunks.push_back(ch);
     }
 }

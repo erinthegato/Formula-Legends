@@ -55,6 +55,10 @@ jobs:
         env:
           ASAN_OPTIONS: detect_leaks=0
         run: ./fl_test_asan hq shots 2>&1 | grep -E "picked|after"
+      - name: No overlaps (barriers, terrain and trackside objects at every circuit)
+        env:
+          ASAN_OPTIONS: detect_leaks=0
+        run: ./fl_test_asan overlaps all 2>/dev/null
       - name: One lap at every circuit (each era's cars)
         env:
           ASAN_OPTIONS: detect_leaks=0

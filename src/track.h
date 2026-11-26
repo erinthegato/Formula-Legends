@@ -97,13 +97,14 @@ struct Track {
     // world position of (s, d): d = metres to the left of the centre line
     V3 world(float s, float d, float lift = 0) const;
 
+    static float terrainCell;            // terrain cell size, metres (33; 50 on the Performance preset)
+    float meshZ(float x, float y) const;      // the terrain mesh's own height
 private:
     void buildMesh();
     void addBuildings(Chunk& ch, int c0, int c1, std::vector<WorldVertex>* bins);
     void buildProps();
     void addTrackside(std::vector<V3>& keepClear);
     void tidyProps();
-    float meshZ(float x, float y) const;      // the terrain mesh's own height
     static constexpr float GROUND_FLAT = 25.0f, GROUND_BLEND = 50.0f;   // ground flat under the circuit, then back to the hills                    // drop objects that stand on a road, in another's run-off or in each other
     bool onAnyRoad(const Footprint& f, int ownIndex, bool allowOwnRunoff) const;
     void groupProps();

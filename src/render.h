@@ -72,6 +72,10 @@ struct Renderer {
     void speedShake(const Race& r, const Car& c, float dt, float& sx, float& sy);
     V3 camRight, camUp;             // camera axes for this frame
     std::vector<int> visChunks;     // chunks on screen this frame
+    // the horizon: far hills, mountains and city blocks round the circuit, and a ground skirt out to them
+    std::vector<WorldVertex> horizonV;
+    const void* horizonTrack = nullptr; u32 horizonHaze = 0; float horizonBase = 0;
+    void drawHorizon(const Track& t, const Camera& cam, u32 haze);
     int raceMark = 0;               // video memory used before any car was loaded
 
     bool loadCommon();

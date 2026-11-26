@@ -1,5 +1,6 @@
 #include "platform.h"
 #include "settings.h"
+#include "track.h"
 #include "sound.h"
 #include "render.h"
 #include <cstdio>
@@ -48,6 +49,8 @@ void Config::apply(int autoLevel) const {
     perf.distance = DIST[d]; perf.lodBias = LOD[d];
     perf.scenery = scenery && autoLevel < 2; perf.effects = effects3d && autoLevel < 1;
     gfx::setSync(vsync, fps == 1 ? 2 : 1);
+    // the terrain mesh (built when a circuit loads): coarser with the near draw distance (Performance)
+    Track::terrainCell = distance >= 2 ? 50.0f : 33.0f;
 }
 
 static const int VERSION = 7;

@@ -266,6 +266,141 @@ bool Renderer::visible(const V3& rel, float radius, const Camera& cam, float tan
 }
 
 // ------------------------------------------------------------------ scene
+// ------------------------------------------------------------------ the horizon
+// What lies beyond the terrain grid, drawn first with no depth so everything else covers it: two rows of
+// hills (the far one paler, in the haze), city blocks in front of them where the circuit is in a city,
+// and a flat ground skirt out to them, so the edge of the terrain never shows the sky. It moves with the
+// camera across the ground (it never comes nearer) but stays at the circuit's height.
+static u32 shadeCol(u32 c, float k) {
+    auto ch = [&](int sh) { int v = (int)(((c >> sh) & 255) * k); return v > 255 ? 255 : v; };
+    return RGBA(ch(0), ch(8), ch(16));
+}
+struct HorizonLook {
+    const char* id;
+    float hills;      // height of the hill rows (m)
+    float peaks;      // mountains on top (m) toward peakDir
+    float peakDir;    // direction of the mountains (radians, 0 = +x / east, pi/2 = +y / north)
+    float city;       // 0 none .. 1 city all round
+    float cityDir, cityArc;   // where the city is (arc 7 = all round)
+    float seaDir, seaArc;     // open water: no hills there (arc 0 = none)
+};
+static const HorizonLook HORIZON[] = {
+    {"interlagos", 70, 60, 1.6f, 0.95f, 0, 7, 0, 0},        // Sao Paulo: city all round, the Serra da Cantareira north
+    {"spa",        95, 40, 0.8f, 0.0f, 0, 0, 0, 0},         // the Ardennes
+    {"redbullring",110, 330, 1.2f, 0.0f, 0, 0, 0, 0},        // Styrian Alps
+    {"monaco",     60, 420, 1.57f, 0.9f, 1.57f, 3.4f, -1.57f, 2.6f},
+    {"imola",      60, 40, -1.2f, 0.25f, 1.6f, 1.5f, 0, 0},
+    {"suzuka",     70, 120, 1.9f, 0.15f, 0, 2, 0, 0},
+    {"hungaroring",55, 0, 0, 0.1f, 3.6f, 1.5f, 0, 0},
+    {"sochi",      40, 380, 0.5f, 0.35f, 2.0f, 2, -2.2f, 2.4f},
+    {"mexico",     50, 260, -0.6f, 0.9f, 0, 7, 0, 0},
+    {"montreal",   25, 140, 2.0f, 0.6f, 2.3f, 2.2f, 0, 0},  // downtown and Mont Royal across the river
+    {"baku",       35, 0, 0, 0.9f, 2.4f, 3.6f, -0.6f, 2.4f},
+    {"singapore",  10, 0, 0, 1.0f, 1.6f, 4.5f, -0.8f, 1.5f},
+    {"jeddah",     15, 0, 0, 0.6f, 0, 3.2f, 3.14f, 2.8f},
+    {"lasvegas",   20, 360, 3.14f, 1.0f, 0, 7, 0, 0},       // the Strip, the Spring Mountains west
+    {"miami",      10, 0, 0, 0.5f, 0, 7, 0, 0},
+    {"melbourne",  20, 0, 0, 0.7f, 2.0f, 2.5f, 0, 0},
+    {"shanghai",   10, 0, 0, 0.5f, 0, 7, 0, 0},
+    {"abudhabi",   10, 0, 0, 0.3f, 1.6f, 3, -1.0f, 2.5f},
+    {"bahrain",    25, 0, 0, 0.05f, 0, 7, 0, 0},
+    {"lusail",     10, 0, 0, 0.25f, -1.6f, 2.5f, 0, 0},
+    {"barcelona",  70, 140, 1.0f, 0.15f, -2.2f, 1.5f, 0, 0},
+    {"istanbul",   55, 0, 0, 0.1f, 0, 7, 0, 0},
+    {"sepang",     40, 0, 0, 0.05f, 0, 7, 0, 0},
+    {"cota",       30, 0, 0, 0.1f, -2.4f, 1.0f, 0, 0},
+    {"zandvoort",  35, 0, 0, 0.25f, 0, 3, 3.14f, 3.0f},    // dunes, the North Sea west
+};
+
+void Renderer::drawHorizon(const Track& t, const Camera& cam, u32 haze) {
+    if (horizonTrack != (const void*)t.def || horizonHaze != haze || horizonV.empty()) {
+        horizonTrack = t.def; horizonHaze = haze;
+        horizonV.clear();
+        horizonBase = 0;
+        for (int i = 0; i < t.n; i++) horizonBase += t.pts[i].p.z / t.n;
+        HorizonLook L{"", 40, 0, 0, t.street ? 0.6f : 0.05f, 0, 7, 0, 0};
+        unsigned seed = 2166136261u;
+        if (t.def) {
+            for (const char* c = t.def->id; *c; c++) seed = (seed ^ (unsigned char)*c) * 16777619u;
+            for (const HorizonLook& h : HORIZON) if (!strcmp(h.id, t.def->id)) L = h;
+        }
+        auto rnd = [&]() { seed = seed * 1664525u + 1013904223u; return (seed >> 8) / 16777216.0f; };
+        auto angDist = [](float a, float b) { float d = fmodf(fabsf(a - b), 6.2832f); return d > 3.1416f ? 6.2832f - d : d; };
+        auto mix = [](u32 c, u32 h, float k) {
+            return RGBA((int)((c & 255) * (1 - k) + (h & 255) * k), (int)(((c >> 8) & 255) * (1 - k) + ((h >> 8) & 255) * k),
+                        (int)(((c >> 16) & 255) * (1 - k) + ((h >> 16) & 255) * k));
+        };
+        float p1 = rnd() * 6.28f, p2 = rnd() * 6.28f, p3 = rnd() * 6.28f, p4 = rnd() * 6.28f;
+        u32 land = t.desert ? RGBA(176, 150, 112) : RGBA(70, 100, 62);
+        auto quad = [&](float a0, float a1, float r, float z0a, float z1a, float z0b, float z1b, u32 cb, u32 ct) {
+            // a vertical strip from angle a0 to a1 at radius r: bottom z0, top z1 at each end
+            float c0 = cosf(a0) * r, s0 = sinf(a0) * r, c1 = cosf(a1) * r, s1 = sinf(a1) * r;
+            WorldVertex A{0, 0, cb, c0, s0, z0a}, B{0, 0, ct, c0, s0, z1a}, C{0, 0, cb, c1, s1, z0b}, D{0, 0, ct, c1, s1, z1b};
+            horizonV.push_back(A); horizonV.push_back(B); horizonV.push_back(C);
+            horizonV.push_back(C); horizonV.push_back(B); horizonV.push_back(D);
+        };
+        // the ground skirt: a flat ring from inside the terrain out to the hills, in the hazed land colour
+        const int N = 72;
+        u32 skirt = mix(land, haze, 0.45f), skirtFar = mix(land, haze, 0.8f);
+        for (int i = 0; i < N; i++) {
+            float a0 = i * 6.2832f / N, a1 = (i + 1) * 6.2832f / N;
+            float r0 = 250, r1 = 1480;
+            WorldVertex A{0, 0, skirt, cosf(a0) * r0, sinf(a0) * r0, -3}, B{0, 0, skirtFar, cosf(a0) * r1, sinf(a0) * r1, -3},
+                        C{0, 0, skirt, cosf(a1) * r0, sinf(a1) * r0, -3}, D{0, 0, skirtFar, cosf(a1) * r1, sinf(a1) * r1, -3};
+            horizonV.push_back(A); horizonV.push_back(B); horizonV.push_back(C);
+            horizonV.push_back(C); horizonV.push_back(B); horizonV.push_back(D);
+        }
+        // the hills: far row (paler, with the mountains), then a nearer row
+        const int H = 144;
+        for (int row = 0; row < 2; row++) {
+            float r = row == 0 ? 1460 : 1300, haz = row == 0 ? 0.72f : 0.55f;
+            u32 top = mix(land, haze, haz), foot = mix(land, haze, haz + 0.12f);
+            auto height = [&](float a) {
+                float h = L.hills * (row == 0 ? 1.15f : 0.8f) *
+                          (0.55f + 0.25f * sinf(3 * a + p1 + row) + 0.14f * sinf(7 * a + p2) + 0.06f * sinf(19 * a + p3 + row * 2));
+                if (L.peaks > 0) {
+                    float k = clampf(1 - angDist(a, L.peakDir) / 1.1f, 0, 1);
+                    float jag = 0.6f + 0.4f * fabsf(sinf(11 * a + p4)) + 0.15f * sinf(29 * a + p1);
+                    h += L.peaks * (row == 0 ? 1 : 0.55f) * k * k * (3 - 2 * k) * jag;
+                }
+                if (L.seaArc > 0) {
+                    float k = clampf((angDist(a, L.seaDir) - L.seaArc * 0.5f) / 0.35f + 1, 0, 1);    // 0 over the open sea
+                    h *= k;
+                }
+                return fmaxf(h, 0.0f);
+            };
+            for (int i = 0; i < H; i++) {
+                float a0 = i * 6.2832f / H, a1 = (i + 1) * 6.2832f / H;
+                quad(a0, a1, r, -4, height(a0), -4, height(a1), foot, top);
+            }
+        }
+        // the city: blocks of all sizes in front of the hills, thicker toward the middle of its arc
+        if (L.city > 0) {
+            u32 cityCol = mix(RGBA(118, 124, 134), haze, 0.45f);
+            int count = (int)(L.city * 420);
+            for (int k = 0; k < count; k++) {
+                float a = rnd() * 6.2832f;
+                if (L.cityArc < 6.9f) {
+                    float d = angDist(a, L.cityDir);
+                    if (d > L.cityArc * 0.5f || rnd() > 1 - d / (L.cityArc * 0.5f) * 0.6f) continue;
+                }
+                float r = 1080 + rnd() * 170;
+                float w = (8 + rnd() * 26) / r;                                  // angular width
+                float tall = rnd(); float h = 15 + tall * tall * tall * 120 * L.city;   // mostly low, a few towers
+                float shadeK = 0.8f + rnd() * 0.35f;
+                u32 c = shadeCol(cityCol, shadeK), cb = shadeCol(cityCol, shadeK * 0.85f);
+                quad(a, a + w, r, -4, h, -4, h, cb, c);
+            }
+        }
+    }
+    if (horizonV.empty()) return;
+    float base = horizonBase;
+    gfx::setFog(false, 0, 1, 0);
+    gfx::setDepthTest(false); gfx::setDepthWrite(false); gfx::setBlend(false);
+    gfx::bindTexture(nullptr);
+    gfx::drawWorld(horizonV.data(), (int)horizonV.size(), PRIM_TRIANGLES, M4::translate(V3(0, 0, base - cam.eye.z)));
+}
+
 void Renderer::drawScene(const Race& r, const Camera& cam, bool hidePlayer) {
     const Track& t = r.track;
     M4 proj = M4::perspective(cam.fov, sceneAspect, 0.8f, 1600.0f), view = M4::lookDir(V3(0, 0, 0), cam.fwd, cam.up);
@@ -280,6 +415,7 @@ void Renderer::drawScene(const Race& r, const Camera& cam, bool hidePlayer) {
         int hr = (int)((haze & 255) * k * (1 - w * 0.3f) + 120 * w * 0.3f * k), hg = (int)(((haze >> 8) & 255) * k * (1 - w * 0.3f) + 125 * w * 0.3f * k), hb = (int)(((haze >> 16) & 255) * k * (1 - w * 0.3f) + 135 * w * 0.3f * k);
         haze = RGBA(hr, hg, hb);
     }
+    drawHorizon(t, cam, haze);
     gfx::setFog(true, (260 - r.rain * 200) * perf.distance, (FAR_TRACK + 150 - r.rain * 520) * perf.distance, haze);
     gfx::setDepthTest(true); gfx::setDepthWrite(true); gfx::setBlend(false);
     float tanV = tanf(cam.fov * 3.14159f / 360.0f), tanH = tanV * sceneAspect;
